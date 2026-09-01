@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stockma-postgres
+    environment:
+      POSTGRES_DB: stockma
+      POSTGRES_USER: stockma
+      POSTGRES_PASSWORD: stockma
+    ports:
+      - "5432:5432"
+    volumes:
+      - stockma-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockma -d stockma"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  stockma-pgdata:

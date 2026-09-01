@@ -1,0 +1,63 @@
+:root {
+  --color-primary: #1565c0;
+  --color-primary-dark: #0d47a1;
+  --color-secondary: #00897b;
+
+  --color-background: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e5ea;
+  --color-text: #1f2933;
+  --color-text-muted: #647084;
+
+  --status-green: #2e7d32;
+  --status-yellow: #f9a825;
+  --status-red: #c62828;
+  --status-expired: #6b7280;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 40px;
+
+  --radius: 8px;
+  --max-width: 1200px;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.page {
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--green {
+  background-color: var(--status-green);
+}
+.status-dot--yellow {
+  background-color: var(--status-yellow);
+}
+.status-dot--red {
+  background-color: var(--status-red);
+}
+.status-dot--expired {
+  background-color: var(--status-expired);
+}
+
+.full-screen-center {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+}

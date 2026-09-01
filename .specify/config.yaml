@@ -1,0 +1,62 @@
+schema: spec-driven
+
+context: |
+  Stockma - Multi-tenant B2B SaaS para gestión inteligente de inventarios
+  con control de lotes y vencimientos (FEFO). Destinado a farmacias,
+  tiendas y pequeños emprendedores en Colombia.
+  
+  Stack: .NET 9, C#, EF Core, PostgreSQL, MediatR (CQRS),
+  React 19, TypeScript, Vite, Material UI, CSS puro con estilos globales,
+  TanStack Query, Zustand.
+  
+  Arquitectura: Clean Architecture, Row-level multi-tenant,
+  CQRS, Domain-Driven Design.
+
+strict_tdd: false
+
+environment:
+  primary_working_directory: "C:\\Users\\User\\Documents\\Stockma"
+  primary_working_directory_notes: >
+    Greenfield project. No source code yet.
+  runnable_environment: Windows
+  docker: "Docker Desktop (pendiente setup)"
+  docker_containers: []
+
+testing:
+  strict_tdd: false
+  test_runner:
+    command: "dotnet test"
+    framework: xUnit + FluentAssertions
+  frontend:
+    unit: "npm run test"
+    typecheck: "npm run typecheck"
+    lint: "npm run lint"
+    format_check: "npm run format:check"
+  e2e:
+    command: "npm run e2e"
+    tool: Playwright (pendiente)
+
+rules:
+  proposal:
+    - Incluir plan de rollback para cambios riesgosos
+    - Referenciar decisiones de arquitectura cuando aplique
+  specs:
+    - Usar Given/When/Then para escenarios
+    - Usar keywords RFC 2119 en español (DEBE, NO DEBE, DEBERÍA, PUEDE)
+  design:
+    - Incluir diagramas de secuencia para flujos complejos
+    - Documentar decisiones de arquitectura con rationale
+  tasks:
+    - Agrupar por fase, usar numeración jerárquica
+    - Tareas completables en una sesión
+  apply:
+    guidelines:
+      - Seguir patrones existentes de Clean Architecture
+      - Todo el código en español para comentarios de dominio
+    tdd: false
+  verify:
+    test_command: "dotnet test"
+    build_command: "dotnet build"
+    coverage_threshold: 70
+  archive:
+    - Advertir antes de mergear deltas destructivos

@@ -1,0 +1,29 @@
+# ---------- .NET ----------
+bin/
+obj/
+*.user
+*.suo
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# ---------- Node ----------
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ---------- Entorno ----------
+.env
+.env.local
+.env.*.local
+appsettings.Local.json
+
+# ---------- Editores ----------
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
