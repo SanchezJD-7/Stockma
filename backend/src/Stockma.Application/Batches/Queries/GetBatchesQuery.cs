@@ -1,4 +1,5 @@
 using MediatR;
+using Stockma.Application.Tenants;
 using Stockma.Domain.Services;
 
 namespace Stockma.Application.Batches.Queries;

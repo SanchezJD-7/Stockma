@@ -164,7 +164,9 @@ frontend/web/src/
   app/ (router, providers)
   features/auth/ { LoginPage, RegisterPage, DeviceOtpForm, auth-store (Zustand) }
   features/inventory/ { ProductListPage, ProductForm, BatchList, BarcodeScanner (@zxing/browser) }
-  shared/ { api-client (orval-generated), query-client, ui-kit }
+  shared/ { api-client (orval-generated), query-client }
+  styles/ { tokens.css, global-styles.tsx, mui-bridge.ts, branding.ts }
+  styles.css (raíz: importa tokens, fija tipografía y layout)
 ```
 
 - Keys de TanStack Query prefijadas: `['tenant', tenantId, 'products', ...]`; el logout resetea la cache.

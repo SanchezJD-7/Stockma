@@ -39,6 +39,8 @@ public class TenantSettings : ITenantEntity
     public int MaxTrustedDevices { get; private set; }
     public ExpiryThresholds Thresholds { get; private set; }
     public int NextSkuNumber { get; private set; }
+    public TenantBranding? Branding { get; private set; }
+    public void UpdateBranding(TenantBranding? branding) => Branding = branding;
     public static TenantSettings CreateDefault(Guid tenantId) =>
         new(tenantId, DefaultMaxTrustedDevices, ExpiryThresholds.Default());
 }

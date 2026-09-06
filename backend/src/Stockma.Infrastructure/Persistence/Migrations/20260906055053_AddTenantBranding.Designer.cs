@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Stockma.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Stockma.Infrastructure.Persistence;
 namespace Stockma.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(StockmaDbContext))]
-    partial class StockmaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260906055053_AddTenantBranding")]
+    partial class AddTenantBranding
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

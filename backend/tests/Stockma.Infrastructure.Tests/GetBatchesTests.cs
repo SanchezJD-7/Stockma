@@ -8,6 +8,7 @@ using Stockma.Infrastructure.Batches;
 using Stockma.Infrastructure.Persistence;
 using Stockma.Infrastructure.Products;
 using Stockma.Infrastructure.Tenancy;
+using Stockma.Infrastructure.Tenants;
 
 namespace Stockma.Infrastructure.Tests;
 
