@@ -76,19 +76,19 @@ Sin dependencias. T001–T006 son paralelizables entre sí (directorios y archiv
 - [x] **T004** `[P]` Crear `packages/contracts/` (placeholder)
 - [x] **T005** `[P]` Crear `ops/docker-compose.yml` (`postgres:16-alpine` + healthcheck `pg_isready`)
 - [x] **T006** `[P]` Crear `.github/workflows/ci.yml` (`dotnet build`/`test` + frontend `build`/`lint`)
-- [x] **T007** `appsettings.json` base (`ConnectionStrings`, `Jwt`, `Sms { Provider, ApiKey, Sender }`, `Tenant:Umbrales`) — depende de T001
+- [x] **T007** `appsettings.json` base (`ConnectionStrings`, `Jwt`, `Sms { Provider, ApiKey, Sender }`, `Tenant:ExpiryThresholds`) — depende de T001
 
 ## Fase 2 — Tenant Isolation · spec `tenant-isolation` (PR 2, depende de PR 1)
 
 Cubre FR-001 … FR-004, NFR-001 … NFR-003.
 
-- [ ] **T008** `[P]` `Domain/Common/ITenantEntity.cs` — contrato tenant (FR-002)
-- [ ] **T009** `[P]` `Api/Middleware/TenantMiddleware.cs` — header `X-Tenant-ID` → `400` si falta/inválido; `TenantContext` (FR-001, NFR-002)
-- [ ] **T010** `Infrastructure/Persistence/StockmaDbContext.cs` + `ApplyTenantFilters()` reflectivo (FR-002) — depende de T008
-- [ ] **T011** Migración `InitialSchema` + políticas RLS + rol `app_user` no-propietario (FR-003, NFR-003) — depende de T010
-- [ ] **T012** `AuditSaveChangesInterceptor` — rechaza el cambio de `TenantId` (FR-004) — depende de T010
-- [ ] **T013** `[P]` `Architecture.Tests/TenantArchitectureTests.cs` — el build falla si una entidad tenant no implementa `ITenantEntity` (FR-002)
-- [ ] **T014** `Api.IntegrationTests/TenantIsolationTests.cs` — tenant A no ve datos de B (Testcontainers) (NFR-001) — depende de T011
+- [x] **T008** `[P]` `Domain/Common/ITenantEntity.cs` — contrato tenant (FR-002)
+- [x] **T009** `[P]` `Api/Middleware/TenantMiddleware.cs` — header `X-Tenant-ID` → `400` si falta/inválido; `TenantContext` (FR-001, NFR-002)
+- [x] **T010** `Infrastructure/Persistence/StockmaDbContext.cs` + `ApplyTenantFilters()` reflectivo (FR-002) — depende de T008
+- [x] **T011** Migración `InitialSchema` + políticas RLS + rol `app_user` no-propietario (FR-003, NFR-003) — depende de T010
+- [x] **T012** `AuditSaveChangesInterceptor` — rechaza el cambio de `TenantId` (FR-004) — depende de T010
+- [x] **T013** `[P]` `Architecture.Tests/TenantArchitectureTests.cs` — el build falla si una entidad tenant no implementa `ITenantEntity` (FR-002)
+- [x] **T014** `Api.IntegrationTests/TenantIsolationTests.cs` — tenant A no ve datos de B (Testcontainers) (NFR-001) — depende de T011
 
 ## Fase 3 — Identity + JWT · spec `identity-access` (PR 3, depende de PR 2)
 
@@ -114,27 +114,27 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
 
 Cubre FR-009 … FR-011, NFR-006 … NFR-008. Contrato: [`contracts/products-api.md`](./contracts/products-api.md).
 
-- [ ] **T023** `Domain/Products/Product.cs` — `Sku` inmutable, `Barcode?`, `Category` (FR-009, FR-010)
-- [ ] **T024** `IProductRepository` — `Add`, `Update`, `GetByBarcode`, `Search` — depende de T023
-- [ ] **T025** `RegisterProductCommand` (`SKU-{n}` automático si no hay barcode) + `UpdateProductCommand` (rechaza cambio de SKU con `400`) (FR-009, FR-010) — depende de T024
-- [ ] **T026** `SearchProductsQuery` (trigram / `ILIKE`) + `GetProductByBarcodeQuery` (`404`) (FR-011, NFR-006) — depende de T024
-- [ ] **T027** `Api/Controllers/ProductsController` — depende de T025, T026
-- [ ] **T028** `[P]` Migración: unique `(TenantId, Sku)` y `(TenantId, Barcode)` (NFR-007)
-- [ ] **T029** `[P]` Unit tests: SKU automático, SKU inmutable, SKU duplicado `409`
-- [ ] **T030** API tests: CRUD + búsqueda por nombre / barcode — depende de T027
+- [x] **T023** `Domain/Products/Product.cs` — `Sku` inmutable, `Barcode?`, `Category` (FR-009, FR-010)
+- [x] **T024** `IProductRepository` — `Add`, `Update`, `GetByBarcode`, `Search` — depende de T023
+- [x] **T025** `RegisterProductCommand` (`SKU-{n}` automático si no hay barcode) + `UpdateProductCommand` (rechaza cambio de SKU con `400`) (FR-009, FR-010) — depende de T024
+- [x] **T026** `SearchProductsQuery` (trigram / `ILIKE`) + `GetProductByBarcodeQuery` (`404`) (FR-011, NFR-006) — depende de T024
+- [x] **T027** `Api/Controllers/ProductsController` — depende de T025, T026
+- [x] **T028** `[P]` Migración: unique `(TenantId, Sku)` y `(TenantId, Barcode)` (NFR-007)
+- [x] **T029** `[P]` Unit tests: SKU automático, SKU inmutable, SKU duplicado `409`
+- [x] **T030** API tests: CRUD + búsqueda por nombre / barcode — depende de T027
 
 ## Fase 5 — Batch Inventory · spec `batch-inventory` (PR 5, depende de PR 4)
 
 Cubre FR-012 … FR-015, NFR-009, NFR-010. Contrato: [`contracts/batches-api.md`](./contracts/batches-api.md).
 
-- [ ] **T031** `Domain/Batches/Batch.cs` (`xmin`) + `BatchStatusCalculator` (semáforo) (FR-012, FR-014, FR-015)
-- [ ] **T032** `IBatchRepository` — `Adjust` con reintento `xmin` ×1 (FR-014) — depende de T031
-- [ ] **T033** `RegisterBatchCommand` + `AdjustBatchStockCommand` — rechazo de stock negativo con `422` / `BATCH_NEGATIVE_STOCK` y **rechazo total** del ajuste, nunca parcial (FR-012, FR-013) — depende de T032
-- [ ] **T034** `GetBatchesQuery` — `SemaphoreColor` computado con umbrales por tenant, no persistido (FR-015, NFR-010) — depende de T031
-- [ ] **T035** `Api/Controllers/BatchesController` — depende de T033, T034
-- [ ] **T036** `[P]` Migración: índice `(ProductId, ExpirationDate)` — soporte para FEFO futuro (NFR-009)
-- [ ] **T037** `[P]` Unit tests: stock negativo, semáforo default/custom, conflicto de concurrencia `409`
-- [ ] **T038** API tests: registrar y ajustar lote — depende de T035
+- [x] **T031** `Domain/Batches/Batch.cs` (`xmin`) + `BatchStatusCalculator` (semáforo) (FR-012, FR-014, FR-015)
+- [x] **T032** `IBatchRepository` — `Adjust` con reintento `xmin` ×1 (FR-014) — depende de T031
+- [x] **T033** `RegisterBatchCommand` + `AdjustBatchStockCommand` — rechazo de stock negativo con `422` / `BATCH_NEGATIVE_STOCK` y **rechazo total** del ajuste, nunca parcial (FR-012, FR-013) — depende de T032
+- [x] **T034** `GetBatchesQuery` — `SemaphoreColor` computado con umbrales por tenant, no persistido (FR-015, NFR-010) — depende de T031
+- [x] **T035** `Api/Controllers/BatchesController` — depende de T033, T034
+- [x] **T036** `[P]` Migración: índice `(ProductId, ExpirationDate)` — soporte para FEFO futuro (NFR-009)
+- [x] **T037** `[P]` Unit tests: stock negativo, semáforo default/custom, conflicto de concurrencia `409`
+- [x] **T038** API tests: registrar y ajustar lote — depende de T035
 
 ## Fase 6 — Frontend auth + inventory (PR 6, depende de PR 3, PR 4, PR 5)
 

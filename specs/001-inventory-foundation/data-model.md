@@ -113,14 +113,15 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 |---|---|---|---|
 | `TenantId` | `Guid` | — | PK y FK a `Tenant` (relación 1:1) |
 | `MaxTrustedDevices` | `int` | `2` | Límite de dispositivos confiables por usuario (FR-007) |
-| `SemaforoUmbrales.VerdeMeses` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
-| `SemaforoUmbrales.AmarilloMeses` | `int` | `3` | Amarillo entre `AmarilloMeses` y `VerdeMeses` (FR-015) |
+| `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
+| `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
+| `NextSkuNumber` | `int` | `1` | Contador de la secuencia de SKU por tenant (FR-009). Se incrementa con `UPDATE ... RETURNING` dentro de la transacción del alta |
 
 **Invariantes**
 
 - `MaxTrustedDevices` DEBE ser ≥ 1.
-- `VerdeMeses` DEBE ser > `AmarilloMeses`.
-- `AmarilloMeses` DEBE ser > 0.
+- `GreenMonths` DEBE ser > `YellowMonths`.
+- `YellowMonths` DEBE ser > 0.
 
 **Aplicación de `TenantId`**: filtro EF + política RLS. El seed inicial queda fuera de este slice (INSERT manual).
 
@@ -252,7 +253,7 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 | `Sku` | `string` | No | **Inmutable** tras la creación (FR-010). Automático `SKU-{n}` por tenant cuando no hay `Barcode` (FR-009) |
 | `Barcode` | `string?` | Sí | PUEDE estar ausente (FR-009) |
 | `Name` | `string` | No | Base del autocompletado (FR-011) |
-| `Category` | `enum` | No | `Medicamento` \| `Suplemento` \| `Cuidado` |
+| `Category` | `enum` | No | `Medication` \| `Supplement` \| `PersonalCare` |
 | `ActiveIngredient` | `string?` | Sí | Principio activo |
 | `Presentation` | `string?` | Sí | Presentación |
 | `StorageConditions` | `string?` | Sí | Condiciones de almacenamiento |
@@ -262,7 +263,8 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 
 - `Sku` DEBE ser único por tenant. Un SKU explícito duplicado responde `409 Conflict` con `errorCode: PRODUCT_SKU_DUPLICATE` (FR-009).
 - `Sku` NO DEBE cambiar en un update; el intento responde `400` (FR-010).
-- Cuando el producto no trae `Barcode`, el sistema DEBE generar `SKU-{n}` con una secuencia **por tenant** (FR-009). `[PENDIENTE: las fuentes dicen "secuencia per-tenant" pero no definen el mecanismo (SEQUENCE PostgreSQL por tenant vs. contador en TenantSettings vs. MAX+1). Riesgo de colisión bajo concurrencia si no se resuelve]`
+- Cuando el request no trae `Sku` explícito, el sistema DEBE generar `SKU-{n}` con una secuencia **por tenant** (FR-009). **Mecanismo decidido: contador `NextSkuNumber` en `tenant_settings`**, incrementado con `UPDATE ... RETURNING` en la misma transacción del alta. El `UPDATE` toma lock de fila, así que dos altas concurrentes del mismo tenant se serializan y NO DEBE haber colisión. Descartados: SEQUENCE por tenant (un objeto de BD por tenant, DDL en runtime y huecos por rollback al no ser transaccional) y `MAX+1` (race condition real entre requests concurrentes).
+- **Supuesto**: el SKU se genera siempre que no venga explícito, tenga `Barcode` o no. FR-009 menciona el caso sin barcode, pero `Sku` es NOT NULL: un producto con barcode y sin SKU explícito también necesita uno. El `Barcode` nunca se usa como identificador interno.
 - `Barcode`, cuando está presente, DEBE ser único por tenant.
 - `Currency` DEBE ser un código ISO-4217. `[PENDIENTE: validación de currency no especificada]`
 
@@ -328,16 +330,16 @@ Comportamiento ante conflicto:
 
 **Semaforización — `BatchStatusCalculator` (domain service)**
 
-VO `SemaphoreColor` = `Verde` | `Amarillo` | `Rojo` | `Vencido`. Se computa contra `TenantSettings.SemaforoUmbrales` (defaults 6/3 meses):
+VO `SemaphoreColor` = `Green` | `Yellow` | `Red` | `Expired`. Se computa contra `TenantSettings.Thresholds` (defaults 6/3 meses):
 
 | Color | Condición (con defaults) |
 |---|---|
-| `Vencido` | `ExpirationDate` < hoy |
-| `Rojo` | faltan < 3 meses (`AmarilloMeses`) |
-| `Amarillo` | faltan entre 3 y 6 meses |
-| `Verde` | faltan > 6 meses (`VerdeMeses`) |
+| `Expired` | `ExpirationDate` < hoy |
+| `Red` | faltan < 3 meses (`YellowMonths`) |
+| `Yellow` | faltan entre 3 y 6 meses |
+| `Green` | faltan > 6 meses (`GreenMonths`) |
 
-Con umbrales personalizados (p. ej. verde `>9 meses`), un lote a 7 meses evalúa `Amarillo` — escenario "Umbrales personalizados" de FR-015.
+Con umbrales personalizados (p. ej. verde `>9 meses`), un lote a 7 meses evalúa `Yellow` — escenario "Umbrales personalizados" de FR-015.
 
 `Status` (`Active`/`Depleted`/`Expired`) es un campo **persistido** distinto del color computado. `[PENDIENTE: las fuentes no definen las transiciones de Status — cuándo pasa a Depleted (¿CurrentQuantity == 0?) o a Expired (¿job? ¿al leer?). Sin Hangfire en este slice, la transición automática no tiene ejecutor]`
 

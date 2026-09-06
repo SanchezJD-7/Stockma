@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Stockma.Infrastructure\Stockma.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Stockma.Api.Tests" />
+  </ItemGroup>
+
 </Project>
