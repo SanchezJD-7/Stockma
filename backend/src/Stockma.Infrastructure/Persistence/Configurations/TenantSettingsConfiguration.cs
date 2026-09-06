@@ -18,5 +18,12 @@ public sealed class TenantSettingsConfiguration : IEntityTypeConfiguration<Tenan
             thresholds.Property(t => t.GreenMonths).HasColumnName("green_months");
             thresholds.Property(t => t.YellowMonths).HasColumnName("yellow_months");
         });
+
+        builder.OwnsOne(s => s.Branding, branding =>
+        {
+            branding.Property(b => b.Primary).HasColumnName("branding_primary").HasMaxLength(7);
+            branding.Property(b => b.PrimaryActive).HasColumnName("branding_primary_active").HasMaxLength(7);
+            branding.Property(b => b.PrimaryBg).HasColumnName("branding_primary_bg").HasMaxLength(7);
+        });
     }
 }

@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Stockma.Application.Common;
 using Stockma.Application.Batches;
 using Stockma.Application.Products;
+using Stockma.Application.Tenants;
 using Stockma.Infrastructure.Persistence;
 using Stockma.Infrastructure.Persistence.Interceptors;
 using Stockma.Infrastructure.Batches;
+using Stockma.Infrastructure.Tenants;
 using Stockma.Infrastructure.Products;
 using Stockma.Infrastructure.Tenancy;
 

@@ -37,7 +37,7 @@ Riesgo del presupuesto de 400 líneas: High
 | 3 | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050 | PR 2 |
 | 4 | Product catalog (Domain + App + Api) | **PR 4** | T023–T030 | PR 2 |
 | 5 | Batch inventory (Domain + App + Api) | **PR 5** | T031–T038 | PR 4 |
-| 6 | Frontend auth + inventory | **PR 6** | T039–T043 | PR 3, PR 4, PR 5 |
+| 6 | Frontend auth + inventory + branding por tenant | **PR 6** | T039–T043, T051–T060 | PR 3, PR 4, PR 5 |
 | 7 | Contracts (orval) + PWA + e2e mínimo | **PR 7** | T044–T048 | PR 6 |
 
 ### Grafo de dependencias entre PRs
@@ -141,7 +141,42 @@ Cubre FR-012 … FR-015, NFR-009, NFR-010. Contrato: [`contracts/batches-api.md`
 - [ ] **T039** `[P]` `features/auth`: `LoginPage`, `RegisterPage`, `DeviceOtpForm`, `auth-store` (Zustand)
 - [ ] **T040** `[P]` `features/inventory`: `ProductListPage`, `ProductForm`, `BatchList`, `BarcodeScanner` (`@zxing/browser`)
 - [ ] **T041** `shared/query-client` — keys de TanStack por tenant (`['tenant', tenantId, ...]`), el logout resetea la cache
-- [ ] **T042** `[P]` `shared/ui-kit` + theme de MUI y tokens en `styles/global.css`
+- [x] **T042** Sistema de diseño: `styles/tokens.css` (única fuente de verdad), `styles/global-styles.tsx` (botones y textos reutilizables), `styles/mui-bridge.ts` (lee los tokens resueltos y arma el theme de MUI), `styles/branding.ts` (3 colores por tenant + contraste derivado). Tipografía única `Work Sans`
+- [x] **T051** Persistir el branding del tenant: VO `TenantBranding` (`Primary`, `PrimaryActive`, `PrimaryBg`) en `TenantSettings` vía `OwnsOne` opcional + migración `AddTenantBranding`. Sin branding configurado se guarda `NULL`: los defaults viven en `tokens.css` y no se duplican en el backend
+- [x] **T052** `GET /api/tenant/branding` — lo consume el front al arrancar. Responde `200` con cuerpo `null` cuando no hay branding (no `404`: la ausencia es un estado válido) — depende de T051
+- [ ] **T053** `PUT /api/admin/tenant/branding` (sólo admin del tenant) — **depende de PR 3**: hoy la API no tiene autenticación configurada, así que un endpoint de escritura "sólo admin" sería un endpoint abierto
+- [ ] **T054** Frontend: pedir `GET /api/tenant/branding` al arrancar y pasarle el resultado a `applyTenantBranding` antes de construir el theme — depende de T041, T052
+
+### Entrada a la aplicación — login genérico y tenant en el path
+
+Decidido: un solo origen, login genérico con logo de Stockma en `stockma.app/login`,
+y el tenant en el path una vez autenticado (`stockma.app/{slug}/inventario`). No se
+cambia de origen después del login: el JWT vive en `localStorage`, que es por origen,
+y el usuario aterrizaría deslogueado.
+
+- [ ] **T055** ⚠️ **BLOQUEANTE — decisión de usuario requerida.** El login genérico y el
+  email único **por tenant** son incompatibles: `POST /api/auth/login` exige
+  `X-Tenant-ID`, y sin tenant en la URL el frontend no lo tiene. Con el mismo email
+  existiendo en varios tenants (`AUTH_EMAIL_DUPLICATE` hoy es por tenant), el email
+  solo no alcanza para resolver a cuál pertenece. Salidas: (a) email **único global**
+  en la plataforma y `/api/auth/login` exento del `TenantMiddleware`, resolviendo el
+  tenant desde el email; (b) mantener email por tenant y volver a un discriminador en
+  la URL o en la pantalla. **Nada de PR 3 se puede cerrar sin esto**
+- [ ] **T056** `Tenant.Slug` (único en la plataforma) y `Tenant.Name` + migración. Hoy la
+  entidad tiene SÓLO `Id` y `Settings`: sin esto no hay path por tenant ni forma de
+  mostrar el nombre del cliente
+- [ ] **T057** `POST /api/auth/login` devuelve `branding` en el cuerpo junto al
+  `accessToken`. Evita el round-trip extra y el parpadeo de colores al entrar; sin esto
+  el usuario ve el azul de Stockma y salta a su paleta — depende de T019, T051, T056
+- [ ] **T058** Routing del frontend con el tenant en el path (`/{slug}/...`) tras el login
+  — depende de T056
+- [ ] **T059** `OnboardingCompletedAt` en `TenantSettings` (separado de `Branding`:
+  completar el onboarding y quedarse con la paleta por defecto es válido) + wizard
+  disparado por **primer login de un admin del tenant**, no por primer login a secas —
+  depende de PR 3
+- [ ] **T060** Logo del tenant — capacidad nueva, NO es un color más: almacenamiento de
+  archivos, formatos y tamaño permitidos, servido y caché, y saneamiento de SVG subido.
+  Sin decidir; el login genérico usa el logo de Stockma y no lo necesita
 - [ ] **T043** Tests de componentes de `auth` e `inventory` — depende de T039, T040
 
 ## Fase 7 — Contracts + PWA (PR 7, depende de PR 6)

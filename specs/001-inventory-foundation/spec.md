@@ -66,7 +66,7 @@ Las cuatro capacidades de este slice son **NUEVAS** (proyecto greenfield). No ha
 | Stock negativo | HTTP **422** con `errorCode: BATCH_NEGATIVE_STOCK` y rechazo total del ajuste (nunca parcial) |
 | Semaforización | Computada en lectura, **no** persistida |
 | SKU | Automático `SKU-{n}` por tenant cuando no hay barcode |
-| Capa de estilos | **Material UI** (Emotion) para componentes + **CSS puro con estilos globales** para layout y tokens. `CssBaseline` de MUI aporta el reset. Los tokens viven en `styles/global.css`; el theme de MUI replica los hex porque MUI no puede parsear `var()` |
+| Capa de estilos | **Material UI** (Emotion) para componentes complejos + **CSS puro con estilos globales** para layout, botones y textos. `CssBaseline` de MUI aporta el reset. Los tokens viven en `styles/tokens.css` y son la **única fuente de verdad**: el theme NO replica hex, `styles/mui-bridge.ts` lee de `:root` los valores ya resueltos y construye el theme con ellos. Pasarle `var()` a la paleta no alcanza — los componentes de MUI llaman `alpha()` al renderizar y revientan. Tipografía única: **Work Sans** |
 | Idioma | Documentación, especificaciones y comentarios en **español** (keywords RFC 2119 incluidas). **Todo identificador de código en inglés, sin excepción**: variables, métodos, clases, propiedades, valores de enum, columnas de base de datos, claves de configuración, claves y clases CSS, y nombres de test. Sólo los comentarios y los mensajes de error van en español |
 | Agregados | `Product`, `Batch` y `Sale` como agregados **separados** |
 

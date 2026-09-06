@@ -86,6 +86,13 @@ Content-Type: application/json
 
 ## `POST /api/auth/login` — FR-006, FR-008
 
+> ⚠️ **`[BLOQUEANTE — T055]` Este contrato es incompatible con el login genérico decidido.**
+> La entrada a la aplicación quedó definida como un solo origen sin tenant en la URL
+> (`stockma.app/login`), pero acá `X-Tenant-ID` es obligatorio y el frontend no lo tiene
+> en ese momento. Y el email no alcanza para deducirlo: hoy es único **por tenant**
+> (ver `AUTH_EMAIL_DUPLICATE`), así que el mismo email puede pertenecer a varios.
+> Hay que resolver esto antes de implementar PR 3.
+
 Emite un JWT si el dispositivo es confiable; si no, dispara el 2FA por SMS.
 
 > El OTP viaja por **SMS** al `ApplicationUser.PhoneNumber` del usuario que se loguea. El `email` del body sigue siendo la **credencial de identificación**, no el canal del segundo factor.
