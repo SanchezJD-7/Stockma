@@ -24,7 +24,7 @@
   "sku": "SKU-1042",
   "barcode": "7702001234567",
   "name": "Acetaminofén 500mg",
-  "category": "Medicamento",
+  "category": "Medication",
   "activeIngredient": "Acetaminofén",
   "presentation": "Caja x 20 tabletas",
   "storageConditions": "Lugar seco, < 30 °C",
@@ -32,7 +32,7 @@
 }
 ```
 
-`category` ∈ `Medicamento` | `Suplemento` | `Cuidado`. `barcode`, `activeIngredient`, `presentation` y `storageConditions` PUEDE ser `null`.
+`category` ∈ `Medication` | `Supplement` | `PersonalCare`. `barcode`, `activeIngredient`, `presentation` y `storageConditions` PUEDE ser `null`.
 
 > `[PENDIENTE: las fuentes no definen campos de precio ni de stock agregado en ProductDto. El stock vive en Batch]`
 
@@ -56,7 +56,7 @@ Content-Type: application/json
 ```json
 {
   "name": "Acetaminofén 500mg",
-  "category": "Medicamento",
+  "category": "Medication",
   "activeIngredient": "Acetaminofén",
   "presentation": "Caja x 20 tabletas",
   "storageConditions": "Lugar seco, < 30 °C",
@@ -78,7 +78,7 @@ Location: /api/products/3b8d1f60-2c14-4a9e-8f77-0a5b3e2d9c41
   "sku": "SKU-1042",
   "barcode": null,
   "name": "Acetaminofén 500mg",
-  "category": "Medicamento",
+  "category": "Medication",
   "activeIngredient": "Acetaminofén",
   "presentation": "Caja x 20 tabletas",
   "storageConditions": "Lugar seco, < 30 °C",
@@ -138,7 +138,7 @@ Content-Type: application/json
 ```json
 {
   "name": "Acetaminofén 500mg x 20",
-  "category": "Medicamento",
+  "category": "Medication",
   "barcode": "7702001234567",
   "activeIngredient": "Acetaminofén",
   "presentation": "Caja x 20 tabletas",
@@ -215,7 +215,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
     "sku": "SKU-1042",
     "barcode": null,
     "name": "Acetaminofén 500mg",
-    "category": "Medicamento",
+    "category": "Medication",
     "activeIngredient": "Acetaminofén",
     "presentation": "Caja x 20 tabletas",
     "storageConditions": "Lugar seco, < 30 °C",

@@ -46,12 +46,12 @@ Worker: Hangfire host (misma infra DI)
 
 Detalle de campos, invariantes e índices en [`data-model.md`](./data-model.md).
 
-- `Product : ITenantEntity, IAggregateRoot` — `Sku` (inmutable), `Barcode?`, `Name`, `Category` (enum: `Medicamento` / `Suplemento` / `Cuidado`), `ActiveIngredient?`, `Presentation?`, `StorageConditions?`, `Currency` (COP por defecto)
+- `Product : ITenantEntity, IAggregateRoot` — `Sku` (inmutable), `Barcode?`, `Name`, `Category` (enum: `Medication` / `Supplement` / `PersonalCare`), `ActiveIngredient?`, `Presentation?`, `StorageConditions?`, `Currency` (COP por defecto)
 - `Batch : ITenantEntity, IAggregateRoot` — `ProductId`, `LotNumber`, `ExpirationDate`, `CurrentQuantity`, `LocationShelf`, `Status` (enum: `Active` / `Depleted` / `Expired`)
-- VO `SemaphoreColor` = `Verde` | `Amarillo` | `Rojo` | `Vencido`; `BatchStatusCalculator` (domain service) usa `TenantSettings.SemaforoUmbrales { VerdeMeses, AmarilloMeses }`, defaults 6/3
+- VO `SemaphoreColor` = `Green` | `Yellow` | `Red` | `Expired`; `BatchStatusCalculator` (domain service) usa `TenantSettings.Thresholds { GreenMonths, YellowMonths }`, defaults 6/3
 - `ApplicationUser : IdentityUser` + `TenantId`, relación con `DeviceFingerprint`
 - `TrustedDevice : ITenantEntity` — `UserId`, `DeviceId`, `Fingerprint`, `TrustedAt`, `RevokedAt?`
-- `TenantSettings : ITenantEntity` — `MaxTrustedDevices` (def. 2), `SemaforoUmbrales`
+- `TenantSettings : ITenantEntity` — `MaxTrustedDevices` (def. 2), `ExpiryThresholds`
 - Interfaces: `IProductRepository` (`Add`, `Update`, `GetByBarcode`, `Search` por nombre), `IBatchRepository` (`Add`, `GetById`, `Adjust` con reintento), `IUnitOfWork` (rollback/redo en `AdjustBatch`)
 
 ## 3. DbContext + EF Core
@@ -179,7 +179,7 @@ frontend/web/src/
 
 ## 9. Configuración
 
-- `appsettings.json`: `ConnectionStrings`, `Jwt { Issuer, Audience, Key, ExpiresMinutes: 60 }`, `Sms { Provider, ApiKey, Sender }`, Hangfire PG, `Tenant:Umbrales` defaults.
+- `appsettings.json`: `ConnectionStrings`, `Jwt { Issuer, Audience, Key, ExpiresMinutes: 60 }`, `Sms { Provider, ApiKey, Sender }`, Hangfire PG, `Tenant:ExpiryThresholds` defaults.
 - `Sms { Provider, ApiKey, Sender }` alimenta `SmsOtpSender` (implementación de `ISmsSender`). En dev, sender de consola/log. `[PENDIENTE: proveedor de SMS no elegido]`
 - Variables de entorno: `ConnectionStrings__StockmaDb`, `Jwt__Key`, `Sms__ApiKey`, `ASPNETCORE_ENVIRONMENT`.
 - `ops/docker-compose.yml`: `postgres:16-alpine` + volumen; network `stockma`; healthcheck `pg_isready`.

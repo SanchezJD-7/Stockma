@@ -29,12 +29,12 @@
   "currentQuantity": 120,
   "locationShelf": "A-03",
   "status": "Active",
-  "semaphoreColor": "Verde"
+  "semaphoreColor": "Green"
 }
 ```
 
 - `status` ∈ `Active` | `Depleted` | `Expired` — **persistido**.
-- `semaphoreColor` ∈ `Verde` | `Amarillo` | `Rojo` | `Vencido` — **computado**, no persistido.
+- `semaphoreColor` ∈ `Green` | `Yellow` | `Red` | `Expired` — **computado**, no persistido.
 
 ---
 
@@ -92,7 +92,7 @@ Location: /api/batches/c41a7d92-5b60-4e18-a3f2-9d0c7e14b688
   "currentQuantity": 120,
   "locationShelf": "A-03",
   "status": "Active",
-  "semaphoreColor": "Verde"
+  "semaphoreColor": "Green"
 }
 ```
 
@@ -157,7 +157,7 @@ Content-Type: application/json
   "currentQuantity": 115,
   "locationShelf": "A-03",
   "status": "Active",
-  "semaphoreColor": "Verde"
+  "semaphoreColor": "Green"
 }
 ```
 
@@ -253,7 +253,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
     "currentQuantity": 115,
     "locationShelf": "A-03",
     "status": "Active",
-    "semaphoreColor": "Verde"
+    "semaphoreColor": "Green"
   },
   {
     "id": "0d5f8a17-91c3-4b26-8e40-72af1c9d3b55",
@@ -263,23 +263,23 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
     "currentQuantity": 8,
     "locationShelf": "A-04",
     "status": "Active",
-    "semaphoreColor": "Vencido"
+    "semaphoreColor": "Expired"
   }
 ]
 ```
 
 ### Cálculo de `semaphoreColor` (FR-015)
 
-`BatchStatusCalculator` (domain service) evalúa `ExpirationDate` contra `TenantSettings.SemaforoUmbrales`:
+`BatchStatusCalculator` (domain service) evalúa `ExpirationDate` contra `TenantSettings.Thresholds`:
 
 | Color | Condición (defaults 6/3 meses) |
 |---|---|
-| `Vencido` | `expirationDate` < hoy |
-| `Rojo` | faltan < `AmarilloMeses` (3 meses) |
-| `Amarillo` | faltan entre `AmarilloMeses` y `VerdeMeses` (3–6 meses) |
-| `Verde` | faltan > `VerdeMeses` (6 meses) |
+| `Expired` | `expirationDate` < hoy |
+| `Red` | faltan < `YellowMonths` (3 meses) |
+| `Yellow` | faltan entre `YellowMonths` y `GreenMonths` (3–6 meses) |
+| `Green` | faltan > `GreenMonths` (6 meses) |
 
-Los umbrales son **configurables por tenant**: con verde `>9 meses`, un lote a 7 meses evalúa `Amarillo`.
+Los umbrales son **configurables por tenant**: con verde `>9 meses`, un lote a 7 meses evalúa `Yellow`.
 
 El color NO DEBE persistirse (NFR-010).
 
@@ -298,17 +298,17 @@ Sin lotes que coincidan: `200` con array vacío.
 **Verde por defecto**
 - **DADO** lote a 7 meses de vencer
 - **CUANDO** se consulta
-- **ENTONCES** `color = Verde`
+- **ENTONCES** `color = Green`
 
 **Vencido**
 - **DADO** lote con `ExpirationDate` pasada
 - **CUANDO** se consulta
-- **ENTONCES** `color = Vencido`
+- **ENTONCES** `color = Expired`
 
 **Umbrales personalizados**
 - **DADO** tenant configura verde `>9 meses`
 - **CUANDO** lote a 7 meses
-- **ENTONCES** el color se evalúa con los umbrales del tenant (`Amarillo`)
+- **ENTONCES** el color se evalúa con los umbrales del tenant (`Yellow`)
 
 ---
 

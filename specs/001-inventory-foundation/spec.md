@@ -67,7 +67,7 @@ Las cuatro capacidades de este slice son **NUEVAS** (proyecto greenfield). No ha
 | Semaforización | Computada en lectura, **no** persistida |
 | SKU | Automático `SKU-{n}` por tenant cuando no hay barcode |
 | Capa de estilos | **Material UI** (Emotion) para componentes + **CSS puro con estilos globales** para layout y tokens. `CssBaseline` de MUI aporta el reset. Los tokens viven en `styles/global.css`; el theme de MUI replica los hex porque MUI no puede parsear `var()` |
-| Idioma | Documentación y especificaciones en **español** (keywords RFC 2119 incluidas). Código, claves CSS y nombres de clase en **inglés** |
+| Idioma | Documentación, especificaciones y comentarios en **español** (keywords RFC 2119 incluidas). **Todo identificador de código en inglés, sin excepción**: variables, métodos, clases, propiedades, valores de enum, columnas de base de datos, claves de configuración, claves y clases CSS, y nombres de test. Sólo los comentarios y los mensajes de error van en español |
 | Agregados | `Product`, `Batch` y `Sale` como agregados **separados** |
 
 ### Riesgos
@@ -277,17 +277,17 @@ Todos los escenarios usan Dado/Cuando/Entonces. Cada uno está trazado a su requ
 **Escenario: Verde por defecto**
 - **DADO** lote a 7 meses de vencer
 - **CUANDO** se consulta
-- **ENTONCES** `color = Verde`
+- **ENTONCES** `color = Green`
 
 **Escenario: Vencido**
 - **DADO** lote con `ExpirationDate` pasada
 - **CUANDO** se consulta
-- **ENTONCES** `color = Vencido`
+- **ENTONCES** `color = Expired`
 
 **Escenario: Umbrales personalizados**
 - **DADO** tenant configura verde `>9 meses`
 - **CUANDO** lote a 7 meses
-- **ENTONCES** el color se evalúa con los umbrales del tenant (`Amarillo`)
+- **ENTONCES** el color se evalúa con los umbrales del tenant (`Yellow`)
 
 ### Cobertura de testing
 
@@ -378,7 +378,7 @@ Modelo detallado (campos, tipos, invariantes, índices) en [`data-model.md`](./d
 | **DeviceOtp** | OTP de 2FA por SMS | Persistido, expira ≤10 min (NFR-004); se envía al `PhoneNumber` del usuario |
 | **Product** | Agregado raíz | `Sku` (inmutable), `Barcode?`, `Name`, `Category`, `Currency` |
 | **Batch** | Agregado raíz separado | `ProductId`, `LotNumber`, `ExpirationDate`, `CurrentQuantity`, `LocationShelf`, `Status`, `xmin` |
-| **SemaphoreColor** | Value object | `Verde` \| `Amarillo` \| `Rojo` \| `Vencido`; computado en lectura (NFR-010) |
+| **SemaphoreColor** | Value object | `Green` \| `Yellow` \| `Red` \| `Expired`; computado en lectura (NFR-010) |
 
 ---
 

@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Formatea con Prettier los archivos staged de frontend/web antes de commitear.
+# Evita que `npm run format:check` del CI sea el primero en avisar.
+#
+# Instalación (una sola vez por clon):
+#   git config core.hooksPath .githooks
+
+set -e
+
+WEB_DIR="frontend/web"
+
+# Archivos staged (añadidos/copiados/modificados/renombrados) bajo frontend/web
+# filtrados por extensión que Prettier maneja.
+staged=""
+for f in $(git diff --cached --name-only --diff-filter=ACMR -- "$WEB_DIR"); do
+  case "$f" in
+    *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.json|*.css|*.scss|*.html|*.md|*.yml|*.yaml)
+      staged="$staged $f" ;;
+  esac
+done
+
+[ -z "$staged" ] && exit 0
+
+# Un archivo con cambios sin stagear no se puede auto-arreglar sin arrastrar
+# al commit trabajo que no revisaste. En ese caso sólo verificamos.
+partial=$(git diff --name-only -- $staged)
+
+# Prettier corre desde frontend/web, así que sacamos el prefijo de las rutas.
+rel=""
+for f in $staged; do rel="$rel ${f#"$WEB_DIR"/}"; done
+
+if [ -n "$partial" ]; then
+  echo "pre-commit: hay cambios sin stagear; verifico sin modificar nada."
+  if ! (cd "$WEB_DIR" && npx --no-install prettier --check $rel); then
+    echo ""
+    echo "  Formato inválido. Corré:  cd $WEB_DIR && npm run format"
+    echo "  (no lo arreglé solo porque tenés cambios a medio stagear)"
+    exit 1
+  fi
+  exit 0
+fi
+
+(cd "$WEB_DIR" && npx --no-install prettier --write --log-level warn $rel)
+
+# Re-stagear lo que Prettier haya tocado.
+fixed=$(git diff --name-only -- $staged)
+if [ -n "$fixed" ]; then
+  echo "pre-commit: Prettier reformateó y re-stageó:"
+  printf '  %s\n' $fixed
+  git add -- $fixed
+fi
+
+exit 0

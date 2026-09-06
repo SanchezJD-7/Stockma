@@ -106,7 +106,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 - [ ] **FR-015 — Semaforización de vencimiento**
       El sistema DEBE clasificar cada lote con umbrales configurables por tenant: Verde `>6 meses`, Amarillo `3–6 meses`, Rojo `<3 meses`, Vencido (fecha pasada).
       *Tareas*: T031, T034, T037 · *Contrato*: `GET /api/batches?productId=`
-      **Verificación**: lote a 7 meses → `Verde` con defaults; `ExpirationDate` pasada → `Vencido`; con verde `>9 meses` configurado, un lote a 7 meses → `Amarillo`.
+      **Verificación**: lote a 7 meses → `Green` con defaults; `ExpirationDate` pasada → `Expired`; con verde `>9 meses` configurado, un lote a 7 meses → `Yellow`.
 
 ---
 
