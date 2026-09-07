@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T050`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T061`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -109,6 +109,11 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
 - [ ] **T050** `PUT /api/admin/users/{userId}/phone-number` (sólo admin del tenant) **y cierre de la superficie self-service de Identity** sobre `PhoneNumber` (FR-008) — depende de T019
       El usuario NO DEBE poder registrar ni cambiar su propio `PhoneNumber`. Identity lo expone por defecto (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que cerrar esa superficie explícitamente, no alcanza con no usarla. Ver [`contracts/auth-api.md`](./contracts/auth-api.md) y [`data-model.md`](./data-model.md).
       `[PENDIENTE: propuesto, no está en las fuentes originales]`
+- [ ] **T061** `PUT /api/auth/phone-number` — cambio del propio `PhoneNumber` **autenticado y con OTP al número ACTUAL** (FR-008) — depende de T018, T019, T050
+      Resuelve la fricción operativa de T050: sin esto, el admin del tenant que quiere cambiar su propio número tiene que escribirle al admin de plataforma.
+      Distinción que sostiene la regla: **enrolar** el primer número con sólo la contraseña es inseguro (un factor se autoenrolaría); **cambiar** uno existente es seguro, porque exige demostrar posesión del factor actual. Un atacante con la contraseña robada no tiene el celular viejo y la cadena de confianza no se corta.
+      Reglas: el OTP DEBE ir al `PhoneNumber` vigente, NUNCA al nuevo. El cambio NO DEBE aplicarse hasta confirmar ese OTP. Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint — ese caso es alta por admin (T050), no cambio. Rate limiting igual que el resto de `auth` (NFR-005).
+      Tests: cambio exitoso confirmando OTP; rechazo con OTP inválido o expirado; rechazo si el usuario no tiene número previo; verificación de que el OTP se envió al número viejo y no al nuevo.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
@@ -207,7 +212,7 @@ y el usuario aterrizaría deslogueado.
 | FR-005        | T015, T017, T019, T022                                             | PR 3 |
 | FR-006        | T016, T017, T019, T021                                             | PR 3 |
 | FR-007        | T015, T020                                                         | PR 3 |
-| FR-008        | T015, T018, T019, T021, T049, T050                                 | PR 3 |
+| FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
 | FR-010        | T023, T025, T029                                                   | PR 4 |
 | FR-011        | T026, T027, T030                                                   | PR 4 |
