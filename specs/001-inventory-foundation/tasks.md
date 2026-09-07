@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T069`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T070`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T069 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T070 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -125,7 +125,7 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
       **Enfoque recomendado**: identidad y endpoints **separados** (`/api/platform/*`), NO un rol más sobre `ApplicationUser`. Motivo: todo el aislamiento (filtro EF + RLS + test de arquitectura) se apoya en la invariante "todo `ApplicationUser` pertenece a exactamente un tenant". Meter un super-usuario exento reabre la misma clase de riesgo que cierra T055b — un filtro con excepciones deja de ser una garantía.
       Alternativas descartadas: (a) `TenantId` nullable + exención del filtro — vuelve el filtro permisivo, justo lo que la spec prohíbe; (b) tenant "de sistema" con `Guid` conocido — el filtro sigue aplicando, así que no resuelve operar sobre otros tenants.
       Tests: ningún `ApplicationUser` queda sin `TenantId`; la superficie de plataforma no es alcanzable con un JWT de tenant, y viceversa.
-      `[PENDIENTE: enfoque recomendado, requiere confirmación del usuario antes de implementar]`
+      **Decidido por el usuario**: superficie separada.
 - [ ] **T064** **Cerrar `POST /api/auth/register`**: pasa a exigir JWT de `TenantAdmin` del mismo tenant — depende de T019, T062
       Hoy el contrato (`contracts/auth-api.md`) muestra el request con `X-Tenant-ID` y **sin** `Authorization`: cualquiera que conozca un tenant ID se crea un usuario adentro. Contradice la premisa de que los usuarios los da de alta el admin.
       El alta DEBE incluir el `PhoneNumber` en el mismo acto (T050): un usuario creado sin número no puede entrar desde un dispositivo no trusted y queda inservible hasta que el admin lo complete.
@@ -136,11 +136,21 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
       El token DEBE persistirse **hasheado**, nunca en plano — mismo criterio que el OTP (`IPasswordHasher`) y la contraseña.
       **Rotación**: cada uso consume el refresh presentado y emite uno nuevo dentro de la misma `FamilyId`.
       **Detección de reuso (la propiedad que importa)**: si se presenta un token con `ConsumedAt != null`, el sistema DEBE revocar **toda la familia** y registrar el evento. Un refresh usado dos veces significa que alguien tiene una copia: la sesión se cae entera, para el legítimo y para el ladrón.
-      **Vigencia**: el access token NO cambia, sigue en ≤ 60 min (NFR-004). El refresh define la sesión real. `RefreshTokenLifetimeHours` configurable por tenant, default propuesto **12 h** (un turno). `[PENDIENTE: confirmar default]`
-      **Almacenamiento recomendado**: el refresh viaja en cookie `httpOnly` + `Secure` + `SameSite=Strict`, NO en `localStorage`. Es la credencial de larga vida: expuesta a XSS, entrega la sesión completa. El access token de 60 min puede seguir donde está. `[PENDIENTE: contradice parcialmente la decisión previa de guardar el JWT en localStorage — confirmar]`
+      **Vigencia**: el access token NO cambia, sigue en ≤ 60 min (NFR-004). El refresh define la sesión real. `RefreshTokenLifetimeHours` configurable por tenant, default **8 h** (decisión del usuario; la propuesta era 12 h con margen). Vigencia **absoluta** desde el login, no deslizante: da exactamente 1 login por turno. Consecuencia aceptada: quien empalma dos turnos o hace horas extra vuelve a loguearse en medio de la jornada. Si el mostrador se queja, la salida es vigencia deslizante con tope absoluto, no un número más grande.
+      **Almacenamiento (decidido)**: el refresh viaja en cookie `httpOnly` + `Secure` + `SameSite=Strict`, **NO** en `localStorage`. Es la credencial de larga vida: en `localStorage` cualquier XSS —una dependencia npm comprometida alcanza— se lleva la sesión completa y renovable. JavaScript no puede leer una cookie `httpOnly`. El access token de ≤ 60 min **sí** sigue en `localStorage`, como estaba decidido: es corto y no renueva nada por sí solo.
       **Reglas**: el refresh DEBE estar acotado al tenant y al usuario; `logout` DEBE revocar la familia **del lado del servidor**, no sólo limpiar el cliente; un refresh NO DEBE servir para saltear el 2FA en un dispositivo nuevo — sólo renueva una sesión ya autenticada en ese dispositivo.
       Tests: rotación emite token nuevo e invalida el anterior; reusar un token consumido revoca la familia entera; el refresh de un tenant no sirve en otro; `logout` invalida del lado del servidor; el refresh caducado responde `401`.
       **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
+- [ ] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
+      **El agujero**: hoy `TrustedDevice` no tiene campo de expiración y el invariante de `data-model.md` **prohíbe** la revocación automática. Un dispositivo queda confiable **para siempre**.
+      **Campo nuevo `ExpiresAt`, NO reusar `RevokedAt`.** `RevokedAt` DEBE seguir significando "una persona lo dio de baja" — es auditoría, y mezclarlo con vencimiento automático arruina el registro de quién hizo qué.
+      ```
+      activo = RevokedAt IS NULL AND ExpiresAt > now()
+      ```
+      `TenantSettings.TrustedDeviceLifetimeDays`, default **15** (decisión del usuario; el estándar de industria es 30 y la propuesta inicial fue 8). `ExpiresAt` se fija en `TrustedAt + TrustedDeviceLifetimeDays` al confiar el dispositivo.
+      **Beneficio lateral**: el slot de `MaxTrustedDevices` se libera solo. Hoy, con el límite en 2, llenar los dos slots requiere un admin para destrabar; los slots no se llenan por uso simultáneo sino por **acumulación** de aparatos viejos, y esto lo ataca en la causa.
+      **Alcance de la caducidad**: obliga a rehacer el 2FA en ese dispositivo. NO corta la sesión viva ni bloquea el acceso — eso es T067 (revocación) y T068 (deshabilitar), que son inmediatos. La caducidad es la **red de seguridad** para lo que nadie se acordó de revocar.
+      Tests: un dispositivo vencido exige OTP de nuevo; vencer libera el slot; `RevokedAt` sigue siendo exclusivamente manual; un dispositivo vencido y otro revocado se distinguen en el listado de T067.
 - [ ] **T067** **Gestión y revocación de dispositivos y sesiones** (FR-007) — depende de T062, T065
       **El endpoint no existe.** `contracts/auth-api.md` lo dice textual: *"Endpoint admin de revocación/alta de dispositivo — no existe en las fuentes `[PENDIENTE: definir]`"*. Y FR-007 apoya todo su diseño en que `RevokedAt` lo setea un admin — con un botón que nadie construyó.
       **Superficie admin**: `GET /api/admin/users/{userId}/devices` (no se puede revocar lo que no se ve), `POST /api/admin/users/{userId}/devices/{deviceId}/revoke`, `POST /api/admin/users/{userId}/devices/revoke-all`.
@@ -278,7 +288,7 @@ y el usuario aterrizaría deslogueado.
 | FR-004        | T012                                                               | PR 2 |
 | FR-005        | T015, T017, T019, T022, T062, T064, T068, T069                     | PR 3 |
 | FR-006        | T016, T017, T019, T021, T062, T063, T065                           | PR 3 |
-| FR-007        | T015, T020, T067, T068                                             | PR 3 |
+| FR-007        | T015, T020, T067, T068, T070                                       | PR 3 |
 | FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
 | FR-010        | T023, T025, T029                                                   | PR 4 |

@@ -113,6 +113,8 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 |---|---|---|---|
 | `TenantId` | `Guid` | — | PK y FK a `Tenant` (relación 1:1) |
 | `MaxTrustedDevices` | `int` | `2` | Límite de dispositivos confiables por usuario (FR-007) |
+| `TrustedDeviceLifetimeDays` | `int` | `15` | Vigencia de un `TrustedDevice` antes de volver a exigir 2FA (FR-007, T070) |
+| `RefreshTokenLifetimeHours` | `int` | `8` | Vigencia **absoluta** de la familia de refresh — la sesión real (FR-006, T065) |
 | `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
 | `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
 | `NextSkuNumber` | `int` | `1` | Contador de la secuencia de SKU por tenant (FR-009). Se incrementa con `UPDATE ... RETURNING` dentro de la transacción del alta |
@@ -120,6 +122,8 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Invariantes**
 
 - `MaxTrustedDevices` DEBE ser ≥ 1.
+- `TrustedDeviceLifetimeDays` DEBE ser ≥ 1.
+- `RefreshTokenLifetimeHours` DEBE ser ≥ 1 y NO DEBE ser menor que la vigencia del access token (≤ 60 min, NFR-004): un refresh más corto que el access token no renueva nada.
 - `GreenMonths` DEBE ser > `YellowMonths`.
 - `YellowMonths` DEBE ser > 0.
 
@@ -193,16 +197,19 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `DeviceId` | `string` | Identificador del dispositivo enviado por el cliente en el login |
 | `Fingerprint` | `string` | Huella del dispositivo. `[PENDIENTE: algoritmo de fingerprint no definido en las fuentes]` |
 | `TrustedAt` | `DateTime` | Momento en que el dispositivo quedó confiable |
-| `RevokedAt` | `DateTime?` | `null` = activo. Un valor marca el dispositivo como revocado |
+| `ExpiresAt` | `DateTime` | `TrustedAt + TenantSettings.TrustedDeviceLifetimeDays`. Vencido = vuelve a exigir 2FA (T070) |
+| `RevokedAt` | `DateTime?` | `null` = no revocado. Un valor marca baja **manual por un admin** — es auditoría de una acción humana, NO se usa para el vencimiento |
 
 **Invariantes**
 
-- Un dispositivo se cuenta como **activo** si `RevokedAt IS NULL`.
+- Un dispositivo se cuenta como **activo** si `RevokedAt IS NULL AND ExpiresAt > now()`.
 - El número de dispositivos activos por usuario DEBE ser ≤ `TenantSettings.MaxTrustedDevices` (def. 2) — FR-007. La fila `TrustedDevice` **no se crea** cuando el conteo ya alcanzó el máximo.
 - El límite gobierna **sólo el privilegio de saltear el 2FA**, no el acceso: la ausencia de un `TrustedDevice` NO DEBE impedir el login (FR-008), sólo obliga al OTP en cada ingreso.
-- `RevokedAt` DEBE setearse **únicamente** por acción manual de un admin. Ninguna ruta automática PUEDE revocar un dispositivo, y no existe selección del "más antiguo".
+- `RevokedAt` DEBE setearse **únicamente** por acción manual de un admin o del propio usuario sobre su dispositivo (T067). Ninguna ruta automática PUEDE escribir `RevokedAt`, y no existe selección del "más antiguo".
+- El **vencimiento** es un mecanismo separado: se resuelve por `ExpiresAt`, nunca escribiendo `RevokedAt` (T070). Mezclarlos borraría la diferencia entre "alguien lo dio de baja" y "se venció solo", que es justamente lo que hace útil la auditoría.
 - Sólo un dispositivo trusted existente PUEDE autorizar uno nuevo (FR-007).
-- `TrustedAt` DEBE ser ≤ `RevokedAt` cuando ambos existen.
+- `TrustedAt` DEBE ser ≤ `RevokedAt` cuando ambos existen, y `TrustedAt` DEBE ser < `ExpiresAt`.
+- Un dispositivo vencido DEBE volver a exigir OTP, pero NO DEBE bloquear el acceso ni cortar una sesión viva: cortar es T067 (revocación) y T068 (deshabilitar), que son inmediatos.
 
 **Relaciones**
 
