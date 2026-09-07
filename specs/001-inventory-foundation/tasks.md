@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T065`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T066`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -168,6 +168,20 @@ Cubre FR-012 … FR-015, NFR-009, NFR-010. Contrato: [`contracts/batches-api.md`
 - [x] **T037** `[P]` Unit tests: stock negativo, semáforo default/custom, conflicto de concurrencia `409`
 - [x] **T038** API tests: registrar y ajustar lote — depende de T035
 
+### Trazabilidad del movimiento de stock — **abierto, PR aparte (depende de PR 3)**
+
+- [ ] **T066** **`StockMovement`: libro de movimientos append-only con autor y motivo** (FR-013, FR-014) — depende de T033, T035, T062
+      **El agujero**: hoy `POST /api/batches/{id}/adjust` recibe `{ "delta": -5 }` y nada más. Sin motivo, sin autor, sin restricción de rol. Y el `[PENDIENTE]` del contrato dice que la trazabilidad la da el `AuditSaveChangesInterceptor` — pero ese interceptor **no audita**: sólo aborta el `SaveChanges` si se intenta modificar `TenantId` (`data-model.md`). Está mal nombrado. **Hoy la trazabilidad del ajuste de stock es CERO.**
+      En una droguería el faltante no entra por el login: entra por el ajuste. "Se venció", "se rompió", el inventario cuadra y no queda nombre.
+      **Entidad** `StockMovement : ITenantEntity`, **append-only, nunca se actualiza ni se borra**: `Id`, `TenantId`, `BatchId`, `Delta`, `Reason`, `Notes?`, `UserId`, `OccurredAt`.
+      `Reason` (enum): `Sale`, `Reception`, `Return`, `Expiry`, `Damage`, `Loss`, `CountCorrection`.
+      **Reglas**: todo cambio de `Batch.CurrentQuantity` DEBE nacer de un `StockMovement` — no DEBE existir camino que mueva stock sin dejar fila. `Reason` es obligatorio. `UserId` sale del claim `sub`, NUNCA del body. La fila es inmutable: corregir un error es **otro** movimiento compensatorio, no editar el anterior.
+      **Rol** (depende de T062): un `Member` PUEDE registrar movimientos, incluidas mermas — bloquearle el paso sólo lograría que no registre nada. Los motivos de merma (`Expiry`, `Damage`, `Loss`) por encima de `MermaApprovalThreshold` (configurable por tenant) DEBEN requerir `TenantAdmin`.
+      El control real no es prohibir el botón: es que **el nombre quede pegado al movimiento** y el admin lo vea.
+      `GET /api/batches/{id}/movements` y reporte por usuario y motivo para el admin.
+      **Renombrar `AuditSaveChangesInterceptor`**: hace de guardia de `TenantId`, no de auditoría. El nombre actual hace creer que hay un rastro que no existe.
+      Tests: ajuste sin `reason` es rechazado; el `UserId` persistido es el del JWT y no el del body; ningún camino modifica `CurrentQuantity` sin crear la fila; merma sobre el umbral con `Member` responde `403`; el libro no admite `UPDATE` ni `DELETE`; la suma de movimientos reconcilia con `CurrentQuantity`.
+
 ## Fase 6 — Frontend auth + inventory (PR 6, depende de PR 3, PR 4, PR 5)
 
 - [ ] **T039** `[P]` `features/auth`: `LoginPage`, `RegisterPage`, `DeviceOtpForm`, `auth-store` (Zustand)
@@ -244,8 +258,8 @@ y el usuario aterrizaría deslogueado.
 | FR-010        | T023, T025, T029                                                   | PR 4 |
 | FR-011        | T026, T027, T030                                                   | PR 4 |
 | FR-012        | T031, T033, T038                                                   | PR 5 |
-| FR-013        | T033, T037                                                         | PR 5 |
-| FR-014        | T031, T032, T037                                                   | PR 5 |
+| FR-013        | T033, T037, T066                                                   | PR 5 |
+| FR-014        | T031, T032, T037, T066                                             | PR 5 |
 | FR-015        | T031, T034, T037                                                   | PR 5 |
 | NFR-001       | T014                                                               | PR 2 |
 | NFR-002       | T009                                                               | PR 2 |
