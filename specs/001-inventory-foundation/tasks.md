@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T061`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T064`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T064 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -114,6 +114,22 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
       Distinción que sostiene la regla: **enrolar** el primer número con sólo la contraseña es inseguro (un factor se autoenrolaría); **cambiar** uno existente es seguro, porque exige demostrar posesión del factor actual. Un atacante con la contraseña robada no tiene el celular viejo y la cadena de confianza no se corta.
       Reglas: el OTP DEBE ir al `PhoneNumber` vigente, NUNCA al nuevo. El cambio NO DEBE aplicarse hasta confirmar ese OTP. Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint — ese caso es alta por admin (T050), no cambio. Rate limiting igual que el resto de `auth` (NFR-005).
       Tests: cambio exitoso confirmando OTP; rechazo con OTP inválido o expirado; rechazo si el usuario no tiene número previo; verificación de que el OTP se envió al número viejo y no al nuevo.
+- [ ] **T062** **Roles del tenant** (`TenantAdmin` / `Member`) — claim `role` en el JWT y policy de autorización — depende de T015, T016
+      **Bloqueante, no mejora.** Toda la superficie de seguridad ya escrita dice "sólo admin del tenant" (T050, T053, T059, branding) y **el rol no existe en el modelo**: `data-model.md` sólo lo menciona de pasada en la lista de tablas de Identity. Sin esto, "sólo admin" no es implementable — se simula.
+      Alcance: `IdentityRole<Guid>` con los dos roles sembrados; asignación por usuario (el usuario ya está acotado al tenant, así que el rol NO necesita `TenantId` propio); claim `role` emitido en el JWT junto a `sub` y `tid`; policy `TenantAdmin` aplicada a todo endpoint `/api/admin/*`.
+      El **primer usuario de un tenant** DEBE nacer `TenantAdmin`; no puede haber un tenant sin admin.
+      Un `TenantAdmin` NO DEBE poder quitarse el rol a sí mismo si es el último admin del tenant.
+      Tests: `Member` recibe `403` en cada endpoint `/api/admin/*`; el claim `role` viaja en el JWT; el último admin no puede degradarse.
+- [ ] **T063** **Admin de plataforma** — superficie separada, fuera del modelo de tenants — depende de T015, T062
+      **Problema de modelo, no de permisos.** `ApplicationUser.TenantId` es obligatorio y hay filtro global por tenant: el dueño de la plataforma, que por definición no pertenece a ningún tenant, hoy **no tiene lugar donde existir**.
+      **Enfoque recomendado**: identidad y endpoints **separados** (`/api/platform/*`), NO un rol más sobre `ApplicationUser`. Motivo: todo el aislamiento (filtro EF + RLS + test de arquitectura) se apoya en la invariante "todo `ApplicationUser` pertenece a exactamente un tenant". Meter un super-usuario exento reabre la misma clase de riesgo que cierra T055b — un filtro con excepciones deja de ser una garantía.
+      Alternativas descartadas: (a) `TenantId` nullable + exención del filtro — vuelve el filtro permisivo, justo lo que la spec prohíbe; (b) tenant "de sistema" con `Guid` conocido — el filtro sigue aplicando, así que no resuelve operar sobre otros tenants.
+      Tests: ningún `ApplicationUser` queda sin `TenantId`; la superficie de plataforma no es alcanzable con un JWT de tenant, y viceversa.
+      `[PENDIENTE: enfoque recomendado, requiere confirmación del usuario antes de implementar]`
+- [ ] **T064** **Cerrar `POST /api/auth/register`**: pasa a exigir JWT de `TenantAdmin` del mismo tenant — depende de T019, T062
+      Hoy el contrato (`contracts/auth-api.md`) muestra el request con `X-Tenant-ID` y **sin** `Authorization`: cualquiera que conozca un tenant ID se crea un usuario adentro. Contradice la premisa de que los usuarios los da de alta el admin.
+      El alta DEBE incluir el `PhoneNumber` en el mismo acto (T050): un usuario creado sin número no puede entrar desde un dispositivo no trusted y queda inservible hasta que el admin lo complete.
+      Tests: `register` sin JWT responde `401`; con JWT de `Member` responde `403`; con JWT de `TenantAdmin` de OTRO tenant responde `403`; alta sin `phoneNumber` es rechazada.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
@@ -209,8 +225,8 @@ y el usuario aterrizaría deslogueado.
 | FR-002        | T008, T010, T013                                                   | PR 2 |
 | FR-003        | T011                                                               | PR 2 |
 | FR-004        | T012                                                               | PR 2 |
-| FR-005        | T015, T017, T019, T022                                             | PR 3 |
-| FR-006        | T016, T017, T019, T021                                             | PR 3 |
+| FR-005        | T015, T017, T019, T022, T062, T064                                 | PR 3 |
+| FR-006        | T016, T017, T019, T021, T062, T063                                 | PR 3 |
 | FR-007        | T015, T020                                                         | PR 3 |
 | FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
