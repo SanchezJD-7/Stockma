@@ -135,7 +135,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 |---|---|---|
 | `Id` | `string` | PK heredada de `IdentityUser` |
 | `TenantId` | `Guid` | Tomado del header `X-Tenant-ID` en el registro. Inmutable (FR-004) |
-| `Email` | `string` | Heredado. Único **por tenant**, no globalmente |
+| `Email` | `string` | Heredado. Único **global** en toda la plataforma (T055) — es lo que permite resolver el tenant en el login genérico |
 | `PasswordHash` | `string` | PBKDF2 vía Identity (NFR-004) |
 | `PhoneNumber` | `string?` | Heredado de `IdentityUser`. **Celular destino del OTP por SMS** — requerido para el 2FA (FR-008). Escribible **sólo por un admin del tenant** |
 | `PhoneNumberConfirmed` | `bool` | Heredado de `IdentityUser`. Se setea al cargar/validar el número; sólo un admin lo altera |
@@ -144,8 +144,8 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 
 **Invariantes**
 
-- El par `(TenantId, NormalizedEmail)` DEBE ser único; un email repetido dentro del mismo tenant responde `409 Conflict` (FR-005).
-- El mismo email PUEDE existir en tenants distintos.
+- `NormalizedEmail` DEBE ser único **en toda la plataforma**; un email ya registrado en cualquier tenant responde `409 Conflict` (FR-005).
+- El mismo email NO PUEDE existir en dos tenants. Es el precio del login genérico: sin tenant en la URL, el email es lo único que identifica a qué tenant pertenece quien se loguea (T055). Si en el futuro una persona necesita operar en varios tenants, la salida es una tabla `UserTenant` y un paso de selección post-login — refactor de Identity, no un campo.
 - `TenantId` NO DEBE cambiar tras la creación (FR-004).
 - El JWT emitido DEBE llevar los claims `sub` (userId) y `tid` (tenantId) — FR-006.
 
@@ -167,13 +167,14 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Índices**
 
 - PK sobre `Id`.
-- Único `(TenantId, NormalizedEmail)`.
-- `[PENDIENTE: Identity crea por defecto un índice único global sobre NormalizedEmail; la migración InitialSchema DEBE reemplazarlo por el compuesto per-tenant o el registro multi-tenant fallará. No está explicitado en las fuentes]`
+- Único **global** sobre `NormalizedEmail` — es el índice que ASP.NET Core Identity crea por defecto, así que no hay nada que reemplazar en la migración.
 
 **Aplicación de `TenantId`**
 
 - EF: `HasQueryFilter` sobre `ApplicationUser`.
-  `[PENDIENTE: el filtro global sobre las tablas Identity puede interferir con SignInManager/UserManager durante el login, cuando el TenantContext ya está poblado por el middleware. Validar en el spike temprano — riesgo "Integración Identity + multi-tenant" de spec.md]`
+- **Excepción del login (T055)**: `POST /api/auth/login` corre SIN `TenantContext`, así que la búsqueda del usuario por email DEBE usar `IgnoreQueryFilters()` de forma explícita y acotada — una sola consulta, que lee únicamente lo necesario para autenticar y obtener el `TenantId`.
+- El filtro NO DEBE volverse permisivo cuando el `TenantContext` está vacío. Hacerlo desactivaría el aislamiento en silencio en cualquier ruta donde el contexto no se haya poblado; la excepción tiene que ser explícita en el punto de uso, nunca un default del filtro.
+- Este es el ÚNICO lugar del sistema que cruza la frontera entre tenants a propósito, y DEBE tener un test que demuestre que por ahí no se puede leer nada más.
 - RLS: política `tenant_isolation` sobre la tabla de usuarios de Identity.
 
 ---
@@ -388,8 +389,8 @@ Patrón: migraciones tenant-wide sobre una DB compartida con filtrado lógico. A
 | 4 | `User` | `DeviceFingerprint`: ¿navegación o columna escalar? |
 | 4b | `User` | `PhoneNumber` sin cargar: ¿primer login sin 2FA, alta obligatoria por admin antes de habilitar, o bloqueo? |
 | 4c | `User` | Formato/validación y unicidad por tenant del `PhoneNumber`; endpoint admin propuesto, no en las fuentes |
-| 5 | `User` | Índice único global de Identity sobre `NormalizedEmail` vs. compuesto per-tenant |
-| 6 | `User` | Interferencia del `HasQueryFilter` con `SignInManager` durante el login |
+| 5 | `User` | ~~Índice único global vs. compuesto per-tenant~~ — **resuelto (T055)**: se usa el índice global por defecto de Identity |
+| 6 | `User` | `HasQueryFilter` durante el login — **acotado (T055)**: el login corre sin `TenantContext` y usa `IgnoreQueryFilters()` explícito en una única consulta |
 | 7 | `TrustedDevice` | Algoritmo de `Fingerprint`; unicidad de `(TenantId, UserId, DeviceId)` |
 | 8 | `DeviceOtp` | ¿`ConsumedAt` o borrado? Política de purga |
 | 8b | `DeviceOtp` | Proveedor de SMS no elegido; columna `Channel` propuesta, no en las fuentes |

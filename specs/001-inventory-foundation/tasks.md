@@ -10,14 +10,14 @@
 
 ## Pronóstico de Carga de Revisión
 
-| Campo | Valor |
-|-------|-------|
-| Líneas cambiadas estimadas | ~8.700 (backend ~4.700, tests ~1.600, frontend ~2.000, ci/ops/contracts ~400) |
-| Riesgo del presupuesto de 400 líneas | **High** |
-| PRs encadenados recomendados | **Yes** |
-| División sugerida | PR1 → PR2 → PR3 → PR4 → PR5 → PR6 → PR7 |
-| Estrategia de entrega | `ask-on-risk` |
-| Estrategia de encadenado | `pending` |
+| Campo                                | Valor                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| Líneas cambiadas estimadas           | ~8.700 (backend ~4.700, tests ~1.600, frontend ~2.000, ci/ops/contracts ~400) |
+| Riesgo del presupuesto de 400 líneas | **High**                                                                      |
+| PRs encadenados recomendados         | **Yes**                                                                       |
+| División sugerida                    | PR1 → PR2 → PR3 → PR4 → PR5 → PR6 → PR7                                       |
+| Estrategia de entrega                | `ask-on-risk`                                                                 |
+| Estrategia de encadenado             | `pending`                                                                     |
 
 ```
 Decisión requerida antes de apply: Yes
@@ -30,15 +30,15 @@ Riesgo del presupuesto de 400 líneas: High
 
 ## Unidades de trabajo → PR slices
 
-| Unit | Objetivo | PR | Tareas | Depende de |
-|------|----------|----|--------|------------|
-| 1 | Scaffolding monorepo + CI + docker-compose | **PR 1** | T001–T007 | — (base) |
-| 2 | Tenant isolation (Domain + Infra + RLS) | **PR 2** | T008–T014 | PR 1 |
-| 3 | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050 | PR 2 |
-| 4 | Product catalog (Domain + App + Api) | **PR 4** | T023–T030 | PR 2 |
-| 5 | Batch inventory (Domain + App + Api) | **PR 5** | T031–T038 | PR 4 |
-| 6 | Frontend auth + inventory + branding por tenant | **PR 6** | T039–T043, T051–T060 | PR 3, PR 4, PR 5 |
-| 7 | Contracts (orval) + PWA + e2e mínimo | **PR 7** | T044–T048 | PR 6 |
+| Unit | Objetivo                                               | PR       | Tareas                | Depende de       |
+| ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
+| 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
+| 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050 | PR 2             |
+| 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
+| 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
+| 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
+| 7    | Contracts (orval) + PWA + e2e mínimo                   | **PR 7** | T044–T048             | PR 6             |
 
 ### Grafo de dependencias entre PRs
 
@@ -154,29 +154,36 @@ y el tenant en el path una vez autenticado (`stockma.app/{slug}/inventario`). No
 cambia de origen después del login: el JWT vive en `localStorage`, que es por origen,
 y el usuario aterrizaría deslogueado.
 
-- [ ] **T055** ⚠️ **BLOQUEANTE — decisión de usuario requerida.** El login genérico y el
-  email único **por tenant** son incompatibles: `POST /api/auth/login` exige
-  `X-Tenant-ID`, y sin tenant en la URL el frontend no lo tiene. Con el mismo email
-  existiendo en varios tenants (`AUTH_EMAIL_DUPLICATE` hoy es por tenant), el email
-  solo no alcanza para resolver a cuál pertenece. Salidas: (a) email **único global**
-  en la plataforma y `/api/auth/login` exento del `TenantMiddleware`, resolviendo el
-  tenant desde el email; (b) mantener email por tenant y volver a un discriminador en
-  la URL o en la pantalla. **Nada de PR 3 se puede cerrar sin esto**
+- [x] **T055** Resuelta: **el email es único en toda la plataforma**, no por tenant.
+      `POST /api/auth/login` queda **exento** del `TenantMiddleware` y resuelve el `TenantId`
+      desde el email. Es lo único compatible con el login genérico ya decidido. Costo
+      aceptado: una persona no puede tener cuenta en dos tenants con el mismo correo; si
+      algún día hace falta, la salida es una tabla `UserTenant` con selección post-login.
+      Actualizados `spec.md` (FR-005, FR-006), `data-model.md` y `contracts/auth-api.md`
+- [ ] **T055a** `TenantMiddleware`: excepción para `POST /api/auth/login` + test de que
+      **ninguna otra ruta** quedó exenta — depende de T055
+- [ ] **T055b** Búsqueda del usuario por email en el login con `IgnoreQueryFilters()`
+      explícito y acotado, leyendo sólo lo necesario para autenticar y obtener el `TenantId`.
+      Test que demuestre que por ese camino no se puede leer nada más de otro tenant. El
+      filtro **NO DEBE** volverse permisivo cuando el `TenantContext` está vacío — depende de T055a
+- [ ] **T055c** Respuesta uniforme `401 AUTH_INVALID_CREDENTIALS` para email inexistente,
+      contraseña incorrecta y usuario de otro tenant, con test de los tres casos. Con email
+      único global, distinguirlos permite enumerar qué correos usan Stockma — depende de T055a
 - [ ] **T056** `Tenant.Slug` (único en la plataforma) y `Tenant.Name` + migración. Hoy la
-  entidad tiene SÓLO `Id` y `Settings`: sin esto no hay path por tenant ni forma de
-  mostrar el nombre del cliente
+      entidad tiene SÓLO `Id` y `Settings`: sin esto no hay path por tenant ni forma de
+      mostrar el nombre del cliente
 - [ ] **T057** `POST /api/auth/login` devuelve `branding` en el cuerpo junto al
-  `accessToken`. Evita el round-trip extra y el parpadeo de colores al entrar; sin esto
-  el usuario ve el azul de Stockma y salta a su paleta — depende de T019, T051, T056
+      `accessToken`. Evita el round-trip extra y el parpadeo de colores al entrar; sin esto
+      el usuario ve el azul de Stockma y salta a su paleta — depende de T019, T051, T056
 - [ ] **T058** Routing del frontend con el tenant en el path (`/{slug}/...`) tras el login
-  — depende de T056
+      — depende de T056
 - [ ] **T059** `OnboardingCompletedAt` en `TenantSettings` (separado de `Branding`:
-  completar el onboarding y quedarse con la paleta por defecto es válido) + wizard
-  disparado por **primer login de un admin del tenant**, no por primer login a secas —
-  depende de PR 3
+      completar el onboarding y quedarse con la paleta por defecto es válido) + wizard
+      disparado por **primer login de un admin del tenant**, no por primer login a secas —
+      depende de PR 3
 - [ ] **T060** Logo del tenant — capacidad nueva, NO es un color más: almacenamiento de
-  archivos, formatos y tamaño permitidos, servido y caché, y saneamiento de SVG subido.
-  Sin decidir; el login genérico usa el logo de Stockma y no lo necesita
+      archivos, formatos y tamaño permitidos, servido y caché, y saneamiento de SVG subido.
+      Sin decidir; el login genérico usa el logo de Stockma y no lo necesita
 - [ ] **T043** Tests de componentes de `auth` e `inventory` — depende de T039, T040
 
 ## Fase 7 — Contracts + PWA (PR 7, depende de PR 6)
@@ -191,33 +198,33 @@ y el usuario aterrizaría deslogueado.
 
 ## Trazabilidad requerimiento → tareas
 
-| Requerimiento | Tareas | PR |
-|---|---|---|
-| FR-001 | T009 | PR 2 |
-| FR-002 | T008, T010, T013 | PR 2 |
-| FR-003 | T011 | PR 2 |
-| FR-004 | T012 | PR 2 |
-| FR-005 | T015, T017, T019, T022 | PR 3 |
-| FR-006 | T016, T017, T019, T021 | PR 3 |
-| FR-007 | T015, T020 | PR 3 |
-| FR-008 | T015, T018, T019, T021, T049, T050 | PR 3 |
-| FR-009 | T023, T025, T029 | PR 4 |
-| FR-010 | T023, T025, T029 | PR 4 |
-| FR-011 | T026, T027, T030 | PR 4 |
-| FR-012 | T031, T033, T038 | PR 5 |
-| FR-013 | T033, T037 | PR 5 |
-| FR-014 | T031, T032, T037 | PR 5 |
-| FR-015 | T031, T034, T037 | PR 5 |
-| NFR-001 | T014 | PR 2 |
-| NFR-002 | T009 | PR 2 |
-| NFR-003 | T011 | PR 2 |
-| NFR-004 | T016, T018, T049 | PR 3 |
-| NFR-005 | T019 | PR 3 |
-| NFR-006 | T026 | PR 4 |
-| NFR-007 | T028 | PR 4 |
-| NFR-008 | T023 — `Currency` del producto sobre el COP por defecto del tenant | PR 4 |
-| NFR-009 | T036 | PR 5 |
-| NFR-010 | T034 | PR 5 |
+| Requerimiento | Tareas                                                             | PR   |
+| ------------- | ------------------------------------------------------------------ | ---- |
+| FR-001        | T009                                                               | PR 2 |
+| FR-002        | T008, T010, T013                                                   | PR 2 |
+| FR-003        | T011                                                               | PR 2 |
+| FR-004        | T012                                                               | PR 2 |
+| FR-005        | T015, T017, T019, T022                                             | PR 3 |
+| FR-006        | T016, T017, T019, T021                                             | PR 3 |
+| FR-007        | T015, T020                                                         | PR 3 |
+| FR-008        | T015, T018, T019, T021, T049, T050                                 | PR 3 |
+| FR-009        | T023, T025, T029                                                   | PR 4 |
+| FR-010        | T023, T025, T029                                                   | PR 4 |
+| FR-011        | T026, T027, T030                                                   | PR 4 |
+| FR-012        | T031, T033, T038                                                   | PR 5 |
+| FR-013        | T033, T037                                                         | PR 5 |
+| FR-014        | T031, T032, T037                                                   | PR 5 |
+| FR-015        | T031, T034, T037                                                   | PR 5 |
+| NFR-001       | T014                                                               | PR 2 |
+| NFR-002       | T009                                                               | PR 2 |
+| NFR-003       | T011                                                               | PR 2 |
+| NFR-004       | T016, T018, T049                                                   | PR 3 |
+| NFR-005       | T019                                                               | PR 3 |
+| NFR-006       | T026                                                               | PR 4 |
+| NFR-007       | T028                                                               | PR 4 |
+| NFR-008       | T023 — `Currency` del producto sobre el COP por defecto del tenant | PR 4 |
+| NFR-009       | T036                                                               | PR 5 |
+| NFR-010       | T034                                                               | PR 5 |
 
 ## Notas de ejecución
 

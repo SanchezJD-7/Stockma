@@ -143,9 +143,14 @@ Todos los escenarios usan Dado/Cuando/Entonces. Cada uno está trazado a su requ
 - **ENTONCES** crea `ApplicationUser` con `TenantId` y retorna `201`
 
 **Escenario: Email duplicado**
-- **DADO** email ya registrado en el tenant
+- **DADO** email ya registrado en CUALQUIER tenant de la plataforma
 - **CUANDO** registrar
 - **ENTONCES** responde `409 Conflict`
+
+**Escenario: Login sin header de tenant**
+- **DADO** un email registrado y su contraseña
+- **CUANDO** `POST /api/auth/login` **sin** `X-Tenant-ID`
+- **ENTONCES** resuelve el tenant desde el email y emite el JWT con el claim `tid`
 
 #### FR-006 — Login JWT
 
@@ -316,8 +321,8 @@ Keywords normativas en español (RFC 2119): DEBE, NO DEBE, DEBERÍA, PUEDE.
 
 | ID | Requerimiento |
 |---|---|
-| **FR-005** | **Registro de usuario** — El sistema DEBE registrar usuarios con ASP.NET Core Identity asociando el `TenantId` del header `X-Tenant-ID`. |
-| **FR-006** | **Login JWT** — El sistema DEBE emitir JWT con claims de usuario y tenant tras credenciales válidas. |
+| **FR-005** | **Registro de usuario** — El sistema DEBE registrar usuarios con ASP.NET Core Identity asociando el `TenantId` del header `X-Tenant-ID`. El email DEBE ser único **en toda la plataforma**, no por tenant (T055). |
+| **FR-006** | **Login JWT** — El sistema DEBE emitir JWT con claims de usuario y tenant tras credenciales válidas. `POST /api/auth/login` DEBE quedar **exento** del `TenantMiddleware` y resolver el `TenantId` desde el email, porque el login es genérico y no lleva tenant en la URL (T055). |
 | **FR-007** | **Dispositivos confiables (máx 2, configurable)** — El sistema DEBE limitar a `MaxTrustedDevices` (def. 2, configurable por tenant) los dispositivos que pueden **saltear el 2FA**, NO DEBE usar ese límite para negar el acceso y NO DEBE revocar dispositivos automáticamente; el alta de un slot ocupado se libera sólo por acción manual de un admin. DEBE notificar al dispositivo trusted existente cuando se confía uno nuevo. |
 | **FR-008** | **2FA por SMS en dispositivo nuevo** — El sistema DEBE exigir OTP enviado por SMS al `ApplicationUser.PhoneNumber` cuando se detecta un dispositivo no conocido, y DEBE permitir el acceso a CUALQUIER dispositivo que supere ese OTP, sin importar `MaxTrustedDevices`. El `PhoneNumber` DEBE ser escribible sólo por un admin del tenant y el usuario NO DEBE poder modificar el suyo. `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]` |
 
