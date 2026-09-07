@@ -99,7 +99,7 @@ Slice en curso: `001-inventory-foundation`. El detalle vive en
 | --- | ------------------------------------ | ---------------------------------------------- |
 | 1   | Scaffolding + CI + docker-compose    | ✅                                             |
 | 2   | Tenant isolation (EF filter + RLS)   | ✅                                             |
-| 3   | Identity + JWT + 2FA por SMS         | ⛔ bloqueado (ver T055)                        |
+| 3   | Identity + JWT + 2FA por SMS         | ⬜ desbloqueado (T055 resuelta)                |
 | 4   | Product catalog                      | ✅                                             |
 | 5   | Batch inventory                      | ✅                                             |
 | 6   | Frontend auth + inventory + branding | 🚧 sistema de diseño y branding backend listos |

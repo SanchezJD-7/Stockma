@@ -10,7 +10,7 @@
 
 | Regla | Detalle |
 |---|---|
-| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente. Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001) |
+| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo `POST /api/auth/login`** (T055). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001) |
 | Header de dispositivo | `X-Device-Id: {string}` — opcional en `login`, obligatorio en `confirm-device`. `[PENDIENTE: las fuentes lo llaman "deviceId header opcional" en login y campo del body en confirm-device; unificar nombre y ubicación]` |
 | Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode` |
 | Rate limiting | `POST /login` DEBERÍA limitar a 5 intentos por IP por minuto → `429` (NFR-005) |
@@ -68,7 +68,7 @@ Content-Type: application/json
 |---|---|---|
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header `X-Tenant-ID` ausente o no es un GUID (FR-001) |
 | `400` | `VALIDATION_FAILED` | Email o contraseña no cumplen las reglas de Identity |
-| `409` | `AUTH_EMAIL_DUPLICATE` | El email ya existe **en ese tenant** (FR-005). El mismo email PUEDE existir en otro tenant |
+| `409` | `AUTH_EMAIL_DUPLICATE` | El email ya existe en **cualquier** tenant de la plataforma (FR-005, T055). El email es único global |
 
 ### Escenarios (Dado/Cuando/Entonces)
 
@@ -86,12 +86,14 @@ Content-Type: application/json
 
 ## `POST /api/auth/login` — FR-006, FR-008
 
-> ⚠️ **`[BLOQUEANTE — T055]` Este contrato es incompatible con el login genérico decidido.**
-> La entrada a la aplicación quedó definida como un solo origen sin tenant en la URL
-> (`stockma.app/login`), pero acá `X-Tenant-ID` es obligatorio y el frontend no lo tiene
-> en ese momento. Y el email no alcanza para deducirlo: hoy es único **por tenant**
-> (ver `AUTH_EMAIL_DUPLICATE`), así que el mismo email puede pertenecer a varios.
-> Hay que resolver esto antes de implementar PR 3.
+> **Excepción al header de tenant (T055).** Esta es la única ruta **exenta** del
+> `TenantMiddleware`: el login es genérico (`stockma.app/login`, sin tenant en la URL),
+> así que el cliente no tiene el GUID para mandar. El tenant se resuelve **desde el
+> email**, que es único en toda la plataforma.
+>
+> La búsqueda del usuario por email DEBE usar `IgnoreQueryFilters()` de forma explícita
+> y leer únicamente lo necesario para autenticar y obtener el `TenantId`. Es el único
+> punto del sistema que cruza la frontera entre tenants a propósito.
 
 Emite un JWT si el dispositivo es confiable; si no, dispara el 2FA por SMS.
 
@@ -103,10 +105,11 @@ Emite un JWT si el dispositivo es confiable; si no, dispara el 2FA por SMS.
 
 ```http
 POST /api/auth/login
-X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
 X-Device-Id: web-chrome-a91f2c
 Content-Type: application/json
 ```
+
+Sin `X-Tenant-ID`: el tenant sale del email.
 
 ```json
 {
@@ -146,8 +149,7 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
-| `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
-| `401` | `AUTH_INVALID_CREDENTIALS` | Email o contraseña incorrectos. La respuesta NO DEBE revelar cuál de los dos falló (FR-006) |
+| `401` | `AUTH_INVALID_CREDENTIALS` | Email inexistente **o** contraseña incorrecta. La respuesta DEBE ser idéntica en los tres casos —email que no existe, contraseña equivocada, usuario de otro tenant— porque distinguirlos habilita enumerar qué correos usan Stockma (FR-006) |
 | `429` | `AUTH_RATE_LIMITED` | Más de 5 intentos por IP por minuto (NFR-005) |
 
 ### Escenarios (Dado/Cuando/Entonces)
