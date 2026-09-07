@@ -137,7 +137,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `TenantId` | `Guid` | Tomado del header `X-Tenant-ID` en el registro. Inmutable (FR-004) |
 | `Email` | `string` | Heredado. Único **global** en toda la plataforma (T055) — es lo que permite resolver el tenant en el login genérico |
 | `PasswordHash` | `string` | PBKDF2 vía Identity (NFR-004) |
-| `PhoneNumber` | `string?` | Heredado de `IdentityUser`. **Celular destino del OTP por SMS** — requerido para el 2FA (FR-008). Escribible **sólo por un admin del tenant** |
+| `PhoneNumber` | `string?` | Heredado de `IdentityUser`. **Celular destino del OTP por SMS** — requerido para el 2FA (FR-008). **Alta**: sólo un admin del tenant (T050). **Cambio**: el propio usuario, con OTP al número actual (T061) |
 | `PhoneNumberConfirmed` | `bool` | Heredado de `IdentityUser`. Se setea al cargar/validar el número; sólo un admin lo altera |
 | `UserName`, `NormalizedEmail`, `SecurityStamp`, … | — | Campos estándar de `IdentityUser` |
 | `DeviceFingerprint` | — | Relación con dispositivos confiables. `[PENDIENTE: las fuentes lo nombran como "relación", no como columna escalar; confirmar si es navegación a TrustedDevice o una columna de último fingerprint]` |
@@ -152,10 +152,12 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Invariantes de `PhoneNumber` (canal del 2FA — FR-008)**
 
 - `PhoneNumber` DEBE estar cargado para que el usuario pueda recibir el OTP por SMS desde un dispositivo no trusted.
-- El usuario **NO DEBE** poder modificar su propio `PhoneNumber`. ASP.NET Core Identity expone esa superficie **por defecto** (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que **cerrarla explícitamente** — no alcanza con no usarla. Ver T050.
+- El usuario **NO DEBE** poder enrolar ni modificar su `PhoneNumber` por la superficie **self-service de Identity**. ASP.NET Core Identity la expone **por defecto** (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que **cerrarla explícitamente** — no alcanza con no usarla. Ver T050.
+- El **alta** del primer número es acto exclusivo de un admin del tenant (T050). El usuario NO DEBE poder enrolarlo: en ese momento sólo hay **un** factor, y si con él se decidiera el destino del OTP, quien tuviera la contraseña controlaría ambos.
+- El **cambio** de un número ya cargado PUEDE hacerlo el propio usuario vía `PUT /api/auth/phone-number` (T061), confirmando un OTP enviado al número **actual**. Ese OTP NUNCA DEBE enviarse al número nuevo, y el cambio NO DEBE aplicarse hasta confirmarlo.
 - El único camino de escritura DEBE ser el endpoint admin `PUT /api/admin/users/{userId}/phone-number` (`[PENDIENTE: propuesto, no está en las fuentes originales]`), autorizado sólo para un admin del tenant.
 - Toda escritura de `PhoneNumber` DEBE quedar auditada con el admin que la ejecutó.
-- `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+- Un usuario **sin** `PhoneNumber` cargado DEBE ser **bloqueado** al intentar entrar desde un dispositivo no trusted (`403 AUTH_PHONE_NOT_ENROLLED`). NO DEBE permitirse el ingreso salteando el 2FA: eso convertiría "no cargar el número" en un bypass permanente del segundo factor.
 - `[PENDIENTE: formato/validación del PhoneNumber (E.164, sólo móviles colombianos, unicidad por tenant) no definido en las fuentes]`
 
 **Relaciones**
@@ -236,7 +238,7 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 
 - El OTP DEBE expirar en ≤ 10 minutos (NFR-004) — la ventana **se mantiene** con el canal SMS.
 - El OTP DEBE enviarse por SMS al `ApplicationUser.PhoneNumber` del usuario que se loguea, nunca por email (FR-008).
-- Sin `PhoneNumber` cargado no hay destino de envío. `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+- Sin `PhoneNumber` cargado no hay destino de envío: el acceso desde un dispositivo no trusted DEBE **bloquearse** con `403 AUTH_PHONE_NOT_ENROLLED` hasta que un admin del tenant cargue el número (T050). Nunca se saltea el 2FA.
 - Un OTP vencido o incorrecto DEBE responder `401` y el intento DEBE quedar registrado (FR-008).
 
 **Índices**: `(TenantId, UserId, DeviceId)`. `[PENDIENTE: política de purga de OTPs vencidos no definida]`
@@ -387,7 +389,7 @@ Patrón: migraciones tenant-wide sobre una DB compartida con filtrado lógico. A
 | 2 | `Tenant` | Alta/onboarding fuera de alcance; seed manual |
 | 3 | `Tenant` | ¿RLS o restricción por rol sobre la tabla `tenants`? |
 | 4 | `User` | `DeviceFingerprint`: ¿navegación o columna escalar? |
-| 4b | `User` | `PhoneNumber` sin cargar: ¿primer login sin 2FA, alta obligatoria por admin antes de habilitar, o bloqueo? |
+| 4b | `User` | ~~`PhoneNumber` sin cargar~~ — **RESUELTO**: bloqueo con `403 AUTH_PHONE_NOT_ENROLLED`; el alta es acto de admin (T050) y el cambio es self-service con OTP al número actual (T061) |
 | 4c | `User` | Formato/validación y unicidad por tenant del `PhoneNumber`; endpoint admin propuesto, no en las fuentes |
 | 5 | `User` | ~~Índice único global vs. compuesto per-tenant~~ — **resuelto (T055)**: se usa el índice global por defecto de Identity |
 | 6 | `User` | `HasQueryFilter` durante el login — **acotado (T055)**: el login corre sin `TenantContext` y usa `IgnoreQueryFilters()` explícito en una única consulta |
