@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T066`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T069`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T069 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -141,6 +141,32 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
       **Reglas**: el refresh DEBE estar acotado al tenant y al usuario; `logout` DEBE revocar la familia **del lado del servidor**, no sólo limpiar el cliente; un refresh NO DEBE servir para saltear el 2FA en un dispositivo nuevo — sólo renueva una sesión ya autenticada en ese dispositivo.
       Tests: rotación emite token nuevo e invalida el anterior; reusar un token consumido revoca la familia entera; el refresh de un tenant no sirve en otro; `logout` invalida del lado del servidor; el refresh caducado responde `401`.
       **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
+- [ ] **T067** **Gestión y revocación de dispositivos y sesiones** (FR-007) — depende de T062, T065
+      **El endpoint no existe.** `contracts/auth-api.md` lo dice textual: *"Endpoint admin de revocación/alta de dispositivo — no existe en las fuentes `[PENDIENTE: definir]`"*. Y FR-007 apoya todo su diseño en que `RevokedAt` lo setea un admin — con un botón que nadie construyó.
+      **Superficie admin**: `GET /api/admin/users/{userId}/devices` (no se puede revocar lo que no se ve), `POST /api/admin/users/{userId}/devices/{deviceId}/revoke`, `POST /api/admin/users/{userId}/devices/revoke-all`.
+      **Superficie propia**: `GET /api/auth/devices` y `POST /api/auth/devices/{deviceId}/revoke`. Que cada uno vea sus dispositivos NO es una comodidad: es cómo el usuario detecta uno que no reconoce. El admin no mira las sesiones de otro todos los días; el dueño de la cuenta sí.
+      **Regla que no se puede omitir**: revocar un dispositivo DEBE revocar también las **familias de refresh token** asociadas (T065). Sin eso, el `RevokedAt` sólo impide saltear el 2FA a futuro mientras la sesión viva sigue funcionando hasta `RefreshTokenLifetimeHours` — revocar sin cerrar la sesión es teatro.
+      La respuesta DEBE listar `DeviceId`, `TrustedAt`, último uso y si está activo. Revocar es idempotente. Un `Member` NO DEBE poder ver ni revocar dispositivos ajenos.
+      Tests: revocar libera el slot de `MaxTrustedDevices`; revocar corta la sesión viva del dispositivo; un `Member` recibe `403` sobre dispositivos de otro usuario; revocar dos veces no falla.
+- [ ] **T068** **Deshabilitar y rehabilitar usuario (offboarding real)** — depende de T062, T065, T067
+      **T067 NO alcanza para el empleado que se va.** Revocarle el dispositivo no le saca el acceso: conserva su contraseña y su celular, así que vuelve a entrar con OTP. Lo único que corta el acceso es deshabilitar la cuenta.
+      `POST /api/admin/users/{userId}/disable` y `/enable`, sólo `TenantAdmin`. ASP.NET Core Identity ya trae `LockoutEnabled` / `LockoutEnd`: se usa eso, no un flag nuevo.
+      **Deshabilitar DEBE, en un solo acto**: rechazar el login con `401` uniforme, revocar **todas** las familias de refresh del usuario y revocar **todos** sus `TrustedDevice`. Un offboarding a medias no es un offboarding.
+      El usuario deshabilitado NO DEBE poder pedir recuperación de contraseña (T069) ni cambiar su `PhoneNumber` (T061).
+      Un `TenantAdmin` NO DEBE poder deshabilitarse a sí mismo si es el último admin del tenant — dejaría al tenant sin quien administre.
+      Tests: el deshabilitado no entra ni con dispositivo trusted; su sesión viva muere en el acto; no puede pedir reset; el último admin no puede autodeshabilitarse; rehabilitar no resucita dispositivos ni sesiones viejas.
+- [ ] **T069** **Recuperación de contraseña por SMS al número enrolado** — depende de T018, T019, T062, T065
+      **No existe en ningún contrato.** Ni `register`, ni `login`, ni `confirm-device`. Día uno de operación real alguien olvida la contraseña y no hay camino que no sea tocar la base.
+      **Canal: SMS al `PhoneNumber` enrolado, NO email.** Es coherente con todo lo ya decidido — el email es el identificador de login, nunca un canal de confianza (FR-008), y el número es enrolado por un admin, así que un atacante no puede redirigirlo. Además reusa la infraestructura de OTP que ya se construye en T018.
+      **Fallback**: `POST /api/admin/users/{userId}/reset-password` iniciado por un `TenantAdmin`, para el que perdió el celular Y la contraseña. Sin esto el usuario queda encerrado afuera.
+      **Reglas de seguridad**:
+      - Respuesta **uniforme** exista o no el email — mismo motivo que T055c: distinguir permite enumerar qué correos usan Stockma.
+      - Token de reset de **un solo uso**, expiración corta, persistido **hasheado**.
+      - Un reset exitoso DEBE revocar **todas** las familias de refresh del usuario (T065). Si el atacante ya tenía sesión, cambiar la contraseña sin cortarla no lo echa.
+      - El reset **NO DEBE** saltear el 2FA: entrar desde un dispositivo nuevo sigue exigiendo OTP.
+      - Un usuario sin `PhoneNumber` cargado o deshabilitado (T068) NO DEBE poder iniciar el flujo — ese caso es del admin.
+      - Rate limiting igual que el resto de `auth` (NFR-005).
+      Tests: respuesta idéntica para email existente e inexistente; token usado dos veces es rechazado; el reset mata las sesiones vivas; tras el reset, un dispositivo desconocido sigue pidiendo OTP; el deshabilitado no puede iniciar el flujo.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
@@ -250,9 +276,9 @@ y el usuario aterrizaría deslogueado.
 | FR-002        | T008, T010, T013                                                   | PR 2 |
 | FR-003        | T011                                                               | PR 2 |
 | FR-004        | T012                                                               | PR 2 |
-| FR-005        | T015, T017, T019, T022, T062, T064                                 | PR 3 |
+| FR-005        | T015, T017, T019, T022, T062, T064, T068, T069                     | PR 3 |
 | FR-006        | T016, T017, T019, T021, T062, T063, T065                           | PR 3 |
-| FR-007        | T015, T020                                                         | PR 3 |
+| FR-007        | T015, T020, T067, T068                                             | PR 3 |
 | FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
 | FR-010        | T023, T025, T029                                                   | PR 4 |
