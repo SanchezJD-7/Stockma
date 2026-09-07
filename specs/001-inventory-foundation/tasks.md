@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T064`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T065`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T064 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -130,6 +130,17 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
       Hoy el contrato (`contracts/auth-api.md`) muestra el request con `X-Tenant-ID` y **sin** `Authorization`: cualquiera que conozca un tenant ID se crea un usuario adentro. Contradice la premisa de que los usuarios los da de alta el admin.
       El alta DEBE incluir el `PhoneNumber` en el mismo acto (T050): un usuario creado sin número no puede entrar desde un dispositivo no trusted y queda inservible hasta que el admin lo complete.
       Tests: `register` sin JWT responde `401`; con JWT de `Member` responde `403`; con JWT de `TenantAdmin` de OTRO tenant responde `403`; alta sin `phoneNumber` es rechazada.
+- [ ] **T065** **Refresh token con rotación y detección de reuso** — `POST /api/auth/refresh` + `POST /api/auth/logout` (FR-006, NFR-004) — depende de T015, T016, T019
+      **Bloqueante para cualquier política de re-autenticación.** Hoy el JWT dura ≤ 60 min y **no hay forma de renovarlo**: un turno de 8 horas son **8 logins por persona**. Con OTP en cada login eso da ~1.200 SMS/mes por droguería y convierte al SMS en punto único de falla — si el proveedor se demora, el mostrador no trabaja. Con refresh, el login pasa a **1 por turno**.
+      **Entidad** `RefreshToken : ITenantEntity`: `Id`, `TenantId`, `UserId`, `TokenHash`, `FamilyId`, `IssuedAt`, `ExpiresAt`, `ConsumedAt?`, `RevokedAt?`.
+      El token DEBE persistirse **hasheado**, nunca en plano — mismo criterio que el OTP (`IPasswordHasher`) y la contraseña.
+      **Rotación**: cada uso consume el refresh presentado y emite uno nuevo dentro de la misma `FamilyId`.
+      **Detección de reuso (la propiedad que importa)**: si se presenta un token con `ConsumedAt != null`, el sistema DEBE revocar **toda la familia** y registrar el evento. Un refresh usado dos veces significa que alguien tiene una copia: la sesión se cae entera, para el legítimo y para el ladrón.
+      **Vigencia**: el access token NO cambia, sigue en ≤ 60 min (NFR-004). El refresh define la sesión real. `RefreshTokenLifetimeHours` configurable por tenant, default propuesto **12 h** (un turno). `[PENDIENTE: confirmar default]`
+      **Almacenamiento recomendado**: el refresh viaja en cookie `httpOnly` + `Secure` + `SameSite=Strict`, NO en `localStorage`. Es la credencial de larga vida: expuesta a XSS, entrega la sesión completa. El access token de 60 min puede seguir donde está. `[PENDIENTE: contradice parcialmente la decisión previa de guardar el JWT en localStorage — confirmar]`
+      **Reglas**: el refresh DEBE estar acotado al tenant y al usuario; `logout` DEBE revocar la familia **del lado del servidor**, no sólo limpiar el cliente; un refresh NO DEBE servir para saltear el 2FA en un dispositivo nuevo — sólo renueva una sesión ya autenticada en ese dispositivo.
+      Tests: rotación emite token nuevo e invalida el anterior; reusar un token consumido revoca la familia entera; el refresh de un tenant no sirve en otro; `logout` invalida del lado del servidor; el refresh caducado responde `401`.
+      **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
@@ -226,7 +237,7 @@ y el usuario aterrizaría deslogueado.
 | FR-003        | T011                                                               | PR 2 |
 | FR-004        | T012                                                               | PR 2 |
 | FR-005        | T015, T017, T019, T022, T062, T064                                 | PR 3 |
-| FR-006        | T016, T017, T019, T021, T062, T063                                 | PR 3 |
+| FR-006        | T016, T017, T019, T021, T062, T063, T065                           | PR 3 |
 | FR-007        | T015, T020                                                         | PR 3 |
 | FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
