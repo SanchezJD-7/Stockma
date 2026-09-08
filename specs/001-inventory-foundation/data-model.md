@@ -113,6 +113,8 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 |---|---|---|---|
 | `TenantId` | `Guid` | — | PK y FK a `Tenant` (relación 1:1) |
 | `MaxTrustedDevices` | `int` | `2` | Límite de dispositivos confiables por usuario (FR-007) |
+| `TrustedDeviceLifetimeDays` | `int` | `15` | Vigencia de un `TrustedDevice` antes de volver a exigir 2FA (FR-007, T070) |
+| `RefreshTokenLifetimeHours` | `int` | `8` | Vigencia **absoluta** de la familia de refresh — la sesión real (FR-006, T065) |
 | `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
 | `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
 | `NextSkuNumber` | `int` | `1` | Contador de la secuencia de SKU por tenant (FR-009). Se incrementa con `UPDATE ... RETURNING` dentro de la transacción del alta |
@@ -120,6 +122,8 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Invariantes**
 
 - `MaxTrustedDevices` DEBE ser ≥ 1.
+- `TrustedDeviceLifetimeDays` DEBE ser ≥ 1.
+- `RefreshTokenLifetimeHours` DEBE ser ≥ 1 y NO DEBE ser menor que la vigencia del access token (≤ 60 min, NFR-004): un refresh más corto que el access token no renueva nada.
 - `GreenMonths` DEBE ser > `YellowMonths`.
 - `YellowMonths` DEBE ser > 0.
 
@@ -137,7 +141,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `TenantId` | `Guid` | Tomado del header `X-Tenant-ID` en el registro. Inmutable (FR-004) |
 | `Email` | `string` | Heredado. Único **global** en toda la plataforma (T055) — es lo que permite resolver el tenant en el login genérico |
 | `PasswordHash` | `string` | PBKDF2 vía Identity (NFR-004) |
-| `PhoneNumber` | `string?` | Heredado de `IdentityUser`. **Celular destino del OTP por SMS** — requerido para el 2FA (FR-008). Escribible **sólo por un admin del tenant** |
+| `PhoneNumber` | `string?` | Heredado de `IdentityUser`. **Celular destino del OTP por SMS** — requerido para el 2FA (FR-008). **Alta**: sólo un admin del tenant (T050). **Cambio**: el propio usuario, con OTP al número actual (T061) |
 | `PhoneNumberConfirmed` | `bool` | Heredado de `IdentityUser`. Se setea al cargar/validar el número; sólo un admin lo altera |
 | `UserName`, `NormalizedEmail`, `SecurityStamp`, … | — | Campos estándar de `IdentityUser` |
 | `DeviceFingerprint` | — | Relación con dispositivos confiables. `[PENDIENTE: las fuentes lo nombran como "relación", no como columna escalar; confirmar si es navegación a TrustedDevice o una columna de último fingerprint]` |
@@ -152,10 +156,12 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Invariantes de `PhoneNumber` (canal del 2FA — FR-008)**
 
 - `PhoneNumber` DEBE estar cargado para que el usuario pueda recibir el OTP por SMS desde un dispositivo no trusted.
-- El usuario **NO DEBE** poder modificar su propio `PhoneNumber`. ASP.NET Core Identity expone esa superficie **por defecto** (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que **cerrarla explícitamente** — no alcanza con no usarla. Ver T050.
+- El usuario **NO DEBE** poder enrolar ni modificar su `PhoneNumber` por la superficie **self-service de Identity**. ASP.NET Core Identity la expone **por defecto** (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que **cerrarla explícitamente** — no alcanza con no usarla. Ver T050.
+- El **alta** del primer número es acto exclusivo de un admin del tenant (T050). El usuario NO DEBE poder enrolarlo: en ese momento sólo hay **un** factor, y si con él se decidiera el destino del OTP, quien tuviera la contraseña controlaría ambos.
+- El **cambio** de un número ya cargado PUEDE hacerlo el propio usuario vía `PUT /api/auth/phone-number` (T061), confirmando un OTP enviado al número **actual**. Ese OTP NUNCA DEBE enviarse al número nuevo, y el cambio NO DEBE aplicarse hasta confirmarlo.
 - El único camino de escritura DEBE ser el endpoint admin `PUT /api/admin/users/{userId}/phone-number` (`[PENDIENTE: propuesto, no está en las fuentes originales]`), autorizado sólo para un admin del tenant.
 - Toda escritura de `PhoneNumber` DEBE quedar auditada con el admin que la ejecutó.
-- `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+- Un usuario **sin** `PhoneNumber` cargado DEBE ser **bloqueado** al intentar entrar desde un dispositivo no trusted (`403 AUTH_PHONE_NOT_ENROLLED`). NO DEBE permitirse el ingreso salteando el 2FA: eso convertiría "no cargar el número" en un bypass permanente del segundo factor.
 - `[PENDIENTE: formato/validación del PhoneNumber (E.164, sólo móviles colombianos, unicidad por tenant) no definido en las fuentes]`
 
 **Relaciones**
@@ -191,16 +197,19 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `DeviceId` | `string` | Identificador del dispositivo enviado por el cliente en el login |
 | `Fingerprint` | `string` | Huella del dispositivo. `[PENDIENTE: algoritmo de fingerprint no definido en las fuentes]` |
 | `TrustedAt` | `DateTime` | Momento en que el dispositivo quedó confiable |
-| `RevokedAt` | `DateTime?` | `null` = activo. Un valor marca el dispositivo como revocado |
+| `ExpiresAt` | `DateTime` | `TrustedAt + TenantSettings.TrustedDeviceLifetimeDays`. Vencido = vuelve a exigir 2FA (T070) |
+| `RevokedAt` | `DateTime?` | `null` = no revocado. Un valor marca baja **manual por un admin** — es auditoría de una acción humana, NO se usa para el vencimiento |
 
 **Invariantes**
 
-- Un dispositivo se cuenta como **activo** si `RevokedAt IS NULL`.
+- Un dispositivo se cuenta como **activo** si `RevokedAt IS NULL AND ExpiresAt > now()`.
 - El número de dispositivos activos por usuario DEBE ser ≤ `TenantSettings.MaxTrustedDevices` (def. 2) — FR-007. La fila `TrustedDevice` **no se crea** cuando el conteo ya alcanzó el máximo.
 - El límite gobierna **sólo el privilegio de saltear el 2FA**, no el acceso: la ausencia de un `TrustedDevice` NO DEBE impedir el login (FR-008), sólo obliga al OTP en cada ingreso.
-- `RevokedAt` DEBE setearse **únicamente** por acción manual de un admin. Ninguna ruta automática PUEDE revocar un dispositivo, y no existe selección del "más antiguo".
+- `RevokedAt` DEBE setearse **únicamente** por acción manual de un admin o del propio usuario sobre su dispositivo (T067). Ninguna ruta automática PUEDE escribir `RevokedAt`, y no existe selección del "más antiguo".
+- El **vencimiento** es un mecanismo separado: se resuelve por `ExpiresAt`, nunca escribiendo `RevokedAt` (T070). Mezclarlos borraría la diferencia entre "alguien lo dio de baja" y "se venció solo", que es justamente lo que hace útil la auditoría.
 - Sólo un dispositivo trusted existente PUEDE autorizar uno nuevo (FR-007).
-- `TrustedAt` DEBE ser ≤ `RevokedAt` cuando ambos existen.
+- `TrustedAt` DEBE ser ≤ `RevokedAt` cuando ambos existen, y `TrustedAt` DEBE ser < `ExpiresAt`.
+- Un dispositivo vencido DEBE volver a exigir OTP, pero NO DEBE bloquear el acceso ni cortar una sesión viva: cortar es T067 (revocación) y T068 (deshabilitar), que son inmediatos.
 
 **Relaciones**
 
@@ -236,7 +245,7 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 
 - El OTP DEBE expirar en ≤ 10 minutos (NFR-004) — la ventana **se mantiene** con el canal SMS.
 - El OTP DEBE enviarse por SMS al `ApplicationUser.PhoneNumber` del usuario que se loguea, nunca por email (FR-008).
-- Sin `PhoneNumber` cargado no hay destino de envío. `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+- Sin `PhoneNumber` cargado no hay destino de envío: el acceso desde un dispositivo no trusted DEBE **bloquearse** con `403 AUTH_PHONE_NOT_ENROLLED` hasta que un admin del tenant cargue el número (T050). Nunca se saltea el 2FA.
 - Un OTP vencido o incorrecto DEBE responder `401` y el intento DEBE quedar registrado (FR-008).
 
 **Índices**: `(TenantId, UserId, DeviceId)`. `[PENDIENTE: política de purga de OTPs vencidos no definida]`
@@ -387,7 +396,7 @@ Patrón: migraciones tenant-wide sobre una DB compartida con filtrado lógico. A
 | 2 | `Tenant` | Alta/onboarding fuera de alcance; seed manual |
 | 3 | `Tenant` | ¿RLS o restricción por rol sobre la tabla `tenants`? |
 | 4 | `User` | `DeviceFingerprint`: ¿navegación o columna escalar? |
-| 4b | `User` | `PhoneNumber` sin cargar: ¿primer login sin 2FA, alta obligatoria por admin antes de habilitar, o bloqueo? |
+| 4b | `User` | ~~`PhoneNumber` sin cargar~~ — **RESUELTO**: bloqueo con `403 AUTH_PHONE_NOT_ENROLLED`; el alta es acto de admin (T050) y el cambio es self-service con OTP al número actual (T061) |
 | 4c | `User` | Formato/validación y unicidad por tenant del `PhoneNumber`; endpoint admin propuesto, no en las fuentes |
 | 5 | `User` | ~~Índice único global vs. compuesto per-tenant~~ — **resuelto (T055)**: se usa el índice global por defecto de Identity |
 | 6 | `User` | `HasQueryFilter` durante el login — **acotado (T055)**: el login corre sin `TenantContext` y usa `IgnoreQueryFilters()` explícito en una única consulta |

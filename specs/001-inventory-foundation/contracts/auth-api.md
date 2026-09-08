@@ -17,7 +17,7 @@
 | Hash de contraseña | PBKDF2 vía ASP.NET Core Identity (NFR-004) |
 | Vigencia del JWT | `exp` ≤ 60 minutos; claims `sub` (userId) y `tid` (tenantId) (NFR-004, FR-006) |
 | Canal del OTP | **SMS** al `ApplicationUser.PhoneNumber`. Ventana de vigencia **≤ 10 min** (NFR-004) — se mantiene sin cambios respecto del canal anterior |
-| Origen del `PhoneNumber` | Escribible sólo por un admin vía `PUT /api/admin/users/{userId}/phone-number`. El usuario NO DEBE poder modificar el suyo |
+| Origen del `PhoneNumber` | **Alta**: sólo un admin vía `PUT /api/admin/users/{userId}/phone-number` (T050). **Cambio**: el propio usuario vía `PUT /api/auth/phone-number`, confirmando un OTP enviado al número **actual** (T061). La superficie self-service de Identity DEBE seguir cerrada |
 
 ### Forma del error
 
@@ -141,7 +141,7 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 
 > `[PENDIENTE: las fuentes no definen si esta respuesta es 200 o 202, ni si incluye el número de celular enmascarado o un tiempo de expiración para la UI]`
 
-> `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+> **Usuario sin `PhoneNumber` cargado**: el acceso DEBE bloquearse con `403 AUTH_PHONE_NOT_ENROLLED`, indicando que un admin del tenant debe cargar el número. NO DEBE permitirse el ingreso salteando el 2FA ni ofrecerle al usuario enrolar el suyo (T050, T061).
 
 > `[PENDIENTE: proveedor de SMS no elegido]`
 
@@ -277,7 +277,7 @@ Content-Type: application/json
 
 ### Reglas
 
-- El usuario objetivo NO DEBE poder invocar este endpoint sobre sí mismo salvo que sea admin del tenant.
+- El usuario objetivo NO DEBE poder invocar este endpoint sobre sí mismo salvo que sea admin del tenant. Para cambiar el suyo tiene `PUT /api/auth/phone-number` (T061), que exige OTP al número actual.
 - Identity expone `SetPhoneNumberAsync` / `ChangePhoneNumberAsync` y los endpoints self-service de Identity por defecto: esa superficie DEBE cerrarse explícitamente (ver T050). Dejarla abierta permitiría al usuario desviar su propio segundo factor.
 - El cambio DEBE quedar auditado (`AuditSaveChangesInterceptor`) con el admin que lo ejecutó.
 - `[PENDIENTE: definir si el cambio de PhoneNumber revoca los OTP en vuelo y/o los TrustedDevice del usuario]`
@@ -293,6 +293,109 @@ Content-Type: application/json
 - **DADO** un usuario no admin autenticado
 - **CUANDO** intenta modificar su propio `PhoneNumber` (por este endpoint o por la superficie self-service de Identity)
 - **ENTONCES** responde `403` y el `PhoneNumber` queda sin cambios
+
+---
+
+## `PUT /api/auth/phone-number` — FR-008 (T061)
+
+`[PENDIENTE: propuesto, no está en las fuentes originales]`
+
+Único camino para que un usuario cambie **su propio** `PhoneNumber`. Exige estar autenticado **y** confirmar un OTP enviado al número **actual**.
+
+> **Alta ≠ cambio.** Enrolar el primer número con sólo la contraseña sería dejar que un factor se autoenrole: quien tuviera la contraseña decidiría a dónde llegan los OTP. Cambiar uno existente es seguro porque exige demostrar posesión del canal vigente — un atacante con la contraseña robada no tiene el celular viejo. Por eso el **alta** es `PUT /api/admin/users/{userId}/phone-number` (admin, T050) y el **cambio** es este endpoint.
+
+**Commands**: `RequestPhoneNumberChangeCommand` / `ConfirmPhoneNumberChangeCommand` `[PENDIENTE: propuesto]`
+
+### Paso 1 — Request del cambio
+
+```http
+PUT /api/auth/phone-number
+X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
+Authorization: Bearer {jwt-del-usuario}
+Content-Type: application/json
+```
+
+```json
+{
+  "newPhoneNumber": "+573009876543"
+}
+```
+
+### Respuesta `202 Accepted`
+
+El OTP se envió al número **actual**. El cambio **no** se aplicó todavía.
+
+```json
+{
+  "otpSentToMasked": "+57300*****67",
+  "expiresInSeconds": 600
+}
+```
+
+### Paso 2 — Confirmación
+
+```http
+POST /api/auth/phone-number/confirm
+Authorization: Bearer {jwt-del-usuario}
+Content-Type: application/json
+```
+
+```json
+{
+  "otp": "483920"
+}
+```
+
+### Respuesta `200 OK`
+
+```json
+{
+  "phoneNumberMasked": "+57300*****43",
+  "phoneNumberConfirmed": true
+}
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no es un número móvil válido en formato E.164 `[PENDIENTE: formato/validación a confirmar]` |
+| `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
+| `401` | `AUTH_OTP_REJECTED` | OTP errado o vencido en el paso 2 |
+| `403` | `AUTH_PHONE_NOT_ENROLLED` | El usuario **no tiene** `PhoneNumber` cargado: ese caso es alta por admin (T050), no cambio |
+| `409` | `AUTH_PHONE_CHANGE_PENDING` | Ya hay un cambio en vuelo sin confirmar `[PENDIENTE: confirmar si se rechaza o se reemplaza el anterior]` |
+| `429` | `RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
+
+### Reglas
+
+- El OTP DEBE enviarse al `PhoneNumber` **vigente**. NUNCA al número nuevo — mandarlo al nuevo destruye la garantía: cualquiera con la contraseña se autoconfirmaría el cambio.
+- El `PhoneNumber` NO DEBE modificarse hasta que el OTP sea confirmado. Mientras tanto el número nuevo vive aparte (pendiente), no en `ApplicationUser`.
+- Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint (`403 AUTH_PHONE_NOT_ENROLLED`).
+- Aplicado el cambio, `PhoneNumberConfirmed` DEBE quedar en `true` y el cambio DEBE quedar auditado con el usuario que lo ejecutó.
+- Rate limiting igual que el resto de `auth` (NFR-005).
+- `[PENDIENTE: definir si el cambio confirmado revoca los TrustedDevice y/o notifica al número viejo]`
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Cambio exitoso**
+- **DADO** un usuario autenticado con `PhoneNumber` cargado
+- **CUANDO** pide el cambio y confirma el OTP que le llegó al número **actual**
+- **ENTONCES** responde `200` y el `PhoneNumber` queda actualizado
+
+**El OTP viaja al número viejo, no al nuevo**
+- **DADO** un usuario que pide cambiar su número
+- **CUANDO** el sistema envía el OTP
+- **ENTONCES** el destino DEBE ser el `PhoneNumber` vigente y NUNCA el `newPhoneNumber`
+
+**OTP inválido o vencido**
+- **DADO** un cambio en vuelo
+- **CUANDO** confirma con un OTP errado o vencido
+- **ENTONCES** responde `401` y el `PhoneNumber` queda **sin cambios**
+
+**Usuario sin número previo**
+- **DADO** un usuario autenticado sin `PhoneNumber` cargado
+- **CUANDO** `PUT /api/auth/phone-number`
+- **ENTONCES** responde `403 AUTH_PHONE_NOT_ENROLLED` y el número queda sin cambios
 
 ---
 
@@ -346,6 +449,6 @@ El cliente PUEDE usar `deviceTrusted: false` para avisar que el dispositivo no q
 | FR-005 | `POST /api/auth/register` |
 | FR-006 | `POST /api/auth/login` |
 | FR-007 | `POST /api/auth/confirm-device` (efecto b: marcado trusted bajo `MaxTrustedDevices`) |
-| FR-008 | `POST /api/auth/login` + `POST /api/auth/confirm-device` (OTP por SMS) + `PUT /api/admin/users/{userId}/phone-number` `[PENDIENTE: propuesto]` |
+| FR-008 | `POST /api/auth/login` + `POST /api/auth/confirm-device` (OTP por SMS) + `PUT /api/admin/users/{userId}/phone-number` (alta) + `PUT /api/auth/phone-number` (cambio con OTP al número actual) `[PENDIENTE: propuesto]` |
 | NFR-004 | Transversal: PBKDF2, JWT ≤ 60 min, OTP ≤ 10 min |
 | NFR-005 | `POST /api/auth/login` (`429`) |

@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T050`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T070`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T070 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -109,6 +109,74 @@ Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](.
 - [ ] **T050** `PUT /api/admin/users/{userId}/phone-number` (sólo admin del tenant) **y cierre de la superficie self-service de Identity** sobre `PhoneNumber` (FR-008) — depende de T019
       El usuario NO DEBE poder registrar ni cambiar su propio `PhoneNumber`. Identity lo expone por defecto (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que cerrar esa superficie explícitamente, no alcanza con no usarla. Ver [`contracts/auth-api.md`](./contracts/auth-api.md) y [`data-model.md`](./data-model.md).
       `[PENDIENTE: propuesto, no está en las fuentes originales]`
+- [ ] **T061** `PUT /api/auth/phone-number` — cambio del propio `PhoneNumber` **autenticado y con OTP al número ACTUAL** (FR-008) — depende de T018, T019, T050
+      Resuelve la fricción operativa de T050: sin esto, el admin del tenant que quiere cambiar su propio número tiene que escribirle al admin de plataforma.
+      Distinción que sostiene la regla: **enrolar** el primer número con sólo la contraseña es inseguro (un factor se autoenrolaría); **cambiar** uno existente es seguro, porque exige demostrar posesión del factor actual. Un atacante con la contraseña robada no tiene el celular viejo y la cadena de confianza no se corta.
+      Reglas: el OTP DEBE ir al `PhoneNumber` vigente, NUNCA al nuevo. El cambio NO DEBE aplicarse hasta confirmar ese OTP. Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint — ese caso es alta por admin (T050), no cambio. Rate limiting igual que el resto de `auth` (NFR-005).
+      Tests: cambio exitoso confirmando OTP; rechazo con OTP inválido o expirado; rechazo si el usuario no tiene número previo; verificación de que el OTP se envió al número viejo y no al nuevo.
+- [ ] **T062** **Roles del tenant** (`TenantAdmin` / `Member`) — claim `role` en el JWT y policy de autorización — depende de T015, T016
+      **Bloqueante, no mejora.** Toda la superficie de seguridad ya escrita dice "sólo admin del tenant" (T050, T053, T059, branding) y **el rol no existe en el modelo**: `data-model.md` sólo lo menciona de pasada en la lista de tablas de Identity. Sin esto, "sólo admin" no es implementable — se simula.
+      Alcance: `IdentityRole<Guid>` con los dos roles sembrados; asignación por usuario (el usuario ya está acotado al tenant, así que el rol NO necesita `TenantId` propio); claim `role` emitido en el JWT junto a `sub` y `tid`; policy `TenantAdmin` aplicada a todo endpoint `/api/admin/*`.
+      El **primer usuario de un tenant** DEBE nacer `TenantAdmin`; no puede haber un tenant sin admin.
+      Un `TenantAdmin` NO DEBE poder quitarse el rol a sí mismo si es el último admin del tenant.
+      Tests: `Member` recibe `403` en cada endpoint `/api/admin/*`; el claim `role` viaja en el JWT; el último admin no puede degradarse.
+- [ ] **T063** **Admin de plataforma** — superficie separada, fuera del modelo de tenants — depende de T015, T062
+      **Problema de modelo, no de permisos.** `ApplicationUser.TenantId` es obligatorio y hay filtro global por tenant: el dueño de la plataforma, que por definición no pertenece a ningún tenant, hoy **no tiene lugar donde existir**.
+      **Enfoque recomendado**: identidad y endpoints **separados** (`/api/platform/*`), NO un rol más sobre `ApplicationUser`. Motivo: todo el aislamiento (filtro EF + RLS + test de arquitectura) se apoya en la invariante "todo `ApplicationUser` pertenece a exactamente un tenant". Meter un super-usuario exento reabre la misma clase de riesgo que cierra T055b — un filtro con excepciones deja de ser una garantía.
+      Alternativas descartadas: (a) `TenantId` nullable + exención del filtro — vuelve el filtro permisivo, justo lo que la spec prohíbe; (b) tenant "de sistema" con `Guid` conocido — el filtro sigue aplicando, así que no resuelve operar sobre otros tenants.
+      Tests: ningún `ApplicationUser` queda sin `TenantId`; la superficie de plataforma no es alcanzable con un JWT de tenant, y viceversa.
+      **Decidido por el usuario**: superficie separada.
+- [ ] **T064** **Cerrar `POST /api/auth/register`**: pasa a exigir JWT de `TenantAdmin` del mismo tenant — depende de T019, T062
+      Hoy el contrato (`contracts/auth-api.md`) muestra el request con `X-Tenant-ID` y **sin** `Authorization`: cualquiera que conozca un tenant ID se crea un usuario adentro. Contradice la premisa de que los usuarios los da de alta el admin.
+      El alta DEBE incluir el `PhoneNumber` en el mismo acto (T050): un usuario creado sin número no puede entrar desde un dispositivo no trusted y queda inservible hasta que el admin lo complete.
+      Tests: `register` sin JWT responde `401`; con JWT de `Member` responde `403`; con JWT de `TenantAdmin` de OTRO tenant responde `403`; alta sin `phoneNumber` es rechazada.
+- [ ] **T065** **Refresh token con rotación y detección de reuso** — `POST /api/auth/refresh` + `POST /api/auth/logout` (FR-006, NFR-004) — depende de T015, T016, T019
+      **Bloqueante para cualquier política de re-autenticación.** Hoy el JWT dura ≤ 60 min y **no hay forma de renovarlo**: un turno de 8 horas son **8 logins por persona**. Con OTP en cada login eso da ~1.200 SMS/mes por droguería y convierte al SMS en punto único de falla — si el proveedor se demora, el mostrador no trabaja. Con refresh, el login pasa a **1 por turno**.
+      **Entidad** `RefreshToken : ITenantEntity`: `Id`, `TenantId`, `UserId`, `TokenHash`, `FamilyId`, `IssuedAt`, `ExpiresAt`, `ConsumedAt?`, `RevokedAt?`.
+      El token DEBE persistirse **hasheado**, nunca en plano — mismo criterio que el OTP (`IPasswordHasher`) y la contraseña.
+      **Rotación**: cada uso consume el refresh presentado y emite uno nuevo dentro de la misma `FamilyId`.
+      **Detección de reuso (la propiedad que importa)**: si se presenta un token con `ConsumedAt != null`, el sistema DEBE revocar **toda la familia** y registrar el evento. Un refresh usado dos veces significa que alguien tiene una copia: la sesión se cae entera, para el legítimo y para el ladrón.
+      **Vigencia**: el access token NO cambia, sigue en ≤ 60 min (NFR-004). El refresh define la sesión real. `RefreshTokenLifetimeHours` configurable por tenant, default **8 h** (decisión del usuario; la propuesta era 12 h con margen). Vigencia **absoluta** desde el login, no deslizante: da exactamente 1 login por turno. Consecuencia aceptada: quien empalma dos turnos o hace horas extra vuelve a loguearse en medio de la jornada. Si el mostrador se queja, la salida es vigencia deslizante con tope absoluto, no un número más grande.
+      **Almacenamiento (decidido)**: el refresh viaja en cookie `httpOnly` + `Secure` + `SameSite=Strict`, **NO** en `localStorage`. Es la credencial de larga vida: en `localStorage` cualquier XSS —una dependencia npm comprometida alcanza— se lleva la sesión completa y renovable. JavaScript no puede leer una cookie `httpOnly`. El access token de ≤ 60 min **sí** sigue en `localStorage`, como estaba decidido: es corto y no renueva nada por sí solo.
+      **Reglas**: el refresh DEBE estar acotado al tenant y al usuario; `logout` DEBE revocar la familia **del lado del servidor**, no sólo limpiar el cliente; un refresh NO DEBE servir para saltear el 2FA en un dispositivo nuevo — sólo renueva una sesión ya autenticada en ese dispositivo.
+      Tests: rotación emite token nuevo e invalida el anterior; reusar un token consumido revoca la familia entera; el refresh de un tenant no sirve en otro; `logout` invalida del lado del servidor; el refresh caducado responde `401`.
+      **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
+- [ ] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
+      **El agujero**: hoy `TrustedDevice` no tiene campo de expiración y el invariante de `data-model.md` **prohíbe** la revocación automática. Un dispositivo queda confiable **para siempre**.
+      **Campo nuevo `ExpiresAt`, NO reusar `RevokedAt`.** `RevokedAt` DEBE seguir significando "una persona lo dio de baja" — es auditoría, y mezclarlo con vencimiento automático arruina el registro de quién hizo qué.
+      ```
+      activo = RevokedAt IS NULL AND ExpiresAt > now()
+      ```
+      `TenantSettings.TrustedDeviceLifetimeDays`, default **15** (decisión del usuario; el estándar de industria es 30 y la propuesta inicial fue 8). `ExpiresAt` se fija en `TrustedAt + TrustedDeviceLifetimeDays` al confiar el dispositivo.
+      **Beneficio lateral**: el slot de `MaxTrustedDevices` se libera solo. Hoy, con el límite en 2, llenar los dos slots requiere un admin para destrabar; los slots no se llenan por uso simultáneo sino por **acumulación** de aparatos viejos, y esto lo ataca en la causa.
+      **Alcance de la caducidad**: obliga a rehacer el 2FA en ese dispositivo. NO corta la sesión viva ni bloquea el acceso — eso es T067 (revocación) y T068 (deshabilitar), que son inmediatos. La caducidad es la **red de seguridad** para lo que nadie se acordó de revocar.
+      Tests: un dispositivo vencido exige OTP de nuevo; vencer libera el slot; `RevokedAt` sigue siendo exclusivamente manual; un dispositivo vencido y otro revocado se distinguen en el listado de T067.
+- [ ] **T067** **Gestión y revocación de dispositivos y sesiones** (FR-007) — depende de T062, T065
+      **El endpoint no existe.** `contracts/auth-api.md` lo dice textual: *"Endpoint admin de revocación/alta de dispositivo — no existe en las fuentes `[PENDIENTE: definir]`"*. Y FR-007 apoya todo su diseño en que `RevokedAt` lo setea un admin — con un botón que nadie construyó.
+      **Superficie admin**: `GET /api/admin/users/{userId}/devices` (no se puede revocar lo que no se ve), `POST /api/admin/users/{userId}/devices/{deviceId}/revoke`, `POST /api/admin/users/{userId}/devices/revoke-all`.
+      **Superficie propia**: `GET /api/auth/devices` y `POST /api/auth/devices/{deviceId}/revoke`. Que cada uno vea sus dispositivos NO es una comodidad: es cómo el usuario detecta uno que no reconoce. El admin no mira las sesiones de otro todos los días; el dueño de la cuenta sí.
+      **Regla que no se puede omitir**: revocar un dispositivo DEBE revocar también las **familias de refresh token** asociadas (T065). Sin eso, el `RevokedAt` sólo impide saltear el 2FA a futuro mientras la sesión viva sigue funcionando hasta `RefreshTokenLifetimeHours` — revocar sin cerrar la sesión es teatro.
+      La respuesta DEBE listar `DeviceId`, `TrustedAt`, último uso y si está activo. Revocar es idempotente. Un `Member` NO DEBE poder ver ni revocar dispositivos ajenos.
+      Tests: revocar libera el slot de `MaxTrustedDevices`; revocar corta la sesión viva del dispositivo; un `Member` recibe `403` sobre dispositivos de otro usuario; revocar dos veces no falla.
+- [ ] **T068** **Deshabilitar y rehabilitar usuario (offboarding real)** — depende de T062, T065, T067
+      **T067 NO alcanza para el empleado que se va.** Revocarle el dispositivo no le saca el acceso: conserva su contraseña y su celular, así que vuelve a entrar con OTP. Lo único que corta el acceso es deshabilitar la cuenta.
+      `POST /api/admin/users/{userId}/disable` y `/enable`, sólo `TenantAdmin`. ASP.NET Core Identity ya trae `LockoutEnabled` / `LockoutEnd`: se usa eso, no un flag nuevo.
+      **Deshabilitar DEBE, en un solo acto**: rechazar el login con `401` uniforme, revocar **todas** las familias de refresh del usuario y revocar **todos** sus `TrustedDevice`. Un offboarding a medias no es un offboarding.
+      El usuario deshabilitado NO DEBE poder pedir recuperación de contraseña (T069) ni cambiar su `PhoneNumber` (T061).
+      Un `TenantAdmin` NO DEBE poder deshabilitarse a sí mismo si es el último admin del tenant — dejaría al tenant sin quien administre.
+      Tests: el deshabilitado no entra ni con dispositivo trusted; su sesión viva muere en el acto; no puede pedir reset; el último admin no puede autodeshabilitarse; rehabilitar no resucita dispositivos ni sesiones viejas.
+- [ ] **T069** **Recuperación de contraseña por SMS al número enrolado** — depende de T018, T019, T062, T065
+      **No existe en ningún contrato.** Ni `register`, ni `login`, ni `confirm-device`. Día uno de operación real alguien olvida la contraseña y no hay camino que no sea tocar la base.
+      **Canal: SMS al `PhoneNumber` enrolado, NO email.** Es coherente con todo lo ya decidido — el email es el identificador de login, nunca un canal de confianza (FR-008), y el número es enrolado por un admin, así que un atacante no puede redirigirlo. Además reusa la infraestructura de OTP que ya se construye en T018.
+      **Fallback**: `POST /api/admin/users/{userId}/reset-password` iniciado por un `TenantAdmin`, para el que perdió el celular Y la contraseña. Sin esto el usuario queda encerrado afuera.
+      **Reglas de seguridad**:
+      - Respuesta **uniforme** exista o no el email — mismo motivo que T055c: distinguir permite enumerar qué correos usan Stockma.
+      - Token de reset de **un solo uso**, expiración corta, persistido **hasheado**.
+      - Un reset exitoso DEBE revocar **todas** las familias de refresh del usuario (T065). Si el atacante ya tenía sesión, cambiar la contraseña sin cortarla no lo echa.
+      - El reset **NO DEBE** saltear el 2FA: entrar desde un dispositivo nuevo sigue exigiendo OTP.
+      - Un usuario sin `PhoneNumber` cargado o deshabilitado (T068) NO DEBE poder iniciar el flujo — ese caso es del admin.
+      - Rate limiting igual que el resto de `auth` (NFR-005).
+      Tests: respuesta idéntica para email existente e inexistente; token usado dos veces es rechazado; el reset mata las sesiones vivas; tras el reset, un dispositivo desconocido sigue pidiendo OTP; el deshabilitado no puede iniciar el flujo.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
@@ -135,6 +203,20 @@ Cubre FR-012 … FR-015, NFR-009, NFR-010. Contrato: [`contracts/batches-api.md`
 - [x] **T036** `[P]` Migración: índice `(ProductId, ExpirationDate)` — soporte para FEFO futuro (NFR-009)
 - [x] **T037** `[P]` Unit tests: stock negativo, semáforo default/custom, conflicto de concurrencia `409`
 - [x] **T038** API tests: registrar y ajustar lote — depende de T035
+
+### Trazabilidad del movimiento de stock — **abierto, PR aparte (depende de PR 3)**
+
+- [ ] **T066** **`StockMovement`: libro de movimientos append-only con autor y motivo** (FR-013, FR-014) — depende de T033, T035, T062
+      **El agujero**: hoy `POST /api/batches/{id}/adjust` recibe `{ "delta": -5 }` y nada más. Sin motivo, sin autor, sin restricción de rol. Y el `[PENDIENTE]` del contrato dice que la trazabilidad la da el `AuditSaveChangesInterceptor` — pero ese interceptor **no audita**: sólo aborta el `SaveChanges` si se intenta modificar `TenantId` (`data-model.md`). Está mal nombrado. **Hoy la trazabilidad del ajuste de stock es CERO.**
+      En una droguería el faltante no entra por el login: entra por el ajuste. "Se venció", "se rompió", el inventario cuadra y no queda nombre.
+      **Entidad** `StockMovement : ITenantEntity`, **append-only, nunca se actualiza ni se borra**: `Id`, `TenantId`, `BatchId`, `Delta`, `Reason`, `Notes?`, `UserId`, `OccurredAt`.
+      `Reason` (enum): `Sale`, `Reception`, `Return`, `Expiry`, `Damage`, `Loss`, `CountCorrection`.
+      **Reglas**: todo cambio de `Batch.CurrentQuantity` DEBE nacer de un `StockMovement` — no DEBE existir camino que mueva stock sin dejar fila. `Reason` es obligatorio. `UserId` sale del claim `sub`, NUNCA del body. La fila es inmutable: corregir un error es **otro** movimiento compensatorio, no editar el anterior.
+      **Rol** (depende de T062): un `Member` PUEDE registrar movimientos, incluidas mermas — bloquearle el paso sólo lograría que no registre nada. Los motivos de merma (`Expiry`, `Damage`, `Loss`) por encima de `MermaApprovalThreshold` (configurable por tenant) DEBEN requerir `TenantAdmin`.
+      El control real no es prohibir el botón: es que **el nombre quede pegado al movimiento** y el admin lo vea.
+      `GET /api/batches/{id}/movements` y reporte por usuario y motivo para el admin.
+      **Renombrar `AuditSaveChangesInterceptor`**: hace de guardia de `TenantId`, no de auditoría. El nombre actual hace creer que hay un rastro que no existe.
+      Tests: ajuste sin `reason` es rechazado; el `UserId` persistido es el del JWT y no el del body; ningún camino modifica `CurrentQuantity` sin crear la fila; merma sobre el umbral con `Member` responde `403`; el libro no admite `UPDATE` ni `DELETE`; la suma de movimientos reconcilia con `CurrentQuantity`.
 
 ## Fase 6 — Frontend auth + inventory (PR 6, depende de PR 3, PR 4, PR 5)
 
@@ -204,16 +286,16 @@ y el usuario aterrizaría deslogueado.
 | FR-002        | T008, T010, T013                                                   | PR 2 |
 | FR-003        | T011                                                               | PR 2 |
 | FR-004        | T012                                                               | PR 2 |
-| FR-005        | T015, T017, T019, T022                                             | PR 3 |
-| FR-006        | T016, T017, T019, T021                                             | PR 3 |
-| FR-007        | T015, T020                                                         | PR 3 |
-| FR-008        | T015, T018, T019, T021, T049, T050                                 | PR 3 |
+| FR-005        | T015, T017, T019, T022, T062, T064, T068, T069                     | PR 3 |
+| FR-006        | T016, T017, T019, T021, T062, T063, T065                           | PR 3 |
+| FR-007        | T015, T020, T067, T068, T070                                       | PR 3 |
+| FR-008        | T015, T018, T019, T021, T049, T050, T061                                 | PR 3 |
 | FR-009        | T023, T025, T029                                                   | PR 4 |
 | FR-010        | T023, T025, T029                                                   | PR 4 |
 | FR-011        | T026, T027, T030                                                   | PR 4 |
 | FR-012        | T031, T033, T038                                                   | PR 5 |
-| FR-013        | T033, T037                                                         | PR 5 |
-| FR-014        | T031, T032, T037                                                   | PR 5 |
+| FR-013        | T033, T037, T066                                                   | PR 5 |
+| FR-014        | T031, T032, T037, T066                                             | PR 5 |
 | FR-015        | T031, T034, T037                                                   | PR 5 |
 | NFR-001       | T014                                                               | PR 2 |
 | NFR-002       | T009                                                               | PR 2 |
