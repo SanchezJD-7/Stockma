@@ -20,3 +20,10 @@ public sealed class ProductNotFoundForBatchException(Guid productId)
 
 public sealed class BatchNotFoundException(Guid batchId)
     : DomainException("BATCH_NOT_FOUND", $"No existe un lote con Id '{batchId}' en este tenant.");
+
+/// <summary>
+/// Un único errorCode para "OTP errado" y "OTP vencido": distinguirlos le diría al atacante
+/// si el código existía, que es información que no debe filtrarse (ADR-002).
+/// </summary>
+public sealed class OtpNotUsableException()
+    : DomainException("AUTH_OTP_REJECTED", "El código es incorrecto o ya no es válido.");
