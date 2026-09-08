@@ -12,6 +12,8 @@ using Stockma.Infrastructure.Batches;
 using Stockma.Infrastructure.Tenants;
 using Stockma.Infrastructure.Products;
 using Stockma.Infrastructure.Tenancy;
+using Stockma.Application.Identity;
+using Stockma.Infrastructure.Identity;
 
 namespace Stockma.Infrastructure.DependencyInjection;
 
@@ -35,6 +37,19 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITenantSettingsProvider, TenantSettingsProvider>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISkuGenerator, SkuGenerator>();
+
+        services.AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+                options.Password.RequiredLength = 12;
+                options.Lockout.AllowedForNewUsers = true;
+            })
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<StockmaDbContext>();
+
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+
         return services;
     }
 }
