@@ -144,7 +144,9 @@ Content-Type: application/json
 |---|---|---|
 | `delta` | `int` | DEBE ser ≠ 0. Positivo = entrada, negativo = salida |
 
-> `[PENDIENTE: las fuentes no definen un campo de motivo/razón del ajuste ni trazabilidad de quién lo hizo más allá del AuditSaveChangesInterceptor]`
+> **Trazabilidad: hoy es CERO (T066).** No hay campo de motivo ni registro de autor. El `AuditSaveChangesInterceptor` **no audita** — sólo aborta el `SaveChanges` si se intenta modificar `TenantId` (ver `data-model.md`); el nombre induce a error.
+>
+> T066 agrega `StockMovement` (append-only, con `Reason`, `UserId` del claim `sub` y `OccurredAt`) y vuelve `reason` obligatorio en este request. Todo cambio de `CurrentQuantity` DEBE nacer de un movimiento registrado.
 
 ### Respuesta `200 OK`
 

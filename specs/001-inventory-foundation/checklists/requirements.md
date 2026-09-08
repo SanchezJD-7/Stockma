@@ -61,8 +61,9 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       1. Login desde dispositivo desconocido responde `requiresDeviceConfirmation` y el OTP llega por **SMS** al `PhoneNumber` del usuario (no por email).
       2. OTP válido marca el dispositivo confiable y emite JWT; OTP inválido o vencido responde `401` y registra el intento.
       3. `PUT /api/admin/users/{userId}/phone-number` con JWT de admin persiste el número; el mismo intento hecho por el propio usuario no admin responde `403`.
-      4. La superficie self-service de Identity sobre `PhoneNumber` (`SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, endpoints del Identity UI/API) está **cerrada**: no existe ruta por la que el usuario cambie su propio número.
-      `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+      4. La superficie self-service **de Identity** sobre `PhoneNumber` (`SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, endpoints del Identity UI/API) está **cerrada**: el único camino de cambio es `PUT /api/auth/phone-number`.
+      5. Un usuario **sin** `PhoneNumber` cargado que entra desde un dispositivo no trusted recibe `403 AUTH_PHONE_NOT_ENROLLED` y **no** ingresa: no existe ruta que saltee el 2FA por falta de número (T050).
+      6. `PUT /api/auth/phone-number` envía el OTP al número **actual** y nunca al nuevo; el `PhoneNumber` no cambia hasta confirmarlo; un usuario sin número previo recibe `403` (T061).
       `[PENDIENTE: proveedor de SMS no elegido]`
       `[PENDIENTE: endpoint admin de PhoneNumber propuesto, no está en las fuentes originales]`
 

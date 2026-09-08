@@ -31,7 +31,8 @@ Las cuatro capacidades de este slice son **NUEVAS** (proyecto greenfield). No ha
 - DbContext + migración inicial + base de `AuditSaveChangesInterceptor`
 - Identity + JWT + dispositivos confiables (máx 2, configurable) + 2FA por SMS en dispositivo nuevo
 - Envío del OTP vía `ISmsSender` / `SmsOtpSender` `[PENDIENTE: proveedor de SMS no elegido]`
-- `PUT /api/admin/users/{userId}/phone-number` — alta/edición del `PhoneNumber` por un admin del tenant, y cierre de la superficie self-service de Identity (`SetPhoneNumberAsync`) `[PENDIENTE: propuesto, no está en las fuentes originales]`
+- `PUT /api/admin/users/{userId}/phone-number` — **alta** del `PhoneNumber` por un admin del tenant, y cierre de la superficie self-service de Identity (`SetPhoneNumberAsync`) `[PENDIENTE: propuesto, no está en las fuentes originales]`
+- `PUT /api/auth/phone-number` — **cambio** del propio `PhoneNumber`, autenticado y confirmando un OTP enviado al número **actual** (T061)
 - Comandos/queries: RegisterProduct, UpdateProduct, RegisterBatch, AdjustBatchStock, SearchProducts, GetProductByBarcode
 - Pipeline MediatR: Validation, Transaction, Audit behaviours
 - Frontend: scaffolding Vite, features `auth` e `inventory` base, TanStack Query con keys por tenant, PWA manifest
@@ -59,7 +60,7 @@ Las cuatro capacidades de este slice son **NUEVAS** (proyecto greenfield). No ha
 | Multi-tenant | Row-level: `TenantId` + EF `HasQueryFilter` + PostgreSQL RLS de respaldo |
 | Autenticación | Identity + JWT, dispositivos confiables (máx 2, configurable por tenant) |
 | Canal del 2FA | **SMS** al celular de cada usuario (`ApplicationUser.PhoneNumber`). El OTP NO DEBE viajar por email; el email es sólo el identificador de login |
-| Origen del `PhoneNumber` | Escribible **únicamente por un admin del tenant**. El usuario NO DEBE poder registrar ni cambiar su propio `PhoneNumber` |
+| Origen del `PhoneNumber` | **Alta**: acto exclusivo de un admin del tenant (T050). **Cambio**: PUEDE hacerlo el propio usuario, autenticado y confirmando un OTP enviado al número **actual** (T061). Enrolar el primero con un solo factor es inseguro; cambiar uno existente exige poseer el factor vigente |
 | Alta de dispositivos | Manual por admin, sin revocación automática por inactividad |
 | Alcance de `MaxTrustedDevices` | Gobierna **sólo el privilegio de saltear el 2FA**, nunca el acceso. El login NO DEBE bloquearse por límite de dispositivos: cualquier dispositivo entra vía OTP por SMS |
 | Expulsión de dispositivos | Nunca automática. `RevokedAt` se setea SÓLO por acción manual de un admin |
@@ -185,7 +186,12 @@ Todos los escenarios usan Dado/Cuando/Entonces. Cada uno está trazado a su requ
 
 #### FR-008 — 2FA por SMS en dispositivo nuevo
 
-> El OTP se envía por **SMS** al celular de **cada usuario** que intenta loguearse (`ApplicationUser.PhoneNumber`). Ese número es escribible **sólo por un admin del tenant**: el usuario NO DEBE poder registrarlo ni cambiarlo por su cuenta. El email sigue siendo el identificador de login, nunca el canal del segundo factor.
+> El OTP se envía por **SMS** al celular de **cada usuario** que intenta loguearse (`ApplicationUser.PhoneNumber`). El email sigue siendo el identificador de login, nunca el canal del segundo factor.
+>
+> **Alta y cambio del número son actos distintos y se gobiernan distinto**:
+>
+> - **Alta (enrolar el primero)** — acto exclusivo de un admin del tenant (T050). El usuario NO DEBE poder registrar el suyo: en ese momento sólo existe **un** factor (la contraseña), y si con él se decidiera el destino del OTP, quien tuviera la contraseña controlaría ambos factores — sería 1FA con un paso extra.
+> - **Cambio (ya hay uno cargado)** — PUEDE hacerlo el propio usuario vía `PUT /api/auth/phone-number` (T061), autenticado y confirmando un OTP enviado al número **actual**. Ahí sí hay segundo factor que oponer: exige demostrar posesión del canal vigente, algo que un atacante con la contraseña robada no puede hacer.
 
 **Escenario: Login desde dispositivo nuevo**
 - **DADO** credenciales válidas desde dispositivo desconocido
@@ -205,8 +211,19 @@ Todos los escenarios usan Dado/Cuando/Entonces. Cada uno está trazado a su requ
 **Escenario: Usuario sin `PhoneNumber` cargado**
 - **DADO** un usuario cuyo `PhoneNumber` el admin todavía no cargó
 - **CUANDO** intenta loguearse desde un dispositivo no trusted
-- **ENTONCES** no existe destino al cual enviar el OTP
-  `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]`
+- **ENTONCES** el sistema DEBE **bloquear el acceso** con `403 AUTH_PHONE_NOT_ENROLLED` e indicar que un admin del tenant debe cargar el número
+- **Y** NO DEBE permitir el ingreso salteando el 2FA, ni ofrecerle al usuario cargar su propio número
+
+**Escenario: Usuario cambia su propio número**
+- **DADO** un usuario autenticado **con** `PhoneNumber` cargado
+- **CUANDO** `PUT /api/auth/phone-number` con el número nuevo
+- **ENTONCES** el sistema DEBE enviar un OTP al `PhoneNumber` **actual**, NUNCA al nuevo
+- **Y** NO DEBE aplicar el cambio hasta que ese OTP sea confirmado
+
+**Escenario: Usuario sin número previo intenta cambiarlo**
+- **DADO** un usuario autenticado **sin** `PhoneNumber` cargado
+- **CUANDO** `PUT /api/auth/phone-number`
+- **ENTONCES** responde `403` y el número queda sin cambios: ese caso es **alta por admin** (T050), no cambio
 
 ### Dominio: product-catalog
 
@@ -324,7 +341,7 @@ Keywords normativas en español (RFC 2119): DEBE, NO DEBE, DEBERÍA, PUEDE.
 | **FR-005** | **Registro de usuario** — El sistema DEBE registrar usuarios con ASP.NET Core Identity asociando el `TenantId` del header `X-Tenant-ID`. El email DEBE ser único **en toda la plataforma**, no por tenant (T055). |
 | **FR-006** | **Login JWT** — El sistema DEBE emitir JWT con claims de usuario y tenant tras credenciales válidas. `POST /api/auth/login` DEBE quedar **exento** del `TenantMiddleware` y resolver el `TenantId` desde el email, porque el login es genérico y no lleva tenant en la URL (T055). |
 | **FR-007** | **Dispositivos confiables (máx 2, configurable)** — El sistema DEBE limitar a `MaxTrustedDevices` (def. 2, configurable por tenant) los dispositivos que pueden **saltear el 2FA**, NO DEBE usar ese límite para negar el acceso y NO DEBE revocar dispositivos automáticamente; el alta de un slot ocupado se libera sólo por acción manual de un admin. DEBE notificar al dispositivo trusted existente cuando se confía uno nuevo. |
-| **FR-008** | **2FA por SMS en dispositivo nuevo** — El sistema DEBE exigir OTP enviado por SMS al `ApplicationUser.PhoneNumber` cuando se detecta un dispositivo no conocido, y DEBE permitir el acceso a CUALQUIER dispositivo que supere ese OTP, sin importar `MaxTrustedDevices`. El `PhoneNumber` DEBE ser escribible sólo por un admin del tenant y el usuario NO DEBE poder modificar el suyo. `[PENDIENTE: usuario sin PhoneNumber cargado — definir si el primer login se permite sin 2FA, si el admin debe cargar el número antes de habilitar la cuenta, o si se bloquea]` |
+| **FR-008** | **2FA por SMS en dispositivo nuevo** — El sistema DEBE exigir OTP enviado por SMS al `ApplicationUser.PhoneNumber` cuando se detecta un dispositivo no conocido, y DEBE permitir el acceso a CUALQUIER dispositivo que supere ese OTP, sin importar `MaxTrustedDevices`. El **alta** del `PhoneNumber` DEBE ser acto exclusivo de un admin del tenant (T050). El **cambio** PUEDE hacerlo el propio usuario, autenticado y confirmando un OTP enviado al número **actual** (T061); ese OTP NO DEBE enviarse al número nuevo, y el cambio NO DEBE aplicarse antes de confirmarlo. Un usuario sin `PhoneNumber` cargado DEBE ser **bloqueado** desde un dispositivo no trusted (`403 AUTH_PHONE_NOT_ENROLLED`) y NO DEBE poder ingresar salteando el 2FA. |
 
 #### product-catalog
 
