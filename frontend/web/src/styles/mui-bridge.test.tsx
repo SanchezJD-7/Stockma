@@ -13,9 +13,9 @@ describe('createMuiBridge', () => {
   it('toma los colores por defecto de tokens.css, no literales propios', () => {
     const theme = createMuiBridge()
 
-    expect(theme.palette.primary.main).toBe('#1565c0')
-    expect(theme.palette.primary.dark).toBe('#0d47a1')
-    expect(theme.palette.primary.light).toBe('#e7edf6')
+    expect(theme.palette.primary.main).toBe('#182f4f')
+    expect(theme.palette.primary.dark).toBe('#142843')
+    expect(theme.palette.primary.light).toBe('#e8eaed')
     expect(theme.palette.primary.contrastText).toBe('#ffffff')
   })
 

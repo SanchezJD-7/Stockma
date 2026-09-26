@@ -1,7 +1,10 @@
 :root {
-  --color-primary: #1565c0;
-  --color-primary-active: #0d47a1;
-  --color-primary-bg: #e7edf6;
+  --brand-navy: #182f4f;
+  --brand-teal: #337082;
+
+  --color-primary: #182f4f;
+  --color-primary-active: #142843;
+  --color-primary-bg: #e8eaed;
   --color-primary-contrast: #ffffff;
 
   --status-green: #2e7d32;
