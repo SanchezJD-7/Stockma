@@ -24,8 +24,7 @@ public sealed class TrustedDeviceConfiguration : IEntityTypeConfiguration<Truste
 
         builder
             .HasIndex(d => new { d.TenantId, d.UserId, d.DeviceId })
-            .IsUnique()
-            .HasDatabaseName("ux_trusted_devices_tenant_user_device");
+            .HasDatabaseName("ix_trusted_devices_tenant_user_device");
 
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(d => d.TenantId).OnDelete(DeleteBehavior.Cascade);

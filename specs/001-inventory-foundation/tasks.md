@@ -4,7 +4,7 @@
 **Fuente**: desglose SDD original (reformateado a Spec Kit, sin pérdida)
 **Referencias**: [`spec.md`](./spec.md) · [`plan.md`](./plan.md) · [`data-model.md`](./data-model.md) · [`contracts/`](./contracts/)
 
-**Convención de IDs**: `T001` … `T070`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
+**Convención de IDs**: `T001` … `T072`. `[P]` = puede ejecutarse en paralelo con las otras tareas `[P]` de su misma fase (sin dependencia de archivo ni de orden).
 
 ---
 
@@ -94,16 +94,36 @@ Cubre FR-001 … FR-004, NFR-001 … NFR-003.
 
 Cubre FR-005 … FR-008, NFR-004, NFR-005. Contrato: [`contracts/auth-api.md`](./contracts/auth-api.md).
 
+### Corte en PRs encadenados
+
+La fase creció de 10 a 19 tareas y no cabe en un PR revisable: el presupuesto de esta guía es
+400 líneas por PR. Se entrega en cinco slices, cada uno con sus tests y mergeable por sí mismo.
+
+| Slice | Tareas | Qué entrega | Estado |
+|---|---|---|---|
+| **3a** Cimientos | T015, T016, T062 | Entidades, emisión del JWT, roles, persistencia con RLS y la función acotada del login | ✅ en `main` |
+| **3b** Flujo de login | T017, T018, T019, T020, T055a, T055b, T055c, T021, T022 | `register`, `login`, `confirm-device`, OTP por SMS y las tres reglas de T055 | ✅ |
+| **3c** Sesión | T065 | Refresh token con rotación y detección de reuso | ⬜ |
+| **3d** Ciclo de vida del acceso | T050, T061, T064, T067, T068, T069, T070 | Alta y cambio del celular, cierre de `register`, revocación, offboarding, reset y caducidad | ⬜ |
+| **3e** Plataforma | T063 | Superficie separada del admin de plataforma | ⬜ |
+
+**T049** (proveedor de SMS concreto) queda **diferida**: con el sender de consola de T018 el flujo
+se implementa y se testea completo, y elegir proveedor es una decisión de infra que no bloquea nada.
+
+**Orden dentro de 3b** (respeta las dependencias): T018 → T017 → T055b → T020 → T019 → T055a →
+T055c → T021/T022. Se arranca por T018 y no por T017 porque el `LoginCommand` necesita poder
+emitir un OTP para estar completo.
+
 - [ ] **T015** Domain: `ApplicationUser`, `TrustedDevice`, `DeviceOtp` (FR-005, FR-007, FR-008)
 - [ ] **T016** `[P]` `Infrastructure/Identity/JwtTokenService.cs` — claims `sub`, `tid`, `exp` ≤ 60 min (FR-006, NFR-004)
-- [ ] **T017** Application: `RegisterUserCommand`, `LoginCommand`, `ConfirmDeviceCommand` — depende de T015
-- [ ] **T018** `[P]` `ISmsSender` / `SmsOtpSender` (sender de consola en dev) + expiración de OTP a 10 min (FR-008, NFR-004)
+- [x] **T017** Application: `RegisterUserCommand`, `LoginCommand`, `ConfirmDeviceCommand` — depende de T015
+- [x] **T018** `[P]` `ISmsSender` / `SmsOtpSender` (sender de consola en dev) + expiración de OTP a 10 min (FR-008, NFR-004)
       El OTP viaja por **SMS** al `ApplicationUser.PhoneNumber`, nunca por email. La ventana ≤ 10 min se mantiene.
-- [ ] **T019** `Api/Controllers/AuthController` — `register` / `login` / `confirm-device` + rate limiting 5/IP/min (NFR-005) — depende de T017
-- [ ] **T020** Marcado condicional de `TrustedDevice` en `confirm-device` bajo `MaxTrustedDevices` (FR-007) — depende de T017
+- [x] **T019** `Api/Controllers/AuthController` — `register` / `login` / `confirm-device` + rate limiting 5/IP/min (NFR-005) — depende de T017
+- [x] **T020** Marcado condicional de `TrustedDevice` en `confirm-device` bajo `MaxTrustedDevices` (FR-007) — depende de T017
       El JWT se emite **siempre**; el `TrustedDevice` se crea **sólo si** el conteo de activos (`RevokedAt IS NULL`) es `< MaxTrustedDevices`. Sin slot: `200` con `deviceTrusted: false`, sin crear la fila y **sin revocar a nadie**. `RevokedAt` sólo cambia por acción manual de un admin. Ver [`plan.md`](./plan.md#5-autenticación) y [`contracts/auth-api.md`](./contracts/auth-api.md).
-- [ ] **T021** `[P]` Unit tests: login desde dispositivo conocido/desconocido, OTP expirado
-- [ ] **T022** API tests (`WebApplicationFactory`): `401` credenciales inválidas, `409` email duplicado, `requiresDeviceConfirmation` — depende de T019
+- [x] **T021** `[P]` Unit tests: login desde dispositivo conocido/desconocido, OTP expirado
+- [x] **T022** API tests (`WebApplicationFactory`): `401` credenciales inválidas, `409` email duplicado, `requiresDeviceConfirmation` — depende de T019
 - [ ] **T049** Integración con proveedor de SMS: implementación concreta de `ISmsSender`, config `Sms { Provider, ApiKey, Sender }`, reintento/fallo del envío y sender de consola para dev (FR-008) — depende de T018
       `[PENDIENTE: proveedor de SMS no elegido]`
 - [ ] **T050** `PUT /api/admin/users/{userId}/phone-number` (sólo admin del tenant) **y cierre de la superficie self-service de Identity** sobre `PhoneNumber` (FR-008) — depende de T019
@@ -242,13 +262,18 @@ y el usuario aterrizaría deslogueado.
       aceptado: una persona no puede tener cuenta en dos tenants con el mismo correo; si
       algún día hace falta, la salida es una tabla `UserTenant` con selección post-login.
       Actualizados `spec.md` (FR-005, FR-006), `data-model.md` y `contracts/auth-api.md`
-- [ ] **T055a** `TenantMiddleware`: excepción para `POST /api/auth/login` + test de que
-      **ninguna otra ruta** quedó exenta — depende de T055
-- [ ] **T055b** Búsqueda del usuario por email en el login con `IgnoreQueryFilters()`
-      explícito y acotado, leyendo sólo lo necesario para autenticar y obtener el `TenantId`.
+- [x] **T055a** `TenantMiddleware`: excepción para la **superficie sin autenticar** —
+      `POST /api/auth/login` y `POST /api/auth/confirm-device` — con test de que la lista de
+      exentas es **exactamente esa** y ninguna ruta más quedó afuera del middleware.
+      `confirm-device` entra porque ocurre ANTES de que exista un token: el cliente no conoce su
+      tenant y la respuesta del login no se lo dice, así que exigirle el header lo volvería
+      inalcanzable. Las dos resuelven el tenant por la misma función acotada (T055b) —
+      depende de T055
+- [x] **T055b** Búsqueda del usuario por email en el login por la función SQL acotada
+      `auth_find_user_by_email`, leyendo sólo lo necesario para autenticar y obtener el `TenantId`.
       Test que demuestre que por ese camino no se puede leer nada más de otro tenant. El
       filtro **NO DEBE** volverse permisivo cuando el `TenantContext` está vacío — depende de T055a
-- [ ] **T055c** Respuesta uniforme `401 AUTH_INVALID_CREDENTIALS` para email inexistente,
+- [x] **T055c** Respuesta uniforme `401 AUTH_INVALID_CREDENTIALS` para email inexistente,
       contraseña incorrecta y usuario de otro tenant, con test de los tres casos. Con email
       único global, distinguirlos permite enumerar qué correos usan Stockma — depende de T055a
 - [ ] **T056** `Tenant.Slug` (único en la plataforma) y `Tenant.Name` + migración. Hoy la
@@ -266,6 +291,11 @@ y el usuario aterrizaría deslogueado.
 - [ ] **T060** Logo del tenant — capacidad nueva, NO es un color más: almacenamiento de
       archivos, formatos y tamaño permitidos, servido y caché, y saneamiento de SVG subido.
       Sin decidir; el login genérico usa el logo de Stockma y no lo necesita
+- [ ] **T071** **Logo de Stockma** (el de la plataforma, NO el del tenant) — depende de T039
+      No confundir con T060: este es el logo del producto, el que se ve en el login genérico
+      antes de saber a qué tenant entra el usuario. Es un asset del repo, no un archivo subido.
+      Alcance: SVG en `frontend/web/src/assets/`, favicon, y los tamaños de icono que pide el
+      manifest de la PWA (T046). Si sólo hay PNG, generar las medidas desde la más grande.
 - [ ] **T043** Tests de componentes de `auth` e `inventory` — depende de T039, T040
 
 ## Fase 7 — Contracts + PWA (PR 7, depende de PR 6)
@@ -275,6 +305,21 @@ y el usuario aterrizaría deslogueado.
 - [ ] **T046** `[P]` PWA manifest + `dotnet dev-certs` HTTPS documentado en el README
 - [ ] **T047** CI: step de generación / verificación de contracts — depende de T045
 - [ ] **T048** `[P]` Playwright e2e mínimo (scanner de barcode, manual/smoke)
+- [ ] **T072** **Workflow de deploy con paso de migraciones** — depende de T047
+      Hoy `Program.cs` **no** llama a `Migrate()` y nadie más lo hace: para levantar contra una
+      base real hay que correr `dotnet ef database update` a mano. No está automatizado ni
+      documentado.
+      Decidido: las migraciones corren como **paso explícito del deploy**, no en el arranque de
+      la API. `Migrate()` en el startup hace que dos instancias se peleen por el lock y permite
+      que un deploy reescriba políticas de RLS sin que nadie las revise.
+      **Regla que no se puede omitir**: el paso de migración NO DEBE usar `app_user`. Ese rol es
+      **no propietario** a propósito — es lo que hace que la RLS le aplique (ver `InitialSchema`).
+      El DDL necesita el rol dueño. Hacen falta **dos connection strings**: el propietario para
+      migrar, `app_user` para el runtime. Si por comodidad se usa el dueño en runtime, PostgreSQL
+      deja de aplicar las políticas al propietario y **la RLS se vuelve decorativa**.
+      Un test o chequeo de arranque DEBERÍA verificar que la app no está conectada como
+      propietario de las tablas.
+      `[PENDIENTE: hosting no elegido; el workflow depende de dónde se despliegue]`
 
 ---
 

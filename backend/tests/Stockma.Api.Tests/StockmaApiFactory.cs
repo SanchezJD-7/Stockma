@@ -22,12 +22,17 @@ public sealed class StockmaApiFactory : WebApplicationFactory<Program>, IAsyncLi
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Development);
+        builder.UseSetting("RateLimiting:Auth:PermitPerWindow", "1000");
 
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = _container.GetConnectionString(),
+                ["Jwt:Key"] = "clave-de-firma-para-tests-de-al-menos-32-bytes-de-largo",
+                ["Jwt:Issuer"] = "stockma-api",
+                ["Jwt:Audience"] = "stockma-web",
+                ["Jwt:ExpiresMinutes"] = "60",
             });
         });
     }

@@ -96,4 +96,31 @@ public class TenantImmutabilityInterceptorTests(PostgresFixture postgres) : ICla
         var persisted = await verification.Entities.SingleAsync(e => e.Id == id);
         persisted.Name.Should().Be("after", "el interceptor sólo debe bloquear cambios de TenantId");
     }
+
+    [Fact]
+    public async Task UpdatingTheWholeEntity_WithTheSameTenantId_IsNotBlocked()
+    {
+        var id = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            await seed.Database.EnsureCreatedAsync();
+            seed.Entities.Add(new TenantScopedEntity { Id = id, TenantId = TenantA, Name = "before" });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var update = CreateContext())
+        {
+            update.Entities.Update(new TenantScopedEntity { Id = id, TenantId = TenantA, Name = "after" });
+
+            var act = async () => await update.SaveChangesAsync();
+
+            await act.Should().NotThrowAsync(
+                "marcar todas las propiedades para el UPDATE no es cambiar el TenantId");
+        }
+
+        await using var verification = CreateContext();
+        var persisted = await verification.Entities.SingleAsync(e => e.Id == id);
+        persisted.Name.Should().Be("after");
+    }
 }

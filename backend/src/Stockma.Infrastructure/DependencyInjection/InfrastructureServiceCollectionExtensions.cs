@@ -50,6 +50,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
+        services.AddSingleton<IOtpGenerator, OtpGenerator>();
+        services.AddScoped<IDeviceOtpService, DeviceOtpService>();
+        services.AddScoped<ISmsSender, ConsoleSmsSender>();
+        services.AddScoped<IUserAccounts, UserAccounts>();
+        services.AddScoped<ITrustedDevices, TrustedDevices>();
+
         return services;
     }
 }

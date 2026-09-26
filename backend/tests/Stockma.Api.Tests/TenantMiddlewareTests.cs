@@ -69,4 +69,91 @@ public class TenantMiddlewareTests
         httpContext.Response.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
         pipelineExecuted.Should().BeFalse();
     }
+
+    private static async Task<(bool Continued, int Status)> InvokeWithoutHeaderAsync(string path)
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Path = path;
+
+        var continued = false;
+        var middleware = new TenantMiddleware(_ =>
+        {
+            continued = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(httpContext, new TenantContext());
+
+        return (continued, httpContext.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/auth/login")]
+    [InlineData("/api/auth/confirm-device")]
+    public async Task UnauthenticatedSurface_IsExemptFromTheHeader(string path)
+    {
+        var (continued, status) = await InvokeWithoutHeaderAsync(path);
+
+        continued.Should().BeTrue("ADR-002: estas rutas ocurren ANTES de que exista un token");
+        status.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Theory]
+    [InlineData("/API/AUTH/LOGIN")]
+    [InlineData("/Api/Auth/Confirm-Device")]
+    public async Task TheExemption_IsCaseInsensitive(string path)
+    {
+        var (continued, _) = await InvokeWithoutHeaderAsync(path);
+
+        continued.Should().BeTrue("el routing de ASP.NET no distingue mayusculas; el middleware tampoco debe");
+    }
+
+    [Theory]
+    [InlineData("/api/auth/login/")]
+    [InlineData("/api/auth/confirm-device/")]
+    public async Task TheExemption_ToleratesATrailingSlash(string path)
+    {
+        var (continued, _) = await InvokeWithoutHeaderAsync(path);
+
+        continued.Should()
+            .BeTrue("el routing matchea igual con barra final: si el middleware no, el cliente recibe un 400 incomprensible");
+    }
+
+    [Theory]
+    [InlineData("/api/auth/register")]
+    [InlineData("/api/auth/phone-number")]
+    [InlineData("/api/products")]
+    [InlineData("/api/batches")]
+    [InlineData("/api/admin/tenant/branding")]
+    [InlineData("/api/tenant/branding")]
+    [InlineData("/api/auth")]
+    [InlineData("/api/auth/login/extra")]
+    public async Task EveryOtherRoute_StillRequiresTheHeader(string path)
+    {
+        var (continued, status) = await InvokeWithoutHeaderAsync(path);
+
+        continued.Should().BeFalse($"'{path}' NO esta en la lista de exentas");
+        status.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public async Task Register_IsNotExempt_BecauseItCreatesInsideATenant()
+    {
+        var (continued, status) = await InvokeWithoutHeaderAsync("/api/auth/register");
+
+        continued.Should()
+            .BeFalse("FR-005: el usuario nace atado al tenant del header. Sin header no hay a donde crearlo");
+        status.Should().Be(StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public void TheExemptList_IsExactlyTheUnauthenticatedSurface()
+    {
+        TenantMiddleware.UnauthenticatedPaths
+            .Should()
+            .BeEquivalentTo(
+                ["/api/auth/login", "/api/auth/confirm-device"],
+                "T055a: agregar una ruta aca amplia la superficie sin autenticar. "
+                + "Este test obliga a que sea un acto consciente");
+    }
 }

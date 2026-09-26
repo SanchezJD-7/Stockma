@@ -48,7 +48,7 @@ public sealed class TenantImmutabilityInterceptor : SaveChangesInterceptor
                 continue;
             }
 
-            if (property.IsModified)
+            if (property.IsModified && !Equals(property.OriginalValue, property.CurrentValue))
             {
                 throw new InvalidOperationException(
                     $"El TenantId de '{entry.Metadata.ClrType.Name}' es inmutable tras la creación (FR-004). " +

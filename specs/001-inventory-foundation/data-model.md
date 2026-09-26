@@ -219,7 +219,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Índices**
 
 - PK sobre `Id`.
-- `(TenantId, UserId, DeviceId)` — lookup del login para decidir si el dispositivo es conocido. `[PENDIENTE: unicidad no explicitada en las fuentes; debería ser único si un DeviceId no puede repetirse por usuario]`
+- `(TenantId, UserId, DeviceId)` — lookup del login para decidir si el dispositivo es conocido. **NO es único**, a propósito: un mismo aparato puede tener varias filas a lo largo del tiempo (una vencida, una revocada, una activa). Hacerlo único rompería el caso normal de reconfiar el mismo dispositivo tras vencer o tras una revocación por error, y forzaría a *editar* la fila vieja — que es justo lo que borraría el rastro de la revocación (T020).
 - El índice `(UserId, TrustedAt)` filtrado por `RevokedAt IS NULL` **se elimina**: existía para seleccionar el dispositivo más antiguo y ya no hay selección automática. El único acceso restante es **contar** los activos (`WHERE TenantId = @t AND UserId = @u AND RevokedAt IS NULL`), que se resuelve con el prefijo `(TenantId, UserId)` del índice anterior sobre una cardinalidad de pocas filas por usuario. No se requiere índice adicional.
 
 **Aplicación de `TenantId`**: filtro EF + política RLS.

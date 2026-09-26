@@ -75,13 +75,25 @@ Que aparezca la necesidad real de una persona operando en varias droguerías. La
 
 Corolario directo de ADR-001. Si el email resuelve el tenant, el login no puede exigir el header `X-Tenant-ID` — todavía no sabe cuál es.
 
+### La exención cubre DOS rutas, no una
+
+Al implementar T055b apareció que el flujo no cerraba. `confirm-device` ocurre **antes** de que exista un token: el cliente nunca supo su tenant, porque la respuesta del login (`requiresDeviceConfirmation`) no se lo dice. Con el header obligatorio, **`confirm-device` era inalcanzable**.
+
+| Opción | Por qué se descartó |
+|---|---|
+| El login devuelve el `tenantId` y el cliente lo repite | Expone el tenant a un llamador sin autenticar y le deja elegir el valor |
+| Un "ticket de confirmación" opaco y efímero | Maquinaria nueva para un problema que el OTP ya resuelve: el OTP **ya** es un secreto no adivinable atado a (usuario, dispositivo) |
+| **Eximir también `confirm-device`** ✅ | — |
+
+La propiedad de seguridad no cambia: sigue habiendo **una sola** consulta acotada y auditada (`auth_find_user_by_email`), usada por las dos rutas. Lo que cambia es que el test de T055a ahora fija una lista de **exactamente dos** rutas exentas, en vez de una.
+
 ### Las tres reglas que la hacen segura
 
 Esta es la **única** excepción al aislamiento entre tenants en todo el sistema. Por eso viene con candados:
 
 | Regla | Por qué |
 |---|---|
-| La exención es **sólo** para `POST /api/auth/login`, con test de que ninguna otra ruta quedó exenta | Una exención sin test se expande sola |
+| La exención es **sólo** para `POST /api/auth/login` y `POST /api/auth/confirm-device`, con test de que la lista es exactamente esa | Una exención sin test se expande sola |
 | La búsqueda usa `IgnoreQueryFilters()` **explícito y acotado**: una consulta, leyendo sólo lo necesario para autenticar y obtener el `TenantId` | Es el único punto que cruza la frontera a propósito |
 | `401 AUTH_INVALID_CREDENTIALS` **idéntico** para email inexistente, contraseña incorrecta y usuario de otro tenant | Distinguirlos permite enumerar qué correos usan Stockma |
 
@@ -92,6 +104,10 @@ Esta es la **única** excepción al aislamiento entre tenants en todo el sistema
 Es tentador: hacés que el filtro "no aplique si no hay contexto" y el login funciona sin excepciones especiales. Y desactivás el aislamiento **en silencio** en toda ruta donde el contexto no se haya poblado por un bug, un job en background o un endpoint nuevo.
 
 La excepción va en el punto de uso. Nunca como default del filtro.
+
+### Y después de resolver, aislamiento completo
+
+Resuelto el tenant, el handler **puebla el `ITenantContext`** y todo lo que sigue —emitir el OTP, consultar dispositivos confiables— pasa por el filtro de EF y la RLS como cualquier otra ruta. La excepción se limita a **la búsqueda**: `Login_ActivatesTheResolvedTenantForTheRestOfTheRequest` lo verifica.
 
 ---
 
@@ -277,6 +293,12 @@ activo = RevokedAt IS NULL AND ExpiresAt > now()
 Cortar es inmediato y es otra cosa: ADR-008.
 
 **La caducidad es la red de seguridad para lo que nadie se acordó de revocar.** No es el control urgente.
+
+### Consecuencia en el índice: varias filas por dispositivo
+
+Si `RevokedAt` y `ExpiresAt` conservan su significado, un mismo aparato acumula filas: una vencida hace un mes, una revocada por error, y la activa de hoy. Por eso el índice `(TenantId, UserId, DeviceId)` **no es único**.
+
+La alternativa —índice único y *actualizar* la fila existente al reconfiar— obligaría a limpiar `RevokedAt`, y ahí se pierde exactamente el dato que hace útil la auditoría: que alguien revocó ese dispositivo y cuándo. El descubrimiento vino de un caso banal: el admin revoca la laptop por error, el empleado la vuelve a confirmar, y la inserción chocaba contra la unicidad.
 
 ---
 

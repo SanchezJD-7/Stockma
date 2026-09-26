@@ -14,6 +14,8 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
     private static readonly Guid TenantB = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid UserA = Guid.Parse("77777777-7777-7777-7777-777777777777");
     private static readonly Guid UserB = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid DeviceA = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    private static readonly Guid DeviceB = Guid.Parse("aaaaaaaa-9999-9999-9999-999999999999");
 
     private string AppUserConnectionString =>
         new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
@@ -53,8 +55,8 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
 
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
             VALUES
-                (gen_random_uuid(), '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now() + interval '15 days'),
-                (gen_random_uuid(), '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now() + interval '15 days')
+                ('{DeviceA}', '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now() + interval '15 days'),
+                ('{DeviceB}', '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now() + interval '15 days')
             ON CONFLICT DO NOTHING;
             """);
 #pragma warning restore EF1002

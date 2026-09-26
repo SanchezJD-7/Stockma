@@ -10,8 +10,9 @@
 
 | Regla | Detalle |
 |---|---|
-| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo `POST /api/auth/login`** (T055). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001) |
-| Header de dispositivo | `X-Device-Id: {string}` — opcional en `login`, obligatorio en `confirm-device`. `[PENDIENTE: las fuentes lo llaman "deviceId header opcional" en login y campo del body en confirm-device; unificar nombre y ubicación]` |
+| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo la superficie sin autenticar**: `POST /api/auth/login` y `POST /api/auth/confirm-device` (T055, T055a). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001) |
+| Por qué son DOS rutas | `confirm-device` ocurre **antes** de que exista un token: el cliente todavía no sabe a qué tenant pertenece, y la respuesta del login (`requiresDeviceConfirmation`) no se lo dice. Exigirle el header lo volvería inalcanzable. Las dos rutas resuelven el tenant desde el email por la **misma** función acotada `auth_find_user_by_email` (T055b) |
+| Header de dispositivo | `deviceId` es **obligatorio en las dos rutas** y viaja en el **body**, no en un header. Motivo: el OTP se persiste atado a un `deviceId` (`device_otps`), así que sin él no hay dónde clavarlo ni forma de decidir si el dispositivo es confiable — pedirle al usuario un código que nunca se envió es un callejón. `400` `VALIDATION_FAILED` si falta |
 | Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode` |
 | Rate limiting | `POST /login` DEBERÍA limitar a 5 intentos por IP por minuto → `429` (NFR-005) |
 | Hash de contraseña | PBKDF2 vía ASP.NET Core Identity (NFR-004) |

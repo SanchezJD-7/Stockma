@@ -6,8 +6,21 @@ public sealed class TenantMiddleware(RequestDelegate next)
 {
     public const string HeaderName = "X-Tenant-ID";
 
+    public static readonly IReadOnlySet<string> UnauthenticatedPaths =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "/api/auth/login",
+            "/api/auth/confirm-device",
+        };
+
     public async Task InvokeAsync(HttpContext httpContext, ITenantContext tenantContext)
     {
+        if (IsUnauthenticatedSurface(httpContext.Request.Path))
+        {
+            await next(httpContext);
+            return;
+        }
+
         if (!httpContext.Request.Headers.TryGetValue(HeaderName, out var headerValues)
             || string.IsNullOrWhiteSpace(headerValues.ToString()))
         {
@@ -31,6 +44,9 @@ public sealed class TenantMiddleware(RequestDelegate next)
 
         await next(httpContext);
     }
+
+    private static bool IsUnauthenticatedSurface(PathString path) =>
+        UnauthenticatedPaths.Contains((path.Value ?? string.Empty).TrimEnd('/'));
 
     private static async Task WriteProblemDetailsAsync(
         HttpContext httpContext,
