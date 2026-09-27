@@ -21,6 +21,10 @@ Cada decisión trae las alternativas que se evaluaron y se descartaron. Si una t
 | [ADR-011](#adr-011--maxtrusteddevices-se-queda-en-2) | `MaxTrustedDevices` se queda en 2 | T070 |
 | [ADR-012](#adr-012--applicationuser-vive-en-infrastructure-no-en-domain) | `ApplicationUser` vive en Infrastructure | T015 |
 | [ADR-013](#adr-013--la-rls-sobre-users-y-la-única-excepción-del-login) | RLS sobre `users` + función del login | T015, T055b |
+| [ADR-014](#adr-014--register-cerrado-antes-de-tiempo-y-bootstrap-cli-como-parche) | `register` cerrado antes de tiempo + bootstrap CLI | T064 |
+| [ADR-015](#adr-015--autenticación-por-defecto-y-el-tenant-atado-al-token) | Autenticación por defecto y el tenant atado al token | T073 |
+| [ADR-016](#adr-016--endurecimiento-del-login-enumeración-fuerza-bruta-del-otp-y-carreras) | Endurecimiento del login: enumeración, fuerza bruta del OTP y carreras | T074–T078 |
+| [ADR-017](#adr-017--la-rls-tiene-que-aplicar-en-runtime-rol-separado-force-y-chequeo-de-arranque) | La RLS tiene que aplicar en runtime: rol separado, `FORCE` y chequeo de arranque | T079–T083 |
 
 ---
 
@@ -500,11 +504,487 @@ la respuesta correcta es una segunda consulta **ya con el tenant resuelto**, no 
 
 ---
 
+## ADR-014 — `register` cerrado antes de tiempo, y bootstrap CLI como parche
+
+**Estado**: decidido al implementar · **Tareas**: T064
+
+### El hallazgo
+
+Una revisión de seguridad encontró que `POST /api/auth/register` era anónimo y tomaba `Role` y
+`PhoneNumber` del body. `X-Tenant-ID` **no es secreto** — viaja en cada request de cualquier
+cliente del tenant. Cualquiera que lo conociera podía registrarse como `TenantAdmin` con su propio
+celular, recibir el OTP y tomar el tenant entero.
+
+Forzar `role = Member` en el servidor **no alcanza**: un `Member` ya puede leer y ajustar stock
+(FR-013/FR-014). El problema no era el rol elegido, era la falta de autorización en el endpoint.
+
+### La decisión
+
+`register` pasa a exigir `[Authorize(Policy = AuthorizationPolicies.TenantAdmin)]` **más** una
+verificación explícita en el controller: el claim `tid` del JWT debe ser igual al tenant resuelto
+por `X-Tenant-ID`. La policy sola no alcanza — sin la segunda verificación, un `TenantAdmin` legítimo
+de un tenant podría apuntar el header a otro tenant y registrar gente ahí. El chequeo corre **antes**
+de tocar `RegisterUserCommand`: un intento cross-tenant no crea ningún usuario, ni siquiera en el
+tenant equivocado.
+
+### El problema que esto abre: el huevo y la gallina
+
+Con `register` cerrado, nadie puede convertirse en el primer `TenantAdmin` de un tenant nuevo por
+HTTP: hace falta ya ser `TenantAdmin` para crear un `TenantAdmin`. La superficie correcta para esto
+es T063 (admin de plataforma), que todavía no existe.
+
+### Alternativas evaluadas
+
+| Opción | Por qué se descartó |
+|---|---|
+| Dejar `register` anónimo hasta T063 | Es exactamente el agujero que encontró la revisión; no es aceptable dejarlo abierto mientras se construye T063 |
+| Adelantar T063 completo | Fuera de alcance: T063 es una superficie nueva (identidad y endpoints separados de plataforma), no un parche de una tarde |
+| **Bootstrap CLI temporal** ✅ | — |
+
+### Decisión: bootstrap CLI
+
+Subcomando de `Stockma.Api`, fuera de HTTP:
+
+```
+dotnet run --project backend/src/Stockma.Api -- bootstrap-admin --tenant <guid> --email <email> --phone <telefono>
+```
+
+- La contraseña se lee de `STOCKMA_BOOTSTRAP_PASSWORD` (variable de entorno), **nunca** de un
+  argumento de línea de comandos — un argv queda en el historial de shell y en `ps`.
+- Corre sobre un tenant **existente**: hoy el único alta de tenants es el `INSERT` manual documentado
+  como decisión abierta más abajo. El CLI no inventa una superficie de creación de tenants.
+- Sólo crea el admin si el tenant tiene **cero usuarios**; si ya tiene alguno, falla con un error
+  claro y código de salida distinto de cero, sin tocar la base.
+- Reutiliza `RegisterUserCommandHandler` (vía `BootstrapAdminCommandHandler`, que valida el tenant
+  y el conteo de usuarios y después delega la creación) en vez de duplicar la lógica de alta de
+  `IUserAccounts`.
+- Sale sin levantar el host web.
+
+### Qué la devolvería a discusión
+
+Este CLI es un parche explícitamente temporal. Cuando exista T063 (admin de plataforma), el alta del
+primer `TenantAdmin` de un tenant debería migrar a esa superficie, y este subcomando puede retirarse.
+
+---
+
+## ADR-015 — Autenticación por defecto y el tenant atado al token
+
+**Estado**: decidido al implementar · **Tareas**: T073
+
+### El hallazgo
+
+Una revisión de seguridad de la slice 3b encontró que `ProductsController`, `BatchesController` y
+`TenantController` no tenían `[Authorize]` en ningún endpoint, y `AddAuthorization` en `Program.cs`
+no traía `FallbackPolicy`. Peor: el `TenantMiddleware` tomaba el tenant **únicamente** del header
+`X-Tenant-ID` y nunca lo comparaba contra el claim `tid` del JWT. `X-Tenant-ID` **no es secreto**
+—el mismo argumento de ADR-014— así que cualquiera que conociera el GUID de un tenant podía leer y
+ajustar su stock sin loguearse nunca. La RLS **no** ataja esto: el tenant que ve la sesión de
+Postgres sale de ese header, elegido por el cliente.
+
+### La decisión
+
+Dos cambios, uno completa al otro:
+
+| Cambio | Efecto |
+|---|---|
+| `FallbackPolicy` con `RequireAuthenticatedUser()` | Autenticado es el default. Un endpoint nuevo queda protegido aunque nadie le ponga `[Authorize]` — el error seguro es cerrado, no abierto |
+| `TenantMiddleware` compara `X-Tenant-ID` contra el `tid` del JWT cuando hay usuario autenticado | El header deja de ser la única fuente de verdad del tenant. Un mismatch corta con `403 TENANT_MISMATCH` **antes** de `Authorization` y antes de tocar el handler o la base |
+
+`Program.cs` corre `UseAuthentication()` **antes** de `UseMiddleware<TenantMiddleware>()`: sin eso,
+`HttpContext.User` todavía no está poblado cuando el middleware necesita leer el `tid`.
+
+### Por qué `RequireAuthenticatedUser()` y no `[Authorize]` por controller
+
+Un `[Authorize]` que se agrega por controller es un opt-in: alguien tiene que acordarse de ponerlo en
+cada endpoint nuevo. Con `FallbackPolicy`, el opt-in se invierte a `[AllowAnonymous]` — la superficie
+pública queda **listada explícitamente**, no es lo que quedó sin decorar por olvido.
+
+### Qué queda anónimo, y por qué cada uno
+
+| Endpoint | Por qué |
+|---|---|
+| `POST /api/auth/login`, `POST /api/auth/confirm-device` | Ya exentos del `TenantMiddleware` desde T055a: ocurren antes de que exista un token |
+| `MapOpenApi()` | Sólo se mapea en `Development`; sin `AllowAnonymous()` explícito el `FallbackPolicy` también lo alcanza y rompe Swagger en dev |
+
+### `GET /api/tenant/branding` NO queda anónimo
+
+Se evaluó dejarlo público para themear la pantalla de login y se descartó: el login es genérico y el
+tenant recién se conoce **después** de loguearse (se resuelve desde el email, T055). Antes del login no
+hay `X-Tenant-ID` que mandar, así que un branding anónimo no sirve a ningún flujo real y sólo expone un
+oráculo para saber qué GUID de tenant existe y cuál es su configuración.
+
+### Consecuencia: el chequeo ad hoc de `register` queda redundante
+
+ADR-014 había agregado una verificación manual en `AuthController.Register` (`tid` del JWT contra
+`tenantContext.TenantId`) porque en ese momento era el **único** lugar donde algo comparaba token
+contra header. Con el `TenantMiddleware` haciendo esa comparación para **toda** ruta autenticada, el
+chequeo del controller pasó a duplicar una garantía que ya corre antes en el pipeline. Se eliminó;
+`[Authorize(Policy = AuthorizationPolicies.TenantAdmin)]` se mantiene sin cambios.
+
+### Alternativas evaluadas
+
+| Opción | Por qué se descartó |
+|---|---|
+| Sólo agregar `[Authorize]` a los tres controllers, sin `FallbackPolicy` | Dependía de que nadie se olvide en el próximo endpoint. Es exactamente el error que esto corrige |
+| Resolver el tenant siempre del `tid` del JWT, ignorando el header por completo | Rompería el contrato ya publicado (`X-Tenant-ID` obligatorio en todas las rutas) y los endpoints anónimos, que no tienen `tid`, quedarían sin forma de resolver tenant |
+| **`FallbackPolicy` + comparación en `TenantMiddleware`** ✅ | — |
+
+### Qué la devolvería a discusión
+
+Si algún día `X-Tenant-ID` deja de ser redundante con el `tid` (por ejemplo, un usuario con acceso a
+más de un tenant), la comparación estricta de igualdad deja de alcanzar y hay que decidir cuál gana.
+
+---
+
+## ADR-016 — Endurecimiento del login: enumeración, fuerza bruta del OTP y carreras
+
+**Estado**: decidido al implementar · **Tareas**: T074, T075, T076, T077, T078
+
+### El hallazgo
+
+La revisión adversarial de cierre de la slice 3b encontró que el flujo de login cumplía el contrato
+funcional pero dejaba abiertas varias formas de atacarlo **sin romper ninguna regla escrita**:
+
+| # | Agujero | Consecuencia |
+|---|---|---|
+| 1 | `confirm-device` respondía `AUTH_INVALID_CREDENTIALS` a un email inexistente y un error de OTP a uno existente | Enumerar qué correos usan Stockma, justo lo que T055c prohíbe en el login |
+| 2 | El login volvía **sin** correr PBKDF2 para un email inexistente o un usuario bloqueado | La misma enumeración, medida con un reloj en vez de leyendo el `errorCode` |
+| 3 | El OTP no tenía tope de intentos, un código errado no lo gastaba, los viejos seguían vivos y cada intento se comparaba contra todos | 10⁶ combinaciones sin límite, y cada SMS nuevo sumaba un blanco más |
+| 4 | `DeviceOtp` no tenía token de concurrencia | Dos `confirm-device` en carrera gastaban el mismo código dos veces |
+| 5 | `TryTrust` contaba y después insertaba sin lock | La carrera superaba `MaxTrustedDevices` y duplicaba filas activas del mismo aparato |
+| 6 | `ConsoleSmsSender` se registraba en **todo** entorno | En producción, el código y el celular terminaban en el log |
+| 7 | `deviceId` ausente → `500`; contraseña rechazada por Identity → `500`; `429` con cuerpo vacío | Contrato incumplido (`400 VALIDATION_FAILED`, `429 AUTH_RATE_LIMITED`) |
+| 8 | El rate limit se particionaba por `RemoteIpAddress` sin forwarded headers | Detrás de un proxy, todos los clientes comparten una sola cuota |
+| 9 | `DeviceOtp` recortaba el `deviceId` al guardar pero las búsquedas comparaban el valor sin recortar | `" abc"` nunca coincidía con `"abc"`; además, un `deviceId` de 3 caracteres se aceptaba |
+
+### Decisión 1 — Un único error en `confirm-device` (T074)
+
+**Toda** falla de `confirm-device` responde `401 AUTH_OTP_REJECTED`, con el mismo cuerpo: email
+inexistente, ningún OTP vigente, código errado, vencido, quemado por intentos o perdedor de una
+carrera. El email inexistente **no** usa `AUTH_INVALID_CREDENTIALS`: ese código sólo existe en el
+login, así que verlo acá ya dice "este email no existe".
+
+Esto resuelve el `[PENDIENTE]` del contrato a favor de un código único: separar
+`AUTH_OTP_INVALID` / `AUTH_OTP_EXPIRED` filtra si había un OTP en vuelo, es decir, si alguien acaba
+de loguearse con la contraseña correcta.
+
+### Decisión 2 — Hash señuelo en el login (T074)
+
+Todo camino de falla del login (email inexistente o en blanco, usuario sin contraseña, usuario
+bloqueado) corre `IPasswordHasher.VerifyHashedPassword` contra un **hash señuelo estático**, generado
+una vez por proceso con el mismo `PasswordHasher` por defecto que usa Identity (mismo formato, mismas
+iteraciones). El resultado se descarta.
+
+El test no mide tiempos —sería flaky—: cuenta con un hasher doble que cada camino de falla invoca la
+verificación **exactamente una vez**, igual que la contraseña equivocada.
+
+### Decisión 3 — Intentos y emisión del OTP (T075)
+
+| Regla | Detalle |
+|---|---|
+| Emitir invalida lo anterior | Un OTP nuevo marca `InvalidatedAt` en todos los vivos de ese usuario+dispositivo. A lo sumo hay **un** código vivo por dispositivo |
+| Sólo el último cuenta | Cada intento se compara contra el OTP vigente **más nuevo**, nunca contra todos |
+| Tope de intentos | `DeviceOtp.FailedAttempts` persistido. `Otp:MaxAttempts` (def. 5) intentos fallidos **queman** el código (`InvalidatedAt`). El invariante vive en la entidad (`RegisterFailedAttempt`); quemado no se compara contra nada más |
+| Tope de emisión | `Otp:MaxIssuesPerWindow` (def. 5) códigos por usuario en `Otp:IssueWindowMinutes` (def. 15, ventana deslizante) |
+| Registro del intento (FR-008) | El contador persistido **más** un log estructurado `Warning` con `UserId`, intentos y si quedó quemado. **Nunca** el código ni el celular, y tampoco el `deviceId` (ver decisión 7) |
+
+`InvalidatedAt` es una columna aparte de `ConsumedAt` por el mismo motivo que ADR-007 separa
+`RevokedAt` de `ExpiresAt`: "lo usó alguien" y "lo quemamos nosotros" son hechos distintos y la
+auditoría necesita distinguirlos.
+
+**Pasado el tope de emisión, el login responde exactamente igual** (`200 requiresDeviceConfirmation`)
+pero no manda SMS. Se descartó un `429`: sólo lo recibiría quien acertó la contraseña de un email
+existente, así que el status mismo confirmaría la cuenta. El costo es de UX: un usuario legítimo que
+pidió 6 códigos en 15 minutos no recibe el sexto y no sabe por qué. Se acepta porque el código
+anterior **sigue vivo** (un pedido sobre el tope no invalida nada) y porque 5 en 15 minutos no es un
+uso normal.
+
+### Decisión 4 — Concurrencia: lock por usuario + token de concurrencia (T075, T076)
+
+| Opción | Por qué se descartó |
+|---|---|
+| Sólo `xmin` (concurrencia optimista) | Evita el doble consumo, pero **no** el ataque de ráfaga: 100 intentos en paralelo leen `FailedAttempts = 0`, se **comparan los 100** y recién después chocan al guardar. El tope limitaría los intentos contados, no los evaluados |
+| `SELECT … FOR UPDATE` sobre la fila del OTP | Serializa el consumo, pero no la emisión ni el tope por ventana, que no tienen una fila que bloquear |
+| **`pg_advisory_xact_lock` por usuario + `xmin`** ✅ | — |
+
+`Issue` y `Consume` corren dentro de una transacción que toma
+`pg_advisory_xact_lock(hashtextextended('device_otps:{userId}', 0))`. Dentro del lock se cuenta la
+ventana, se invalidan los anteriores, se compara el código y se registra el intento: una ráfaga en
+paralelo evalúa **como máximo** `MaxAttempts` intentos. El lock se libera solo al terminar la
+transacción; no toca tablas, así que convive con la RLS (la sesión ya tiene `app.tenant` seteado
+por el interceptor al abrir la conexión). Una colisión del hash sólo agrega espera, nunca un error.
+
+`DeviceOtp` suma además `xmin` como token de concurrencia (`IsRowVersion()`, el mismo patrón que
+`Batch`). Con el lock no debería disparar nunca; si otra ruta futura toca la fila sin el lock, el
+perdedor recibe `AUTH_OTP_REJECTED` en vez de gastar el código dos veces. El test de doble consumo
+pasa **incluso sin el lock**, lo que prueba que el token defiende solo.
+
+`TryTrust` toma el mismo tipo de lock con otro alcance (`trusted_devices:{userId}`) y, dentro, vuelve
+a chequear si ese `(usuario, dispositivo)` ya tiene una fila activa —si la tiene, lo devuelve como
+confiable sin insertar— y recién después cuenta los activos contra `MaxTrustedDevices`.
+
+**No se agregó un índice único parcial** `(user_id, device_id) WHERE revoked_at IS NULL`. Un
+dispositivo **vencido** tiene `revoked_at IS NULL`, así que reconfiarlo chocaría contra el índice
+salvo que se le escriba `RevokedAt` a la fila vieja — y eso es exactamente lo que ADR-007 prohíbe:
+`RevokedAt` significa "una persona lo dio de baja". El predicado tampoco puede usar `now()` (un
+índice parcial exige funciones inmutables). La garantía de unicidad entre activos la da el lock.
+
+### Decisión 5 — El sender de consola sólo en `Development` (T077)
+
+`ConsoleSmsSender` se registra **únicamente** si el entorno es `Development`. En cualquier otro, y
+mientras no exista un proveedor real (T049), la API **no arranca**: una validación de opciones con
+`ValidateOnStart()` corta el arranque del host con un mensaje que dice qué falta.
+
+Se eligió `ValidateOnStart()` y no tirar la excepción al registrar servicios porque el subcomando
+`bootstrap-admin` (ADR-014) construye el host pero no lo arranca, y **tiene** que poder correr en
+producción. El error seguro es cerrado: nunca se cae en silencio al sender que escribe códigos en el
+log.
+
+### Decisión 6 — Forwarded headers con proxies explícitos (T078)
+
+`UseForwardedHeaders()` corre primero en el pipeline, antes del rate limiter. Los proxies de
+confianza salen de `ForwardedHeaders:KnownProxies` (IPs) y `ForwardedHeaders:KnownNetworks` (CIDR),
+**vacíos por defecto**.
+
+Hay una trampa en ASP.NET Core: con las dos listas vacías, el middleware acepta `X-Forwarded-For` de
+**cualquier** origen. Por eso, sin configuración, `ForwardedHeaders` queda en `None` y el header se
+ignora: un cliente no puede inventarse una IP nueva por request para esquivar el límite. Detrás de un
+proxy real hay que declararlo; si no, todos comparten una cuota — molesto, pero seguro.
+
+### Decisión 7 — `deviceId` con entropía mínima; la huella es informativa (T078)
+
+- El `deviceId` se normaliza en **un** lugar (`DeviceIdentifier`, recorta espacios) y ese valor se
+  usa para emitir, consumir, confiar y buscar.
+- Después de normalizar DEBE tener entre **16 y 128** caracteres (128 es el largo de la columna; un
+  GUID tiene 36). Si no, `400 VALIDATION_FAILED` **antes** de mirar credenciales, así el `400` es el
+  mismo para cualquier email.
+- La validación vive en la entrada (los handlers de `login` y `confirm-device`); las entidades y los
+  servicios sólo normalizan.
+- **El `fingerprint` NO se compara.** Se guarda en el `TrustedDevice` como dato informativo para el
+  listado de T067, pero no es un control de seguridad: las huellas de navegador cambian con cada
+  actualización, y exigir coincidencia sacaría del estado confiable a usuarios legítimos cada pocas
+  semanas sin detener a nadie que ya tenga el `deviceId`.
+- La seguridad del dispositivo confiable descansa en **entropía del `deviceId` + contraseña + OTP**.
+  Por eso el `deviceId` se trata como un secreto: no se loguea.
+
+### Decisión 8 — `400 VALIDATION_FAILED` con una excepción dedicada (T078)
+
+Se agregó `ValidationFailedException` (`DomainException` con `VALIDATION_FAILED`) en vez de mapear
+`ArgumentException` a `400` en el middleware. Una `ArgumentException` también sale de invariantes
+internas (un `Guid.Empty` que llegó donde no debía, una clave JWT corta): esos son bugs y tienen que
+seguir siendo `500`, no disfrazarse de error del cliente. Lo que es input del usuario —`deviceId`,
+email, celular, rol, contraseña rechazada por Identity— tira la excepción dedicada. El binding de MVC
+(`[ApiController]`) responde con el mismo `errorCode`. Todos los errores de dominio y el `429` salen
+como `application/problem+json`.
+
+### Qué la devolvería a discusión
+
+- **Un proveedor de SMS real (T049)**: la validación de arranque pasa a exigir su configuración en
+  vez de fallar siempre fuera de `Development`.
+- **Varias instancias de la API detrás de un balanceador**: el lock ya es de la base, así que sigue
+  valiendo; el rate limit por IP es en memoria y **no** — cada instancia tendría su propia cuota.
+- **Un `deviceId` generado por el servidor** (cookie firmada): la regla de entropía pasaría a ser una
+  garantía propia en vez de una validación del input.
+- **Tiempo en `confirm-device`**: un email con OTP vigente cuesta un PBKDF2 y uno inexistente no. Sólo
+  distingue cuentas en las que alguien acaba de acertar la contraseña; se dejó fuera de este alcance.
+
+---
+
+## ADR-017 — La RLS tiene que aplicar en runtime: rol separado, `FORCE` y chequeo de arranque
+
+**Estado**: decidido al implementar · **Tareas**: T079, T080, T081, T082, T083; tercera revisión: T084–T089
+
+### El hallazgo
+
+La segunda revisión adversarial de la slice 3b encontró que la capa 2 del aislamiento **no hacía
+nada en runtime**. `InitialSchema` crea `app_user` y avisa que la app NO DEBE conectarse como
+propietario, pero `appsettings.json` conectaba como `stockma` —el rol que migra, dueño de las
+tablas— y ninguna tabla tenía `FORCE ROW LEVEL SECURITY`. PostgreSQL no aplica RLS al propietario.
+Los tests no lo veían: la API y los fixtures de OTP y dispositivos corrían como el superusuario
+`postgres`, que también la saltea.
+
+| # | Agujero | Consecuencia |
+|---|---|---|
+| 1 | Runtime conectado como propietario, sin `FORCE` | La RLS era decorativa: todo el aislamiento colgaba del filtro de EF |
+| 2 | `UseHttpsRedirection()` antes de `UseForwardedHeaders()` | Detrás de un proxy que termina TLS, cada request se redirige a sí misma |
+| 3 | El OTP se commiteaba antes de `TryTrust`; la huella sólo se validaba en blanco | Una huella de 257 caracteres (o cualquier falla posterior) gastaba el código sin dar JWT |
+| 4 | `confirm-device` ignoraba `LockoutEnd` | Un usuario deshabilitado con un OTP vigente recibía token |
+| 5 | Bootstrap sin lock; usuario y rol en dos pasos | Dos admins en carrera, o un usuario sin rol que traba el bootstrap para siempre |
+| 6 | Errores del `TenantMiddleware` como `application/json` | Contrato incumplido (`problem+json`) |
+| 7 | Clave JWT corta u opciones de proxy inválidas | Fallaban en la primera request, o al arrancar con un mensaje que no decía qué clave |
+
+### Decisión 1 — Dos roles, dos connection strings (T079)
+
+| Clave | Rol | Uso |
+|---|---|---|
+| `ConnectionStrings:Postgres` | `app_user` (no propietario) | Runtime de la API y `bootstrap-admin` |
+| `ConnectionStrings__PostgresMigrations` (env) | propietario | Sólo `dotnet ef` vía `StockmaDbContextFactory` |
+
+El runtime **nunca** recibe la credencial del propietario: no está en `appsettings.json`. Se mantuvo
+el nombre `Postgres` que ya usaban el código, los tests y el README; el `StockmaDb` de `plan.md`
+nunca llegó al código y se reconcilió. `STOCKMA_CONNECTION_STRING` se reemplazó por
+`ConnectionStrings__PostgresMigrations` para que las dos claves sigan la misma convención.
+
+### Decisión 2 — `FORCE ROW LEVEL SECURITY` en las seis tablas (T079)
+
+Segunda llave: aunque alguien vuelva a conectar el runtime con el propietario, la política le aplica.
+Un superusuario o un rol con `BYPASSRLS` la siguen salteando; eso no lo puede frenar la base, lo
+frena la decisión 4.
+
+### Decisión 3 — La función del login pasa a un rol propio (T079)
+
+Con `FORCE`, `auth_find_user_by_email` —`SECURITY DEFINER`, corre sin `app.tenant`— dejaría de
+encontrar usuarios si su dueño fuera el propietario de las tablas.
+
+| Opción | Por qué se descartó |
+|---|---|
+| `SET row_security = off` en la función | Sólo lo acepta un superusuario |
+| Dueño con `BYPASSRLS` | Saltea la RLS en **toda** tabla, no sólo en `users`; un rol así es exactamente lo que el chequeo de arranque rechaza |
+| Política permisiva cuando `app.tenant` está vacía | Lo que ADR-002 y ADR-013 prohíben |
+| **Rol `auth_lookup` con una política propia** ✅ | — |
+
+`auth_lookup` es `NOLOGIN`, no es dueño de ninguna tabla y no tiene `BYPASSRLS`. Tiene `SELECT`
+**sólo** sobre las columnas de autenticación de `users` y una política
+`auth_lookup_read FOR SELECT TO auth_lookup USING (true)` que no aplica a ningún otro rol. La
+migración le concede al rol que migra la membresía **sin `INHERIT`** y le da a `auth_lookup`
+`CREATE` sobre el schema sólo mientras cambia el dueño; las dos se revocan en el acto. Si el rol que
+migra heredara `auth_lookup`, la política le abriría `users` entera, y el test
+`TheOwner_WithoutAnActiveTenant_SeesNoUsers` lo detecta.
+
+**Consecuencia aceptada**: un propietario **no superusuario** necesita `CREATEROLE`. Si `auth_lookup`
+ya existe en el cluster (lo crea la primera base migrada), el rol que migra necesita `ADMIN` sobre él
+—lo que PostgreSQL 16 le da solo a quien lo crea—. `ForceRowLevelSecurity` y
+`HardenLoginLookupSearchPath` lo chequean primero (`pg_has_role(current_user, 'auth_lookup', 'USAGE
+WITH ADMIN OPTION')`, que un superusuario siempre pasa) y, si falta, abortan con un mensaje que nombra
+el rol y trae el `GRANT auth_lookup TO <rol> WITH ADMIN OPTION, INHERIT FALSE, SET FALSE` que tiene que
+correr un superusuario (T086). Antes fallaba con un `permission denied to grant role` que no decía qué
+hacer. Nunca queda a medias: cada migración corre en una transacción.
+
+### Decisión 4 — La API no arranca con un rol que saltee la RLS (T079)
+
+`RuntimeDatabaseRoleCheck` (`IHostedLifecycleService.StartingAsync`, antes que cualquier otro
+servicio) consulta `pg_roles` y corta el arranque si el rol de runtime es, **o es miembro a cualquier
+profundidad de**, un superusuario, un rol con `BYPASSRLS` o el propietario de alguna tabla de `public`.
+Usa `pg_has_role(…, 'MEMBER')`, no `'USAGE'`: `USAGE` sólo ve las membresías con `INHERIT`, y un
+miembro `NOINHERIT` igual puede hacer `SET ROLE` al dueño o al rol que saltea la RLS (T084).
+
+La **única** excepción es `Development`: en local el `docker-compose` crea `stockma` como
+superusuario, y exigir el chequeo ahí sólo empujaría a desactivarlo. Hasta la tercera revisión también
+se exceptuaba `Testing`, pero ningún test lo necesitaba (`StockmaApiFactory` corre en `Development`) y
+era un nombre de entorno que apagaba un control de seguridad; se quitó (T084).
+
+`bootstrap-admin` corre **los mismos** chequeos antes de hacer nada: la validación de opciones
+(`IStartupValidator`, lo que dispara `ValidateOnStart`) y `RuntimeDatabaseRole.EnsureRestrictedAsync`
+con la misma excepción de `Development`. Si fallan, sale con código `1` y el motivo en `stderr`
+(T085). Consecuencia aceptada: fuera de `Development`, sin proveedor de SMS (T049) el subcomando
+tampoco corre, igual que la API. Un admin creado así no podría loguearse de todos modos: el login
+exige OTP por SMS.
+
+### Decisión 5 — `confirm-device` es una sola unidad (T080)
+
+La huella se valida (1–256 después de recortar) junto al `deviceId`, antes de mirar el email.
+`IDeviceOtpService.ConsumeAsync<T>` recibe **lo que sigue al consumo** —confiar el dispositivo y
+emitir el JWT— y lo corre dentro de la misma transacción con lock por usuario; si falla, el consumo
+se revierte y el usuario reintenta con el mismo código.
+
+| Opción | Por qué se descartó |
+|---|---|
+| Transacción externa alrededor de consumo + confianza | Un código errado **registra el intento y tira**: la transacción de afuera revertiría el contador y reabriría la fuerza bruta que cierra T075 |
+| Consumir después de confiar | Confía el dispositivo antes de saber si el código ganó la carrera |
+| **Callback dentro del consumo** ✅ | Sólo corre si el código coincide; los intentos fallidos se siguen commiteando |
+
+El orden de locks es siempre `device_otps:{userId}` → `trusted_devices:{userId}`; ninguna ruta los
+toma al revés.
+
+El usuario bloqueado (`LockoutEnabled` + `LockoutEnd` futuro) recibe en `confirm-device` el mismo
+`401 AUTH_OTP_REJECTED` que un email inexistente, y no se toca su OTP: misma regla que el login.
+
+### Decisión 6 — Bootstrap bajo lock y alta atómica (T083)
+
+`ITenantAccounts.RunExclusivelyAsync` toma `pg_advisory_xact_lock('tenant_bootstrap:{tenantId}')`
+y dentro corren el chequeo de "sin usuarios" y el alta. `UserAccounts.CreateAsync` crea usuario y
+rol en una transacción, y se une a la del lock si ya hay una. Mismo mecanismo que ADR-016 decisión
+4, con otro alcance.
+
+### Decisión 7 — Fallar al arrancar, no en la primera request (T081, T082)
+
+- `JwtOptions` con `ValidateOnStart`: clave ≥ 32 bytes, `Issuer` y `Audience` no vacíos,
+  `ExpiresMinutes` entre 1 y 60.
+- `ForwardedHeadersOptions` con `ValidateOnStart` y mensajes que nombran la clave. Las listas ya se
+  resolvían al construir el pipeline, así que la revisión sobreestimó el problema: fallaba al
+  arrancar, pero con `An invalid IP address was specified` y sin validar el largo del prefijo CIDR.
+- `UseForwardedHeaders()` es el **primer** middleware; ADR-016 decisión 6 lo afirmaba pero el código
+  corría antes `UseHttpsRedirection()`.
+- Los errores del `TenantMiddleware` salen en `application/problem+json`.
+
+### Decisión 8 — `search_path` de la función del login sin `pg_temp` primero (T086)
+
+`SET search_path = public` no saca a `pg_temp`: si no figura explícito, PostgreSQL lo busca **primero**
+para relaciones. `app_user` puede crear una tabla temporal `users`, y la función `SECURITY DEFINER`
+leería esa en vez de la real. La migración nueva `HardenLoginLookupSearchPath` (nunca se edita una
+migración aplicada) deja `SET search_path = pg_catalog, public, pg_temp`. Sólo hace `ALTER FUNCTION`,
+no `CREATE OR REPLACE`: reemplazar el cuerpo exigiría darle `CREATE` en el schema a `auth_lookup` otra
+vez. Como la función es de `auth_lookup`, el rol que migra repite la maniobra de `ForceRowLevelSecurity`
+(membresía sin `INHERIT`, `SET ROLE`, revocar) y necesita el mismo `ADMIN`.
+
+### Decisión 9 — La configuración base no trae credenciales (T087)
+
+`appsettings.json` traía `app_user`/`app_user`: un deploy sin override probaba una contraseña
+conocida. Ahora la base deja `ConnectionStrings:Postgres` vacía, la cadena de desarrollo vive en
+`appsettings.Development.json` (versionado, sólo local) y `DatabaseOptions` con `ValidateOnStart` corta
+el arranque con un mensaje que nombra la clave. `ConnectionStrings__PostgresMigrations` nunca se
+define en el entorno de la API.
+
+### Decisión 10 — La carrera de registro entre tenants es `409`, no `500` (T088)
+
+El pre-chequeo de `register` usa la función del login (ve todos los tenants), pero Identity valida la
+unicidad con el filtro y la RLS del tenant activo. Dos altas simultáneas del mismo email en tenants
+distintos pasan las dos, y la segunda choca con `ux_users_normalized_email`. `UserAccounts.CreateAsync`
+traduce ese `23505` (y el de `ux_users_normalized_user_name`, porque el usuario es el email), y los
+errores `DuplicateEmail`/`DuplicateUserName` de Identity, a `EmailAlreadyRegisteredException`: el mismo
+`409 AUTH_EMAIL_DUPLICATE` del pre-chequeo.
+
+### El pool de conexiones es fail-closed (T089)
+
+`app.tenant` se setea a nivel de sesión (`set_config(…, false)`) al abrir la conexión. Una conexión del
+pool reusada sin tenant no ve filas porque Npgsql corre `DISCARD ALL` al devolverla. El test
+`APooledConnection_ReusedWithoutATenant_SeesNoRows` lo fija y falla si la connection string lleva
+`No Reset On Close=true`: esa opción queda **prohibida** mientras el tenant viva en la sesión.
+
+### Brecha aceptada: tablas sin RLS (T089)
+
+`user_roles`, `user_claims`, `user_tokens`, `user_logins`, `roles`, `role_claims` y `tenants` **no
+tienen RLS**: no tienen `tenant_id` (las de Identity cuelgan de `user_id`/`role_id`; `roles` y
+`tenants` son globales), y el login lee `user_roles` para armar el JWT **antes** de que exista un
+tenant activo. Ahí el aislamiento depende sólo de la aplicación: toda lectura parte de un `user_id` que
+ya salió de `users` (con RLS) o de la función del login. Una política que resolviera el tenant por
+`user_id` → `users.tenant_id` rompería el login mismo. Queda en las decisiones abiertas.
+
+### La duración de 3h28m de la suite
+
+No era un lock ni un timeout. El registro de Windows muestra la máquina en *modern standby* de 17:48
+a 21:15 (tapa cerrada), 3h27m. Corridas aisladas: `Stockma.Api.Tests` 21 s y
+`Stockma.Infrastructure.Tests` 33 s, ningún test por encima de 4,7 s (el primero de cada clase, que
+arranca el contenedor).
+
+### Qué la devolvería a discusión
+
+- **Un hosting con Postgres administrado** que no permita `CREATEROLE`: los roles se crearían en el
+  aprovisionamiento y la migración sólo haría `GRANT`/`ALTER OWNER`.
+- **Migraciones de datos sobre tablas con RLS**: con `FORCE`, el propietario no ve filas sin
+  `app.tenant`. Una migración así DEBE setear el tenant por lote o correr como superusuario, y
+  decirlo en su comentario.
+
+---
+
 ## Decisiones que siguen abiertas
 
 | Tema | Estado |
 |---|---|
-| Tope de intentos **por código** de OTP | Sin tarea. El rate limiting es por IP, está escrito sólo para `/login` y no para `confirm-device`, y NFR-005 dice "DEBERÍA" |
 | Alta de tenants | Sin tarea. Hoy el seed es un `INSERT` manual: no se puede dar de alta una droguería sin tocar la base |
-| Proveedor de SMS | Sin elegir (T049) |
+| Proveedor de SMS | Sin elegir (T049). Mientras tanto la API no arranca fuera de `Development` (ADR-016) |
+| Rate limit con varias instancias | Es en memoria por instancia; con más de una réplica cada una tiene su propia cuota (ADR-016). Sigue abierto tras la segunda revisión de 3b |
+| Password spraying | Una contraseña errada no incrementa `AccessFailedCount`; el único freno es el rate limit por IP. El lockout por intentos queda en los criterios de T068 |
+| Tiempo de `confirm-device` | Un email con OTP vigente cuesta un PBKDF2 y uno inexistente o bloqueado no: unos milisegundos de diferencia. Sólo distingue cuentas en las que alguien acaba de acertar la contraseña (ADR-016) |
 | ¿Sobrevive `TrustedDevice`? | A reevaluar después de T065 — ver ADR-006 |
+| Tablas sin RLS | `user_roles`, `user_claims`, `user_tokens`, `user_logins`, `roles`, `role_claims` y `tenants` no tienen `tenant_id` ni política, y el login lee `user_roles` sin tenant. Ahí el aislamiento es sólo de la aplicación (ADR-017, brecha aceptada) |

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Stockma.Application.Common;
+using Stockma.Application.Identity;
 
 namespace Stockma.Api.Middleware;
 public sealed class TenantMiddleware(RequestDelegate next)
@@ -26,6 +27,8 @@ public sealed class TenantMiddleware(RequestDelegate next)
         {
             await WriteProblemDetailsAsync(
                 httpContext,
+                StatusCodes.Status400BadRequest,
+                "Tenant no resuelto",
                 "TENANT_HEADER_MISSING",
                 $"El header {HeaderName} es obligatorio.");
             return;
@@ -35,9 +38,27 @@ public sealed class TenantMiddleware(RequestDelegate next)
         {
             await WriteProblemDetailsAsync(
                 httpContext,
+                StatusCodes.Status400BadRequest,
+                "Tenant no resuelto",
                 "TENANT_HEADER_INVALID",
                 $"El header {HeaderName} debe ser un GUID válido y distinto de Guid.Empty.");
             return;
+        }
+
+        if (httpContext.User.Identity?.IsAuthenticated == true)
+        {
+            var tokenTenantIdClaim = httpContext.User.FindFirst(StockmaClaimTypes.TenantId)?.Value;
+
+            if (!Guid.TryParse(tokenTenantIdClaim, out var tokenTenantId) || tokenTenantId != tenantId)
+            {
+                await WriteProblemDetailsAsync(
+                    httpContext,
+                    StatusCodes.Status403Forbidden,
+                    "Tenant no coincide",
+                    "TENANT_MISMATCH",
+                    $"El {HeaderName} no coincide con el tenant del token.");
+                return;
+            }
         }
 
         tenantContext.Set(tenantId);
@@ -50,19 +71,21 @@ public sealed class TenantMiddleware(RequestDelegate next)
 
     private static async Task WriteProblemDetailsAsync(
         HttpContext httpContext,
+        int status,
+        string title,
         string errorCode,
         string detail)
     {
-        httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+        httpContext.Response.StatusCode = status;
 
         var problem = new ProblemDetails
         {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Tenant no resuelto",
+            Status = status,
+            Title = title,
             Detail = detail,
             Extensions = { ["errorCode"] = errorCode },
         };
 
-        await httpContext.Response.WriteAsJsonAsync(problem);
+        await httpContext.Response.WriteAsJsonAsync(problem, options: null, contentType: ProblemResponses.ContentType);
     }
 }

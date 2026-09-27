@@ -12,6 +12,8 @@ public interface IUserAccounts
     Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default);
 
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
+
+    Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record LoginIdentity(Guid UserId, Guid TenantId, IReadOnlyList<string> Roles);

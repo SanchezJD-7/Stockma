@@ -111,16 +111,18 @@ public class ConfirmDeviceCommandTests
     }
 
     [Fact]
-    public async Task Confirm_ForAnUnknownEmail_IsRejectedWithTheCredentialsError()
+    public async Task Confirm_ForAnUnknownEmail_IsRejectedWithTheSingleOtpError()
     {
         accounts.ByEmailResult = null;
 
-        var exception = await Assert.ThrowsAsync<InvalidCredentialsException>(
+        var exception = await Assert.ThrowsAsync<OtpNotUsableException>(
             () => CreateHandler().Handle(Command(), default));
 
         exception.ErrorCode
             .Should()
-            .Be("AUTH_INVALID_CREDENTIALS", "mismo criterio que T055c: no revelar si el email existe");
+            .Be(
+                "AUTH_OTP_REJECTED",
+                "ADR-016: email inexistente y OTP errado dan la MISMA respuesta; distinguirlos enumera correos");
     }
 
     [Fact]
@@ -128,10 +130,106 @@ public class ConfirmDeviceCommandTests
     {
         accounts.ByEmailResult = null;
 
-        await Assert.ThrowsAsync<InvalidCredentialsException>(
+        await Assert.ThrowsAsync<OtpNotUsableException>(
             () => CreateHandler().Handle(Command(), default));
 
         otps.Consumed.Should().BeEmpty();
+        tenantContext.SetCalls.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("dev-1")]
+    public async Task Confirm_WithALowEntropyDeviceId_IsAValidationFailure(string deviceId)
+    {
+        ArrangeKnownUser();
+
+        await Assert.ThrowsAsync<ValidationFailedException>(
+            () => CreateHandler().Handle(new ConfirmDeviceCommand(Email, deviceId, Fingerprint, Otp), default));
+
+        otps.Consumed.Should().BeEmpty("un deviceId inválido se rechaza antes de gastar el OTP");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Confirm_WithoutAFingerprint_IsRejectedBeforeConsumingTheOtp(string fingerprint)
+    {
+        ArrangeKnownUser();
+
+        await Assert.ThrowsAsync<ValidationFailedException>(
+            () => CreateHandler().Handle(new ConfirmDeviceCommand(Email, DeviceId, fingerprint, Otp), default));
+
+        otps.Consumed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Confirm_WithAFingerprintLongerThanTheColumn_IsRejectedBeforeLookingUpTheUser()
+    {
+        ArrangeKnownUser();
+        var fingerprint = new string('f', 257);
+
+        await Assert.ThrowsAsync<ValidationFailedException>(
+            () => CreateHandler().Handle(new ConfirmDeviceCommand(Email, DeviceId, fingerprint, Otp), default));
+
+        otps.Consumed.Should().BeEmpty("una huella que no entra en la columna no puede gastar el OTP");
+        tenantContext.SetCalls.Should().BeEmpty("la validación de la entrada va antes de mirar el email, igual para cualquier cuenta");
+    }
+
+    [Fact]
+    public async Task Confirm_WithAFingerprintOfExactly256Characters_IsAccepted()
+    {
+        ArrangeKnownUser();
+
+        var result = await CreateHandler().Handle(
+            new ConfirmDeviceCommand(Email, DeviceId, new string('f', 256), Otp),
+            default);
+
+        result.DeviceTrusted.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Confirm_WhenTrustingTheDeviceFails_DoesNotCommitTheOtpConsumption()
+    {
+        ArrangeKnownUser();
+        devices.TrustThrows = new InvalidOperationException("la base se cayó");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateHandler().Handle(Command(), default));
+
+        otps.Committed.Should().BeEmpty("ADR-017: sin JWT no se gasta el OTP; el usuario puede reintentar con el mismo código");
+    }
+
+    [Fact]
+    public async Task Confirm_WhenTheTokenCannotBeIssued_DoesNotCommitTheOtpConsumption()
+    {
+        ArrangeKnownUser();
+        tokens.Throws = new InvalidOperationException("clave de firma inválida");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateHandler().Handle(Command(), default));
+
+        otps.Committed.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Confirm_WithAValidOtp_CommitsTheConsumptionAfterIssuingTheToken()
+    {
+        ArrangeKnownUser();
+
+        await CreateHandler().Handle(Command(), default);
+
+        otps.Committed.Should().ContainSingle().Which.Should().Be((UserId, DeviceId, Otp));
+    }
+
+    [Fact]
+    public async Task Confirm_NormalizesTheDeviceIdBeforeUsingIt()
+    {
+        ArrangeKnownUser();
+
+        await CreateHandler().Handle(new ConfirmDeviceCommand(Email, $"  {DeviceId}  ", Fingerprint, Otp), default);
+
+        otps.Consumed.Should().ContainSingle().Which.DeviceId.Should().Be(DeviceId);
+        devices.TrustAttempts.Should().ContainSingle().Which.Should().Be(DeviceId);
     }
 
     [Fact]

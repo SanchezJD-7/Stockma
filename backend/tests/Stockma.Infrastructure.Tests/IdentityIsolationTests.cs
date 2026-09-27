@@ -147,6 +147,29 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
     }
 
     [Fact]
+    public async Task LoginLookup_IsNotShadowedByATempTableNamedUsers()
+    {
+        await PrepareAsync();
+
+        await using var connection = new NpgsqlConnection(AppUserConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            $"""
+            CREATE TEMP TABLE users (id uuid, tenant_id uuid, normalized_email text, password_hash text,
+                                     security_stamp text, lockout_end timestamptz, lockout_enabled boolean);
+            INSERT INTO users VALUES (gen_random_uuid(), '{TenantB}', 'ANA@DROGA.CO', 'hash-falso', 'stamp-falso',
+                                      NULL, false);
+            SELECT tenant_id FROM auth_find_user_by_email('ANA@DROGA.CO');
+            """,
+            connection);
+
+        (await command.ExecuteScalarAsync())
+            .Should()
+            .Be(TenantA, "ADR-017: pg_temp va último en el search_path de la función SECURITY DEFINER");
+    }
+
+    [Fact]
     public async Task LoginLookup_FindsAUserOfAnyTenant()
     {
         await PrepareAsync();
@@ -208,6 +231,49 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
             activeTenant: null);
 
         rows.Should().ContainSingle().Which.Should().Be("1");
+    }
+
+    [Fact]
+    public async Task LoginLookup_RunsAsADedicatedRoleThatOwnsNoTableAndCannotBypassRls()
+    {
+        await PrepareAsync();
+
+        var rows = await QueryAsAppUserAsync(
+            """
+            SELECT concat_ws('|', r.rolname, r.rolsuper::text, r.rolbypassrls::text, r.rolcanlogin::text,
+                   (EXISTS (SELECT 1 FROM pg_class c WHERE c.relowner = r.oid))::text)
+              FROM pg_proc p
+              JOIN pg_roles r ON r.oid = p.proowner
+             WHERE p.proname = 'auth_find_user_by_email';
+            """,
+            activeTenant: null);
+
+        rows.Should()
+            .ContainSingle()
+            .Which.Should()
+            .Be(
+                "auth_lookup|false|false|false|false",
+                "ADR-017: con FORCE, un SECURITY DEFINER propiedad del dueño de las tablas no encontraría a nadie; "
+                + "el dueño de la función es un rol sin login, sin BYPASSRLS y sin tablas");
+    }
+
+    [Fact]
+    public async Task LoginLookupRole_CanReadOnlyTheAuthenticationColumns()
+    {
+        await PrepareAsync();
+
+        var rows = await QueryAsAppUserAsync(
+            """
+            SELECT a.attname
+              FROM pg_attribute a
+             WHERE a.attrelid = 'users'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+               AND has_column_privilege('auth_lookup', 'users', a.attname, 'SELECT')
+             ORDER BY a.attname;
+            """,
+            activeTenant: null);
+
+        rows.Should().BeEquivalentTo(
+            ["id", "tenant_id", "normalized_email", "password_hash", "security_stamp", "lockout_end", "lockout_enabled"]);
     }
 
     [Fact]

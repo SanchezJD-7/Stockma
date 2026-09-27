@@ -18,21 +18,19 @@ public sealed class RegisterUserCommandHandler(
     {
         if (string.IsNullOrWhiteSpace(command.Email))
         {
-            throw new ArgumentException("El email es obligatorio.", nameof(command.Email));
+            throw new ValidationFailedException("El email es obligatorio.");
         }
 
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
         {
-            throw new ArgumentException(
-                "El celular es obligatorio en el alta: sin el, el usuario no puede recibir el OTP.",
-                nameof(command.PhoneNumber));
+            throw new ValidationFailedException(
+                "El celular es obligatorio en el alta: sin el, el usuario no puede recibir el OTP.");
         }
 
         if (!TenantRoles.IsKnown(command.Role))
         {
-            throw new ArgumentException(
-                $"'{command.Role}' no es un rol de tenant. Valores admitidos: {string.Join(", ", TenantRoles.All)}.",
-                nameof(command.Role));
+            throw new ValidationFailedException(
+                $"'{command.Role}' no es un rol de tenant. Valores admitidos: {string.Join(", ", TenantRoles.All)}.");
         }
 
         var email = command.Email.Trim();

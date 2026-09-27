@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Stockma.Application.Common;
 using Stockma.Application.Batches;
 using Stockma.Application.Products;
@@ -23,6 +24,11 @@ public static class InfrastructureServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddOptions<DatabaseOptions>()
+            .Bind(configuration.GetSection(DatabaseOptions.SectionName))
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Postgres), DatabaseOptions.MissingRuntimeConnectionMessage)
+            .ValidateOnStart();
+
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<TenantSessionInterceptor>();
         services.AddDbContext<StockmaDbContext>((provider, options) =>
@@ -47,14 +53,34 @@ public static class InfrastructureServiceCollectionExtensions
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<StockmaDbContext>();
 
-        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
+        services.Configure<OtpOptions>(configuration.GetSection(OtpOptions.SectionName));
         services.AddSingleton<IOtpGenerator, OtpGenerator>();
         services.AddScoped<IDeviceOtpService, DeviceOtpService>();
-        services.AddScoped<ISmsSender, ConsoleSmsSender>();
         services.AddScoped<IUserAccounts, UserAccounts>();
         services.AddScoped<ITrustedDevices, TrustedDevices>();
+        services.AddScoped<ITenantAccounts, TenantAccounts>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddSmsSender(this IServiceCollection services, bool isDevelopment)
+    {
+        if (isDevelopment)
+        {
+            services.AddScoped<ISmsSender, ConsoleSmsSender>();
+            return services;
+        }
+
+        services
+            .AddOptions<SmsOptions>()
+            .Validate(_ => false, SmsOptions.MissingProviderMessage)
+            .ValidateOnStart();
 
         return services;
     }

@@ -27,6 +27,26 @@ public class DomainExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task ValidationFailed_MapsTo400()
+    {
+        var (status, errorCode) = await InvokeAsync(new ValidationFailedException("El deviceId es obligatorio."));
+
+        status.Should().Be(StatusCodes.Status400BadRequest);
+        errorCode.Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
+    public async Task DomainErrors_AreWrittenAsProblemJson()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Response.Body = new MemoryStream();
+
+        await new DomainExceptionMiddleware(_ => throw new ValidationFailedException("x")).InvokeAsync(httpContext);
+
+        httpContext.Response.ContentType.Should().StartWith("application/problem+json", "auth-api.md: formato de error");
+    }
+
+    [Fact]
     public async Task NegativeStock_MapsTo422()
     {
         var (status, errorCode) = await InvokeAsync(new NegativeStockException(3, -5));

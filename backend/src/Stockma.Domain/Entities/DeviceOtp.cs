@@ -1,5 +1,6 @@
 using Stockma.Domain.Common;
 using Stockma.Domain.Exceptions;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Domain.Entities;
 
@@ -54,7 +55,7 @@ public class DeviceOtp : ITenantEntity, IAggregateRoot
         Id = Guid.CreateVersion7();
         TenantId = tenantId;
         UserId = userId;
-        DeviceId = deviceId.Trim();
+        DeviceId = DeviceIdentifier.Normalize(deviceId);
         CodeHash = codeHash;
         IssuedAt = issuedAt;
         ExpiresAt = issuedAt.Add(lifetime);
@@ -68,7 +69,42 @@ public class DeviceOtp : ITenantEntity, IAggregateRoot
     public DateTimeOffset IssuedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? ConsumedAt { get; private set; }
-    public bool IsUsable(DateTimeOffset now) => ConsumedAt is null && ExpiresAt > now;
+    public DateTimeOffset? InvalidatedAt { get; private set; }
+    public int FailedAttempts { get; private set; }
+    public bool IsUsable(DateTimeOffset now) => ConsumedAt is null && InvalidatedAt is null && ExpiresAt > now;
+    public void RegisterFailedAttempt(DateTimeOffset attemptedAt, int maxAttempts)
+    {
+        if (maxAttempts <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxAttempts),
+                maxAttempts,
+                "El tope de intentos del código debe ser positivo.");
+        }
+
+        if (!IsUsable(attemptedAt))
+        {
+            throw new OtpNotUsableException();
+        }
+
+        FailedAttempts++;
+
+        if (FailedAttempts >= maxAttempts)
+        {
+            InvalidatedAt = attemptedAt;
+        }
+    }
+
+    public void Invalidate(DateTimeOffset invalidatedAt)
+    {
+        if (ConsumedAt is not null || InvalidatedAt is not null)
+        {
+            return;
+        }
+
+        InvalidatedAt = invalidatedAt;
+    }
+
     public void Consume(DateTimeOffset usedAt)
     {
         if (!IsUsable(usedAt))

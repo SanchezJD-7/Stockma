@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Stockma.Application.Identity;
+using Stockma.Domain.Exceptions;
 using Stockma.Infrastructure.Persistence;
 
 namespace Stockma.Infrastructure.Identity;
@@ -19,6 +20,18 @@ public sealed class UserAccounts(
           FROM auth_find_user_by_email(@email);
         """;
 
+    private const string NormalizedEmailIndex = "ux_users_normalized_email";
+    private const string NormalizedUserNameIndex = "ux_users_normalized_user_name";
+
+    private static readonly string[] DuplicateEmailErrorCodes =
+    [
+        nameof(IdentityErrorDescriber.DuplicateEmail),
+        nameof(IdentityErrorDescriber.DuplicateUserName),
+    ];
+
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<ApplicationUser>().HashPassword(new ApplicationUser(), Guid.NewGuid().ToString());
+
     private sealed record LoginCandidate(
         Guid UserId,
         Guid TenantId,
@@ -33,13 +46,9 @@ public sealed class UserAccounts(
     {
         var candidate = await FindCandidateAsync(email, cancellationToken);
 
-        if (candidate is null || string.IsNullOrEmpty(candidate.PasswordHash))
+        if (candidate is null || string.IsNullOrEmpty(candidate.PasswordHash) || IsLockedOut(candidate))
         {
-            return null;
-        }
-
-        if (IsLockedOut(candidate))
-        {
+            passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, password);
             return null;
         }
 
@@ -62,22 +71,59 @@ public sealed class UserAccounts(
     {
         var candidate = await FindCandidateAsync(email, cancellationToken);
 
-        return candidate is null ? null : await ToIdentityAsync(candidate, cancellationToken);
+        return candidate is null || IsLockedOut(candidate) ? null : await ToIdentityAsync(candidate, cancellationToken);
     }
 
     public async Task<Guid> CreateAsync(NewUser newUser, CancellationToken cancellationToken = default)
+    {
+        if (context.Database.CurrentTransaction is not null)
+        {
+            return await CreateWithRoleAsync(newUser);
+        }
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var userId = await CreateWithRoleAsync(newUser);
+            await transaction.CommitAsync(cancellationToken);
+            return userId;
+        }
+        catch
+        {
+            context.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    private async Task<Guid> CreateWithRoleAsync(NewUser newUser)
     {
         var user = new ApplicationUser(newUser.TenantId, newUser.Email)
         {
             PhoneNumber = newUser.PhoneNumber,
         };
 
-        var created = await userManager.CreateAsync(user, newUser.Password);
+        IdentityResult created;
+
+        try
+        {
+            created = await userManager.CreateAsync(user, newUser.Password);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateEmail(exception))
+        {
+            throw new EmailAlreadyRegisteredException();
+        }
+
+        if (created.Errors.Any(error => DuplicateEmailErrorCodes.Contains(error.Code)))
+        {
+            throw new EmailAlreadyRegisteredException();
+        }
 
         if (!created.Succeeded)
         {
-            throw new InvalidOperationException(
-                $"No se pudo crear el usuario: {string.Join("; ", created.Errors.Select(e => e.Description))}");
+            throw new ValidationFailedException(
+                "El email o la contraseña no cumplen las reglas de alta: "
+                + string.Join(", ", created.Errors.Select(e => e.Code)));
         }
 
         var assigned = await userManager.AddToRoleAsync(user, newUser.Role);
@@ -92,8 +138,18 @@ public sealed class UserAccounts(
         return user.Id;
     }
 
+    private static bool IsDuplicateEmail(DbUpdateException exception) =>
+        exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: NormalizedEmailIndex or NormalizedUserNameIndex,
+        };
+
     public async Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
         await FindCandidateAsync(email, cancellationToken) is not null;
+
+    public Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default) =>
+        context.Users.AnyAsync(cancellationToken);
 
     private async Task<LoginCandidate?> FindCandidateAsync(string email, CancellationToken cancellationToken)
     {

@@ -1,9 +1,12 @@
 using Stockma.Domain.Common;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Domain.Entities;
 
 public class TrustedDevice : ITenantEntity, IAggregateRoot
 {
+    public const int MaxFingerprintLength = 256;
+
     private TrustedDevice()
     {
         DeviceId = string.Empty;
@@ -48,7 +51,7 @@ public class TrustedDevice : ITenantEntity, IAggregateRoot
         Id = Guid.CreateVersion7();
         TenantId = tenantId;
         UserId = userId;
-        DeviceId = deviceId.Trim();
+        DeviceId = DeviceIdentifier.Normalize(deviceId);
         Fingerprint = fingerprint.Trim();
         TrustedAt = trustedAt;
         ExpiresAt = expiresAt;

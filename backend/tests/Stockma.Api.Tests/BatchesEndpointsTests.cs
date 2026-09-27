@@ -39,6 +39,9 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
         return client;
     }
 
+    private HttpClient CreateAuthenticatedClient(Guid tenantId) =>
+        factory.CreateAuthenticatedClient(tenantId);
+
     private static async Task<Guid> CreateProductAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync(
@@ -71,7 +74,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Post_WithValidData_Returns201()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
         var productId = await CreateProductAsync(client);
 
         var response = await client.PostAsJsonAsync("/api/batches", NewBatch(productId));
@@ -87,7 +90,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Post_WithMissingProduct_Returns404()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.PostAsJsonAsync("/api/batches", NewBatch(Guid.NewGuid()));
 
@@ -98,7 +101,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Adjust_WithPositiveDelta_Returns200AndNewQuantity()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
         var productId = await CreateProductAsync(client);
 
         var created = await client.PostAsJsonAsync("/api/batches", NewBatch(productId));
@@ -116,7 +119,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Adjust_BeyondStock_Returns422AndLeavesStockUntouched()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
         var productId = await CreateProductAsync(client);
 
         var created = await client.PostAsJsonAsync("/api/batches", NewBatch(productId, quantity: 3));
@@ -138,7 +141,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Adjust_OfMissingBatch_Returns404()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.PostAsJsonAsync(
             $"/api/batches/{Guid.NewGuid()}/adjust",
@@ -151,7 +154,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Get_ByProduct_ReturnsSemaphoreColorAsString()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
         var productId = await CreateProductAsync(client);
 
         await client.PostAsJsonAsync("/api/batches", NewBatch(productId, monthsAhead: 7));
@@ -170,7 +173,7 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Get_ByProduct_ComputesExpiredForPastDate()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
         var productId = await CreateProductAsync(client);
 
         await client.PostAsJsonAsync("/api/batches", NewBatch(productId, monthsAhead: -1));
@@ -184,8 +187,8 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     [Fact]
     public async Task Get_ByProduct_DoesNotCrossTenants()
     {
-        var clientA = CreateClient(await SeedTenantAsync());
-        var clientB = CreateClient(await SeedTenantAsync());
+        var clientA = CreateAuthenticatedClient(await SeedTenantAsync());
+        var clientB = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var productOfA = await CreateProductAsync(clientA);
         await clientA.PostAsJsonAsync("/api/batches", NewBatch(productOfA));
@@ -198,5 +201,44 @@ public class BatchesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
         batches.GetArrayLength().Should().Be(
             0,
             "un tenant no debe ver los lotes de otro, ni siquiera conociendo el productId (NFR-007)");
+    }
+
+    [Fact]
+    public async Task Get_WithoutAuthentication_Returns401()
+    {
+        var tenantId = await SeedTenantAsync();
+
+        var response = await CreateClient(tenantId).GetAsync($"/api/batches?productId={Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.Unauthorized,
+            "T073: la superficie de negocio pasa a exigir autenticación por defecto (FallbackPolicy)");
+    }
+
+    [Fact]
+    public async Task Adjust_WithATokenForAnotherTenant_Returns403AndLeavesStockUntouched()
+    {
+        var tenantA = await SeedTenantAsync();
+        var tenantB = await SeedTenantAsync();
+
+        var ownerClient = CreateAuthenticatedClient(tenantA);
+        var productId = await CreateProductAsync(ownerClient);
+
+        var created = await ownerClient.PostAsJsonAsync("/api/batches", NewBatch(productId));
+        var batch = await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var batchId = batch.GetProperty("id").GetGuid();
+
+        var crossTenantClient = factory.CreateAuthenticatedClient(headerTenantId: tenantB, tokenTenantId: tenantA);
+
+        var response = await crossTenantClient.PostAsJsonAsync($"/api/batches/{batchId}/adjust", new { delta = 5 });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadErrorCodeAsync(response)).Should().Be("TENANT_MISMATCH");
+
+        var check = await ownerClient.GetAsync($"/api/batches?productId={productId}");
+        var batches = await check.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        batches[0].GetProperty("currentQuantity").GetInt32().Should().Be(
+            10,
+            "T073: un mismatch de tenant se rechaza en el middleware, antes de tocar el handler o la base");
     }
 }

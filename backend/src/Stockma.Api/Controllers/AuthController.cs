@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Stockma.Application.Identity;
@@ -12,6 +13,7 @@ namespace Stockma.Api.Controllers;
 public sealed class AuthController(ISender sender) : ControllerBase
 {
     [HttpPost("register")]
+    [Authorize(Policy = AuthorizationPolicies.TenantAdmin)]
     public async Task<ActionResult<RegisteredUser>> Register(RegisterUserCommand command, CancellationToken cancellationToken)
     {
         var user = await sender.Send(command, cancellationToken);
@@ -19,10 +21,12 @@ public sealed class AuthController(ISender sender) : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult<LoginResult>> Login(LoginCommand command, CancellationToken cancellationToken) =>
         Ok(await sender.Send(command, cancellationToken));
 
     [HttpPost("confirm-device")]
+    [AllowAnonymous]
     public async Task<ActionResult<ConfirmDeviceResult>> ConfirmDevice(ConfirmDeviceCommand command, CancellationToken cancellationToken) =>
         Ok(await sender.Send(command, cancellationToken));
 }

@@ -18,14 +18,54 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByEmailResult);
 
+    public Func<bool>? LockProbe { get; set; }
+    public bool? CheckedWhileLocked { get; private set; }
+    public bool? CreatedWhileLocked { get; private set; }
+
     public Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default)
     {
         Created = user;
+        CreatedWhileLocked = LockProbe?.Invoke();
         return Task.FromResult(CreatedId);
     }
 
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(EmailTaken);
+
+    public bool HasAnyUser { get; set; }
+
+    public Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default)
+    {
+        CheckedWhileLocked = LockProbe?.Invoke();
+        return Task.FromResult(HasAnyUser);
+    }
+}
+
+public sealed class FakeTenantAccounts : ITenantAccounts
+{
+    public bool Exists { get; set; }
+
+    public Task<bool> ExistsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Exists);
+
+    public Guid? HoldingLockFor { get; private set; }
+
+    public async Task<T> RunExclusivelyAsync<T>(
+        Guid tenantId,
+        Func<Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        HoldingLockFor = tenantId;
+
+        try
+        {
+            return await work();
+        }
+        finally
+        {
+            HoldingLockFor = null;
+        }
+    }
 }
 
 public sealed class FakeTrustedDevices : ITrustedDevices
@@ -33,7 +73,14 @@ public sealed class FakeTrustedDevices : ITrustedDevices
     public bool Trusted { get; set; }
     public bool TrustGranted { get; set; } = true;
     public List<string> TrustAttempts { get; } = [];
-    public Task<bool> IsTrustedAsync(Guid userId, string deviceId, CancellationToken cancellationToken = default) => Task.FromResult(Trusted);
+    public List<string> CheckedDeviceIds { get; } = [];
+    public Task<bool> IsTrustedAsync(Guid userId, string deviceId, CancellationToken cancellationToken = default)
+    {
+        CheckedDeviceIds.Add(deviceId);
+        return Task.FromResult(Trusted);
+    }
+
+    public Exception? TrustThrows { get; set; }
 
     public Task<bool> TryTrustAsync(
         Guid userId,
@@ -42,6 +89,12 @@ public sealed class FakeTrustedDevices : ITrustedDevices
         CancellationToken cancellationToken = default)
     {
         TrustAttempts.Add(deviceId);
+
+        if (TrustThrows is not null)
+        {
+            throw TrustThrows;
+        }
+
         return Task.FromResult(TrustGranted);
     }
 }
@@ -63,10 +116,13 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
         return Task.CompletedTask;
     }
 
-    public Task ConsumeAsync(
+    public List<(Guid UserId, string DeviceId, string Code)> Committed { get; } = [];
+
+    public async Task<T> ConsumeAsync<T>(
         Guid userId,
         string deviceId,
         string code,
+        Func<Task<T>> onConsumed,
         CancellationToken cancellationToken = default)
     {
         if (ConsumeThrows is not null)
@@ -75,15 +131,25 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
         }
 
         Consumed.Add((userId, deviceId, code));
-        return Task.CompletedTask;
+
+        var result = await onConsumed();
+
+        Committed.Add((userId, deviceId, code));
+        return result;
     }
 }
 
 public sealed class FakeJwtTokenService : IJwtTokenService
 {
     public List<(Guid UserId, Guid TenantId, IReadOnlyCollection<string> Roles)> Requests { get; } = [];
+    public Exception? Throws { get; set; }
     public AccessToken Create(Guid userId, Guid tenantId, IReadOnlyCollection<string> roles)
     {
+        if (Throws is not null)
+        {
+            throw Throws;
+        }
+
         Requests.Add((userId, tenantId, roles));
         return new AccessToken($"jwt-para-{userId}", 3600);
     }

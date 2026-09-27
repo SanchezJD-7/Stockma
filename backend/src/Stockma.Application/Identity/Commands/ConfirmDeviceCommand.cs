@@ -1,6 +1,8 @@
 using MediatR;
 using Stockma.Application.Common;
+using Stockma.Domain.Entities;
 using Stockma.Domain.Exceptions;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Application.Identity.Commands;
 
@@ -21,26 +23,38 @@ public sealed class ConfirmDeviceCommandHandler(
         ConfirmDeviceCommand command,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.DeviceId))
-        {
-            throw new ArgumentException("El identificador del dispositivo es obligatorio.", nameof(command.DeviceId));
-        }
+        var deviceId = DeviceIdentifier.Parse(command.DeviceId);
+        var fingerprint = ParseFingerprint(command.Fingerprint);
 
         var identity = await accounts.FindByEmailAsync(command.Email, cancellationToken)
-            ?? throw new InvalidCredentialsException();
+            ?? throw new OtpNotUsableException();
 
         tenantContext.Set(identity.TenantId);
 
-        await deviceOtps.ConsumeAsync(identity.UserId, command.DeviceId, command.Otp, cancellationToken);
-
-        var trusted = await trustedDevices.TryTrustAsync(
+        return await deviceOtps.ConsumeAsync(
             identity.UserId,
-            command.DeviceId,
-            command.Fingerprint,
+            deviceId,
+            command.Otp,
+            async () =>
+            {
+                var trusted = await trustedDevices.TryTrustAsync(identity.UserId, deviceId, fingerprint, cancellationToken);
+                var token = tokens.Create(identity.UserId, identity.TenantId, identity.Roles);
+
+                return new ConfirmDeviceResult(token.Value, token.ExpiresInSeconds, trusted);
+            },
             cancellationToken);
+    }
 
-        var token = tokens.Create(identity.UserId, identity.TenantId, identity.Roles);
+    private static string ParseFingerprint(string? fingerprint)
+    {
+        var normalized = fingerprint?.Trim() ?? string.Empty;
 
-        return new ConfirmDeviceResult(token.Value, token.ExpiresInSeconds, trusted);
+        if (normalized.Length == 0 || normalized.Length > TrustedDevice.MaxFingerprintLength)
+        {
+            throw new ValidationFailedException(
+                $"La huella del dispositivo es obligatoria y no puede superar {TrustedDevice.MaxFingerprintLength} caracteres.");
+        }
+
+        return normalized;
     }
 }

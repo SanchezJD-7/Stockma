@@ -12,6 +12,14 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
     private const string Fingerprint = "fp";
 
+    private StockmaDbContext NewContext(Guid tenantId)
+    {
+        var tenantContext = new TenantContext();
+        tenantContext.Set(tenantId);
+
+        return postgres.CreateAppUserContext(tenantContext);
+    }
+
     private async Task<(TrustedDevices Devices, StockmaDbContext Context, Guid TenantId, Guid UserId)> BuildAsync(
         int maxTrustedDevices = 2)
     {
@@ -21,38 +29,48 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         var tenantContext = new TenantContext();
         tenantContext.Set(tenantId);
 
-        var options = new DbContextOptionsBuilder<StockmaDbContext>()
-            .UseNpgsql(postgres.ConnectionString)
-            .Options;
+        await using (var seeding = new StockmaDbContext(
+            new DbContextOptionsBuilder<StockmaDbContext>().UseNpgsql(postgres.ConnectionString).Options,
+            tenantContext))
+        {
+            await seeding.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO tenants (id) VALUES ({0}) ON CONFLICT DO NOTHING;
 
-        var context = new StockmaDbContext(options, tenantContext);
-        await context.Database.MigrateAsync();
+                INSERT INTO tenant_settings (tenant_id, max_trusted_devices, green_months, yellow_months, next_sku_number)
+                VALUES ({0}, {1}, 6, 3, 1) ON CONFLICT (tenant_id) DO UPDATE SET max_trusted_devices = {1};
 
-        await context.Database.ExecuteSqlRawAsync(
-            """
-            INSERT INTO tenants (id) VALUES ({0}) ON CONFLICT DO NOTHING;
+                INSERT INTO users (id, tenant_id, email, normalized_email, user_name, normalized_user_name,
+                                   email_confirmed, password_hash, security_stamp, concurrency_stamp,
+                                   phone_number, phone_number_confirmed, two_factor_enabled,
+                                   lockout_enabled, access_failed_count)
+                VALUES ({2}, {0}, {3}, {4}, {3}, {4}, true, 'hash', 'stamp', gen_random_uuid()::text,
+                        '+573001234567', false, false, true, 0);
+                """,
+                tenantId,
+                maxTrustedDevices,
+                userId,
+                $"{userId:N}@droga.co",
+                $"{userId:N}@DROGA.CO".ToUpperInvariant());
+        }
 
-            INSERT INTO tenant_settings (tenant_id, max_trusted_devices, green_months, yellow_months, next_sku_number)
-            VALUES ({0}, {1}, 6, 3, 1) ON CONFLICT (tenant_id) DO UPDATE SET max_trusted_devices = {1};
-
-            INSERT INTO users (id, tenant_id, email, normalized_email, user_name, normalized_user_name,
-                               email_confirmed, password_hash, security_stamp, concurrency_stamp,
-                               phone_number, phone_number_confirmed, two_factor_enabled,
-                               lockout_enabled, access_failed_count)
-            VALUES ({2}, {0}, {3}, {4}, {3}, {4}, true, 'hash', 'stamp', gen_random_uuid()::text,
-                    '+573001234567', false, false, true, 0);
-            """,
-            tenantId,
-            maxTrustedDevices,
-            userId,
-            $"{userId:N}@droga.co",
-            $"{userId:N}@DROGA.CO".ToUpperInvariant());
+        var context = NewContext(tenantId);
 
         return (new TrustedDevices(context, new FixedTimeProvider(Now)), context, tenantId, userId);
     }
 
     private static Task<bool> TrustAsync(TrustedDevices devices, Guid userId, string deviceId) =>
         devices.TryTrustAsync(userId, deviceId, Fingerprint);
+
+    [Fact]
+    public async Task TheServiceUnderTest_RunsAsTheRestrictedAppUser()
+    {
+        var (_, context, _, _) = await BuildAsync();
+
+        var role = await context.Database.SqlQueryRaw<string>("SELECT current_user::text AS \"Value\"").SingleAsync();
+
+        role.Should().Be("app_user", "ADR-017: el lock y el alta de TryTrust se prueban bajo RLS, no como superusuario");
+    }
 
     [Fact]
     public async Task TryTrust_TheFirstDevice_Succeeds()
@@ -349,5 +367,53 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         (await TrustAsync(devices, userId, "dev-turno"))
             .Should()
             .BeTrue("el mismo aparato vuelve a confiarse tras vencer: es el caso normal cada 15 dias");
+    }
+    private async Task<bool[]> TrustInParallelAsync(Guid tenantId, Guid userId, IEnumerable<string> deviceIds)
+    {
+        var attempts = deviceIds.Select(async deviceId =>
+        {
+            await using var parallel = NewContext(tenantId);
+            return await new TrustedDevices(parallel, new FixedTimeProvider(Now)).TryTrustAsync(userId, deviceId, Fingerprint);
+        });
+
+        return await Task.WhenAll(attempts);
+    }
+
+    [Fact]
+    public async Task TryTrust_InParallelForDistinctDevices_NeverExceedsTheLimit()
+    {
+        var (_, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+
+        var results = await TrustInParallelAsync(tenantId, userId, Enumerable.Range(1, 6).Select(index => $"dev-{index}"));
+
+        results.Count(trusted => trusted).Should().Be(2, "ADR-016: el conteo y el alta corren bajo un lock por usuario");
+        (await context.TrustedDevices.CountAsync(device => device.UserId == userId && device.RevokedAt == null))
+            .Should()
+            .Be(2, "FR-007: nunca más de MaxTrustedDevices activos, ni siquiera en carrera");
+    }
+
+    [Fact]
+    public async Task TryTrust_InParallelForTheSameDevice_NeverDuplicatesTheActiveRow()
+    {
+        var (_, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+
+        var results = await TrustInParallelAsync(tenantId, userId, Enumerable.Repeat("dev-1", 5));
+
+        results.Should().AllSatisfy(trusted => trusted.Should().BeTrue());
+        (await context.TrustedDevices.CountAsync(device => device.UserId == userId && device.DeviceId == "dev-1"))
+            .Should()
+            .Be(1, "ADR-016: dentro del lock se re-chequea si ese dispositivo ya tiene una fila activa");
+    }
+
+    [Fact]
+    public async Task IsTrusted_NormalizesTheDeviceIdLikeTryTrust()
+    {
+        var (devices, _, _, userId) = await BuildAsync();
+        await TrustAsync(devices, userId, "  dev-1  ");
+
+        (await devices.IsTrustedAsync(userId, "dev-1"))
+            .Should()
+            .BeTrue("ADR-016: el deviceId se normaliza en un solo lugar para guardar y para buscar");
+        (await devices.IsTrustedAsync(userId, " dev-1 ")).Should().BeTrue();
     }
 }

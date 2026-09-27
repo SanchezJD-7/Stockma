@@ -84,6 +84,7 @@ public class LoginCommandTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
+    [InlineData("dev-1")]
     public async Task Login_WithNoDeviceId_IsRejected(string? deviceId)
     {
         ArrangeValidUser();
@@ -92,7 +93,7 @@ public class LoginCommandTests
         Func<Task> act = () => CreateHandler().Handle(Command(deviceId), default);
 
         await act.Should()
-            .ThrowAsync<ArgumentException>(
+            .ThrowAsync<ValidationFailedException>(
                 "el OTP se guarda atado a un deviceId: sin el, no hay donde clavarlo y no se puede "
                 + "decidir si el dispositivo es confiable");
     }
@@ -102,7 +103,7 @@ public class LoginCommandTests
     {
         ArrangeValidUser();
 
-        await Assert.ThrowsAsync<ArgumentException>(
+        await Assert.ThrowsAsync<ValidationFailedException>(
             () => CreateHandler().Handle(Command(deviceId: null), default));
 
         otps.Issued.Should().BeEmpty();
@@ -213,5 +214,29 @@ public class LoginCommandTests
             () => CreateHandler().Handle(Command(), default));
 
         tenantContext.SetCalls.Should().BeEmpty();
+    }
+    [Fact]
+    public async Task Login_WithNoDeviceId_IsRejectedBeforeCheckingTheCredentials()
+    {
+        accounts.CredentialsResult = null;
+
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => CreateHandler().Handle(Command(deviceId: "corto"), default));
+
+        exception.ErrorCode.Should().Be(
+            "VALIDATION_FAILED",
+            "auth-api.md: sin deviceId es 400, y el mismo 400 para cualquier email: no enumera");
+    }
+
+    [Fact]
+    public async Task Login_NormalizesTheDeviceIdBeforeUsingIt()
+    {
+        ArrangeValidUser();
+        devices.Trusted = false;
+
+        await CreateHandler().Handle(Command($"  {DeviceId}  "), default);
+
+        devices.CheckedDeviceIds.Should().ContainSingle().Which.Should().Be(DeviceId);
+        otps.Issued.Should().ContainSingle().Which.DeviceId.Should().Be(DeviceId);
     }
 }

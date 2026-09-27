@@ -1,6 +1,7 @@
 using MediatR;
 using Stockma.Application.Common;
 using Stockma.Domain.Exceptions;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Application.Identity.Commands;
 
@@ -18,22 +19,19 @@ public sealed class LoginCommandHandler(
 {
     public async Task<LoginResult> Handle(LoginCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.DeviceId))
-        {
-            throw new ArgumentException("El identificador del dispositivo es obligatorio en el login.", nameof(command.DeviceId));
-        }
+        var deviceId = DeviceIdentifier.Parse(command.DeviceId);
 
         var identity = await accounts.VerifyCredentialsAsync(command.Email, command.Password, cancellationToken)
             ?? throw new InvalidCredentialsException();
 
         tenantContext.Set(identity.TenantId);
 
-        if (await trustedDevices.IsTrustedAsync(identity.UserId, command.DeviceId, cancellationToken))
+        if (await trustedDevices.IsTrustedAsync(identity.UserId, deviceId, cancellationToken))
         {
             return LoginResult.Issued(tokens.Create(identity.UserId, identity.TenantId, identity.Roles));
         }
 
-        await deviceOtps.IssueAsync(identity.UserId, command.DeviceId, cancellationToken);
+        await deviceOtps.IssueAsync(identity.UserId, deviceId, cancellationToken);
 
         return LoginResult.NeedsDeviceConfirmation();
     }

@@ -4,6 +4,9 @@ public abstract class DomainException(string errorCode, string message) : Except
 {
     public string ErrorCode { get; } = errorCode;
 }
+public sealed class ValidationFailedException(string message)
+    : DomainException("VALIDATION_FAILED", message);
+
 public sealed class NegativeStockException(int currentQuantity, int delta)
     : DomainException(
         "BATCH_NEGATIVE_STOCK",
@@ -34,3 +37,11 @@ public sealed class InvalidCredentialsException()
 
 public sealed class EmailAlreadyRegisteredException()
     : DomainException("AUTH_EMAIL_DUPLICATE", "Ese email ya está registrado en la plataforma.");
+
+public sealed class TenantNotFoundException(Guid tenantId)
+    : DomainException("TENANT_NOT_FOUND", $"No existe un tenant con Id '{tenantId}'.");
+
+public sealed class TenantAlreadyBootstrappedException(Guid tenantId)
+    : DomainException(
+        "TENANT_ALREADY_BOOTSTRAPPED",
+        $"El tenant '{tenantId}' ya tiene usuarios; el bootstrap sólo corre sobre un tenant vacío.");

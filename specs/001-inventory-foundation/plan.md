@@ -183,7 +183,7 @@ frontend/web/src/
 
 - `appsettings.json`: `ConnectionStrings`, `Jwt { Issuer, Audience, Key, ExpiresMinutes: 60 }`, `Sms { Provider, ApiKey, Sender }`, Hangfire PG, `Tenant:ExpiryThresholds` defaults.
 - `Sms { Provider, ApiKey, Sender }` alimenta `SmsOtpSender` (implementación de `ISmsSender`). En dev, sender de consola/log. `[PENDIENTE: proveedor de SMS no elegido]`
-- Variables de entorno: `ConnectionStrings__StockmaDb`, `Jwt__Key`, `Sms__ApiKey`, `ASPNETCORE_ENVIRONMENT`.
+- Variables de entorno: `ConnectionStrings__Postgres` (runtime, rol `app_user`), `ConnectionStrings__PostgresMigrations` (sólo el paso de migración, rol propietario), `Jwt__Key`, `Sms__ApiKey`, `ASPNETCORE_ENVIRONMENT`. El nombre `StockmaDb` del plan original nunca llegó al código; se reconcilió a `Postgres` (ADR-017).
 - `ops/docker-compose.yml`: `postgres:16-alpine` + volumen; network `stockma`; healthcheck `pg_isready`.
 - CI: `dotnet build`/`test` de los 4 proyectos de test; frontend `npm run build` / `npm run lint`.
 

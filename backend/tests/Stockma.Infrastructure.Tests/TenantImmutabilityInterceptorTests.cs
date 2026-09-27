@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Stockma.Domain.Common;
 using Stockma.Infrastructure.Persistence.Interceptors;
 
@@ -38,8 +39,13 @@ public class TenantImmutabilityInterceptorTests(PostgresFixture postgres) : ICla
 
     private InterceptorTestContext CreateContext()
     {
+        var connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
+        {
+            Database = "interceptor_test",
+        }.ConnectionString;
+
         var options = new DbContextOptionsBuilder<InterceptorTestContext>()
-            .UseNpgsql(postgres.ConnectionString)
+            .UseNpgsql(connectionString)
             .Options;
 
         return new InterceptorTestContext(options);

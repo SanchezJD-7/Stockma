@@ -21,6 +21,9 @@ public sealed class DeviceOtpConfiguration : IEntityTypeConfiguration<DeviceOtp>
         builder.Property(o => o.IssuedAt).HasColumnName("issued_at");
         builder.Property(o => o.ExpiresAt).HasColumnName("expires_at");
         builder.Property(o => o.ConsumedAt).HasColumnName("consumed_at");
+        builder.Property(o => o.InvalidatedAt).HasColumnName("invalidated_at");
+        builder.Property(o => o.FailedAttempts).HasColumnName("failed_attempts");
+        builder.Property<uint>("Xmin").HasColumnName("xmin").IsRowVersion().IsConcurrencyToken();
 
         builder
             .HasIndex(o => new { o.TenantId, o.UserId, o.DeviceId, o.ExpiresAt })

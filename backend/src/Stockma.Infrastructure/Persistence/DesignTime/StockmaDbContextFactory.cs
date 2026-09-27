@@ -6,10 +6,13 @@ namespace Stockma.Infrastructure.Persistence.DesignTime;
 
 public sealed class StockmaDbContextFactory : IDesignTimeDbContextFactory<StockmaDbContext>
 {
+    public const string ConnectionStringVariable = "ConnectionStrings__PostgresMigrations";
+
     private const string DefaultConnectionString = "Host=localhost;Port=5432;Database=stockma;Username=stockma;Password=stockma";
+
     public StockmaDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("STOCKMA_CONNECTION_STRING") ?? DefaultConnectionString;
+        var connectionString = Environment.GetEnvironmentVariable(ConnectionStringVariable) ?? DefaultConnectionString;
         var options = new DbContextOptionsBuilder<StockmaDbContext>().UseNpgsql(connectionString).Options;
         return new StockmaDbContext(options, new DesignTimeTenantContext());
     }

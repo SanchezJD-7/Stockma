@@ -18,13 +18,16 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
 
             httpContext.Response.StatusCode = status;
 
-            await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
-            {
-                Status = status,
-                Title = TitleFor(status),
-                Detail = exception.Message,
-                Extensions = { ["errorCode"] = exception.ErrorCode },
-            });
+            await httpContext.Response.WriteAsJsonAsync(
+                new ProblemDetails
+                {
+                    Status = status,
+                    Title = TitleFor(status),
+                    Detail = exception.Message,
+                    Extensions = { ["errorCode"] = exception.ErrorCode },
+                },
+                options: null,
+                contentType: ProblemResponses.ContentType);
         }
     }
 
@@ -36,7 +39,7 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,
         ConcurrencyConflictException => StatusCodes.Status409Conflict,
         SkuDuplicateException or BarcodeDuplicateException => StatusCodes.Status409Conflict,
-        SkuImmutableException => StatusCodes.Status400BadRequest,
+        SkuImmutableException or ValidationFailedException => StatusCodes.Status400BadRequest,
         ProductNotFoundException
             or BarcodeNotFoundException
             or ProductNotFoundForBatchException

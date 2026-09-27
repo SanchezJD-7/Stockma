@@ -40,7 +40,7 @@ public class RegisterUserCommandTests
         Func<Task> act = () => CreateHandler().Handle(Command(phoneNumber: "   "), default);
 
         await act.Should()
-            .ThrowAsync<ArgumentException>(
+            .ThrowAsync<ValidationFailedException>(
                 "T064: un usuario creado sin celular no puede entrar desde un dispositivo no trusted "
                 + "y queda inservible hasta que un admin lo complete");
     }
@@ -84,8 +84,20 @@ public class RegisterUserCommandTests
         Func<Task> act = () => CreateHandler().Handle(Command(role: "SuperAdmin"), default);
 
         await act.Should()
-            .ThrowAsync<ArgumentException>(
+            .ThrowAsync<ValidationFailedException>(
                 "ADR-005: el admin de plataforma no es un rol de tenant; sólo TenantAdmin y Member");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Register_WithoutAnEmail_IsRejectedAsAValidationFailure(string email)
+    {
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+            () => CreateHandler().Handle(new RegisterUserCommand(email, Password, PhoneNumber), default));
+
+        exception.ErrorCode.Should().Be("VALIDATION_FAILED", "auth-api.md: 400 VALIDATION_FAILED, no un 500");
+        accounts.Created.Should().BeNull();
     }
 
     [Theory]
