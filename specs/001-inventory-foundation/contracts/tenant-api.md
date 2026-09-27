@@ -3,6 +3,11 @@
 Base: `/api/tenant`. Todas las rutas requieren el header `X-Tenant-ID`; sin él
 el `TenantMiddleware` responde `400` antes de llegar al controlador.
 
+**Autenticación (T073)**: `GET /api/tenant/branding` exige JWT como el resto de la API de negocio,
+y el `X-Tenant-ID` DEBE coincidir con el `tid` del token (`403 TENANT_MISMATCH` si no). El login es
+genérico: antes de loguearse no hay tenant conocido, así que el branding se pide **después** del
+login, con el tenant del token. Sin token responde `401`.
+
 ## `GET /api/tenant/branding`
 
 Colores de marca del tenant activo. El frontend lo pide al arrancar y le pasa el

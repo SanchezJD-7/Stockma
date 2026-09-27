@@ -11,7 +11,8 @@
 | Regla | Detalle |
 |---|---|
 | Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente. Ausente o no parseable → `400` (FR-001) |
-| Autenticación | `Authorization: Bearer {jwt}` DEBE estar presente. `401` si falta o expiró |
+| Autenticación | `Authorization: Bearer {jwt}` DEBE estar presente. `401` si falta o expiró (T073: `FallbackPolicy` autenticado por defecto) |
+| Tenant atado al token | El `X-Tenant-ID` DEBE coincidir con el claim `tid` del JWT. Si no coincide → `403 TENANT_MISMATCH`, antes de tocar el handler (T073) |
 | Acotamiento | Todas las consultas DEBE estar acotadas al `TenantId` (NFR-007) — filtro EF + RLS |
 | Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode` |
 | Moneda | `Currency` por defecto `COP`; el producto PUEDE sobrescribir el default del tenant (NFR-008) |
@@ -93,6 +94,7 @@ Location: /api/products/3b8d1f60-2c14-4a9e-8f77-0a5b3e2d9c41
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header `X-Tenant-ID` ausente o inválido |
 | `400` | `VALIDATION_FAILED` | `name` o `category` ausentes / inválidos |
 | `401` | — | JWT ausente o expirado |
+| `403` | `TENANT_MISMATCH` | El `tid` del JWT no coincide con `X-Tenant-ID` (T073) |
 | `409` | `PRODUCT_SKU_DUPLICATE` | El `sku` explícito ya existe en el tenant (FR-009) |
 | `409` | `PRODUCT_BARCODE_DUPLICATE` | El `barcode` ya existe en el tenant. `[PENDIENTE: las fuentes definen unique (TenantId, Barcode) pero no nombran el errorCode; propuesto por simetría con PRODUCT_SKU_DUPLICATE]` |
 

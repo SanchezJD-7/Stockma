@@ -14,6 +14,8 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
     private static readonly Guid TenantB = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid UserA = Guid.Parse("77777777-7777-7777-7777-777777777777");
     private static readonly Guid UserB = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid DeviceA = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    private static readonly Guid DeviceB = Guid.Parse("aaaaaaaa-9999-9999-9999-999999999999");
 
     private string AppUserConnectionString =>
         new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
@@ -53,8 +55,8 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
 
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
             VALUES
-                (gen_random_uuid(), '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now() + interval '15 days'),
-                (gen_random_uuid(), '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now() + interval '15 days')
+                ('{DeviceA}', '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now() + interval '15 days'),
+                ('{DeviceB}', '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now() + interval '15 days')
             ON CONFLICT DO NOTHING;
             """);
 #pragma warning restore EF1002
@@ -145,6 +147,29 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
     }
 
     [Fact]
+    public async Task LoginLookup_IsNotShadowedByATempTableNamedUsers()
+    {
+        await PrepareAsync();
+
+        await using var connection = new NpgsqlConnection(AppUserConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            $"""
+            CREATE TEMP TABLE users (id uuid, tenant_id uuid, normalized_email text, password_hash text,
+                                     security_stamp text, lockout_end timestamptz, lockout_enabled boolean);
+            INSERT INTO users VALUES (gen_random_uuid(), '{TenantB}', 'ANA@DROGA.CO', 'hash-falso', 'stamp-falso',
+                                      NULL, false);
+            SELECT tenant_id FROM auth_find_user_by_email('ANA@DROGA.CO');
+            """,
+            connection);
+
+        (await command.ExecuteScalarAsync())
+            .Should()
+            .Be(TenantA, "ADR-017: pg_temp va último en el search_path de la función SECURITY DEFINER");
+    }
+
+    [Fact]
     public async Task LoginLookup_FindsAUserOfAnyTenant()
     {
         await PrepareAsync();
@@ -206,6 +231,49 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
             activeTenant: null);
 
         rows.Should().ContainSingle().Which.Should().Be("1");
+    }
+
+    [Fact]
+    public async Task LoginLookup_RunsAsADedicatedRoleThatOwnsNoTableAndCannotBypassRls()
+    {
+        await PrepareAsync();
+
+        var rows = await QueryAsAppUserAsync(
+            """
+            SELECT concat_ws('|', r.rolname, r.rolsuper::text, r.rolbypassrls::text, r.rolcanlogin::text,
+                   (EXISTS (SELECT 1 FROM pg_class c WHERE c.relowner = r.oid))::text)
+              FROM pg_proc p
+              JOIN pg_roles r ON r.oid = p.proowner
+             WHERE p.proname = 'auth_find_user_by_email';
+            """,
+            activeTenant: null);
+
+        rows.Should()
+            .ContainSingle()
+            .Which.Should()
+            .Be(
+                "auth_lookup|false|false|false|false",
+                "ADR-017: con FORCE, un SECURITY DEFINER propiedad del dueño de las tablas no encontraría a nadie; "
+                + "el dueño de la función es un rol sin login, sin BYPASSRLS y sin tablas");
+    }
+
+    [Fact]
+    public async Task LoginLookupRole_CanReadOnlyTheAuthenticationColumns()
+    {
+        await PrepareAsync();
+
+        var rows = await QueryAsAppUserAsync(
+            """
+            SELECT a.attname
+              FROM pg_attribute a
+             WHERE a.attrelid = 'users'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+               AND has_column_privilege('auth_lookup', 'users', a.attname, 'SELECT')
+             ORDER BY a.attname;
+            """,
+            activeTenant: null);
+
+        rows.Should().BeEquivalentTo(
+            ["id", "tenant_id", "normalized_email", "password_hash", "security_stamp", "lockout_end", "lockout_enabled"]);
     }
 
     [Fact]

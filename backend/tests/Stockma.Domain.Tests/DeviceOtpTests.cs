@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Stockma.Domain.Entities;
 using Stockma.Domain.Exceptions;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Domain.Tests;
 
@@ -153,5 +154,113 @@ public class DeviceOtpTests
             .Be(
                 "AUTH_OTP_REJECTED",
                 "ADR-002: un único errorCode para OTP errado y vencido, para no filtrar si el OTP existía");
+    }
+    [Fact]
+    public void NewOtp_HasNoFailedAttempts()
+    {
+        CreateOtp().FailedAttempts.Should().Be(0);
+    }
+
+    [Fact]
+    public void RegisterFailedAttempt_CountsTheAttempt()
+    {
+        var otp = CreateOtp();
+
+        otp.RegisterFailedAttempt(IssuedAt.AddMinutes(1), maxAttempts: 5);
+
+        otp.FailedAttempts.Should().Be(1, "FR-008: el intento fallido DEBE quedar registrado");
+        otp.IsUsable(IssuedAt.AddMinutes(1)).Should().BeTrue("un intento por debajo del tope no quema el código");
+    }
+
+    [Fact]
+    public void RegisterFailedAttempt_ReachingTheMaximum_BurnsTheOtp()
+    {
+        var otp = CreateOtp();
+        var at = IssuedAt.AddMinutes(1);
+
+        foreach (var _ in Enumerable.Range(0, 5))
+        {
+            otp.RegisterFailedAttempt(at, maxAttempts: 5);
+        }
+
+        otp.IsUsable(at).Should().BeFalse("ADR-016: al llegar al tope de intentos el OTP queda quemado");
+        otp.InvalidatedAt.Should().Be(at);
+        otp.ConsumedAt.Should().BeNull("quemar no es consumir: nadie superó el OTP");
+    }
+
+    [Fact]
+    public void RegisterFailedAttempt_OnABurnedOtp_IsRejected()
+    {
+        var otp = CreateOtp();
+        var at = IssuedAt.AddMinutes(1);
+        otp.RegisterFailedAttempt(at, maxAttempts: 1);
+
+        var act = () => otp.RegisterFailedAttempt(at, maxAttempts: 1);
+
+        act.Should().Throw<OtpNotUsableException>();
+        otp.FailedAttempts.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void RegisterFailedAttempt_RejectsANonPositiveMaximum(int maxAttempts)
+    {
+        var act = () => CreateOtp().RegisterFailedAttempt(IssuedAt, maxAttempts);
+
+        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("maxAttempts");
+    }
+
+    [Fact]
+    public void Invalidate_MakesTheOtpUnusable()
+    {
+        var otp = CreateOtp();
+        var at = IssuedAt.AddMinutes(1);
+
+        otp.Invalidate(at);
+
+        otp.IsUsable(at).Should().BeFalse("ADR-016: emitir un OTP nuevo invalida los anteriores");
+        otp.InvalidatedAt.Should().Be(at);
+    }
+
+    [Fact]
+    public void Invalidate_AnInvalidatedOtp_KeepsTheFirstInstant()
+    {
+        var otp = CreateOtp();
+        otp.Invalidate(IssuedAt.AddMinutes(1));
+
+        otp.Invalidate(IssuedAt.AddMinutes(2));
+
+        otp.InvalidatedAt.Should().Be(IssuedAt.AddMinutes(1));
+    }
+
+    [Fact]
+    public void Invalidate_AConsumedOtp_DoesNothing()
+    {
+        var otp = CreateOtp();
+        otp.Consume(IssuedAt.AddMinutes(1));
+
+        otp.Invalidate(IssuedAt.AddMinutes(2));
+
+        otp.InvalidatedAt.Should().BeNull("un OTP ya usado no se reescribe como invalidado");
+    }
+
+    [Fact]
+    public void Consume_AnInvalidatedOtp_IsRejected()
+    {
+        var otp = CreateOtp();
+        otp.Invalidate(IssuedAt.AddMinutes(1));
+
+        var act = () => otp.Consume(IssuedAt.AddMinutes(2));
+
+        act.Should().Throw<OtpNotUsableException>();
+    }
+
+    [Fact]
+    public void NewOtp_NormalizesTheDeviceIdentifier()
+    {
+        var otp = new DeviceOtp(TenantId, UserId, "  device-abc  ", "hash", IssuedAt, TenMinutes);
+
+        otp.DeviceId.Should().Be(DeviceIdentifier.Normalize("  device-abc  "));
     }
 }

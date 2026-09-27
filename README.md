@@ -15,16 +15,22 @@ Requisitos: **Docker**, **.NET 9 SDK**, **Node 22**.
 # 1. Base de datos
 docker compose -f ops/docker-compose.yml up -d
 
-# 2. Migraciones — NO se aplican solas al arrancar la API
+# 2. Migraciones — NO se aplican solas al arrancar la API. Corren con el rol
+#    propietario (stockma); por defecto usan la cadena de docker-compose.
 cd backend
 dotnet ef database update \
   --project src/Stockma.Infrastructure \
   --startup-project src/Stockma.Infrastructure
 
-# 3. API  →  http://localhost:5265
+# 3. Contraseña del rol de runtime (una vez por base). La migración crea
+#    app_user sin contraseña; la API se conecta con él, nunca con stockma.
+docker exec stockma-postgres psql -U stockma -d stockma \
+  -c "ALTER ROLE app_user PASSWORD 'app_user';"
+
+# 4. API  →  http://localhost:5265
 dotnet run --project src/Stockma.Api
 
-# 4. Frontend (en otra terminal)  →  http://localhost:5173
+# 5. Frontend (en otra terminal)  →  http://localhost:5173
 cd frontend/web
 npm ci
 npm run dev
@@ -33,6 +39,37 @@ npm run dev
 El `--startup-project` es `Stockma.Infrastructure`, **no** `Stockma.Api`: la API
 no referencia `Microsoft.EntityFrameworkCore.Design`. Las herramientas de EF usan
 `Persistence/DesignTime/StockmaDbContextFactory.cs`.
+
+**Dos connection strings, dos roles** (ADR-017):
+
+| Clave | Rol | Quién la usa |
+| ----- | --- | ------------ |
+| `ConnectionStrings:Postgres` (`appsettings.Development.json` en local, env `ConnectionStrings__Postgres` en cualquier otro entorno) | `app_user`, no propietario | La API en runtime y el subcomando `bootstrap-admin` |
+| env `ConnectionStrings__PostgresMigrations` | propietario de las tablas | Sólo `dotnet ef` (por defecto `stockma`/`stockma` en `localhost`) |
+
+`appsettings.json` **no trae** connection string: la de desarrollo vive en
+`appsettings.Development.json`. Fuera de `Development`, sin `ConnectionStrings__Postgres`
+la API (y `bootstrap-admin`) corta al arrancar con un mensaje que nombra la clave.
+`ConnectionStrings__PostgresMigrations` **nunca** se define en el entorno de la API: es
+la credencial del propietario y sólo la recibe el paso de migración.
+
+Si la API se conecta con el propietario, la RLS deja de aislar tenants. Fuera de
+`Development` —en cualquier otro entorno, `Testing` incluido— la API y `bootstrap-admin`
+**no arrancan** si su rol es superusuario, tiene `BYPASSRLS`, es propietario de tablas o
+es miembro (con o sin `INHERIT`) de un rol así.
+
+**Requisitos del rol que migra** (ADR-017):
+
+- Un superusuario migra sin más.
+- Un propietario **no superusuario** necesita `CREATEROLE` (las migraciones crean
+  `app_user` y `auth_lookup`) y **`ADMIN` sobre `auth_lookup`**. Quien crea el rol lo
+  tiene solo; pero `auth_lookup` es de todo el cluster, así que si otra base u otro rol
+  ya lo creó, la migración falla con este aviso y un superusuario tiene que correr, una
+  vez:
+
+  ```sql
+  GRANT auth_lookup TO <rol_que_migra> WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+  ```
 
 ### Sembrar un tenant
 

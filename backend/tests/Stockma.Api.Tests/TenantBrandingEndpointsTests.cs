@@ -40,7 +40,7 @@ public class TenantBrandingEndpointsTests(StockmaApiFactory factory) : IClassFix
         return tenantId;
     }
 
-    private HttpClient CreateClient(Guid tenantId)
+    private HttpClient CreateAnonymousClient(Guid tenantId)
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TenantHeader, tenantId.ToString());
@@ -52,7 +52,7 @@ public class TenantBrandingEndpointsTests(StockmaApiFactory factory) : IClassFix
     {
         var tenantId = await SeedTenantAsync();
 
-        var response = await CreateClient(tenantId).GetAsync("/api/tenant/branding");
+        var response = await factory.CreateAuthenticatedClient(tenantId).GetAsync("/api/tenant/branding");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).Trim().Should().Be("null");
@@ -63,7 +63,7 @@ public class TenantBrandingEndpointsTests(StockmaApiFactory factory) : IClassFix
     {
         var tenantId = await SeedTenantAsync(new TenantBranding("#8e24aa", "#6a1b9a", "#f3e5f5"));
 
-        var response = await CreateClient(tenantId).GetAsync("/api/tenant/branding");
+        var response = await factory.CreateAuthenticatedClient(tenantId).GetAsync("/api/tenant/branding");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -79,5 +79,15 @@ public class TenantBrandingEndpointsTests(StockmaApiFactory factory) : IClassFix
         var response = await factory.CreateClient().GetAsync("/api/tenant/branding");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetBranding_WithoutAuthentication_Returns401()
+    {
+        var tenantId = await SeedTenantAsync();
+
+        var response = await CreateAnonymousClient(tenantId).GetAsync("/api/tenant/branding");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

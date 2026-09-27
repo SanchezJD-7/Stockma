@@ -68,7 +68,10 @@ CREATE POLICY tenant_isolation ON products
 -- ídem para batches, trusted_devices, tenant_settings, device_otps y tablas Identity
 ```
 
-- La aplicación se conecta con el rol **no-propietario** `app_user` (un rol propietario haría bypass de RLS).
+- La aplicación se conecta con el rol **no-propietario** `app_user` (`ConnectionStrings:Postgres`). Las migraciones usan el rol propietario, por otra connection string (`ConnectionStrings__PostgresMigrations`) que el runtime nunca recibe (T079, ADR-017).
+- **`FORCE ROW LEVEL SECURITY`** en `tenant_settings`, `products`, `batches`, `users`, `trusted_devices` y `device_otps` (migración `ForceRowLevelSecurity`): aunque el runtime se conectara por error con el propietario, la política le aplica igual. Un superusuario o un rol con `BYPASSRLS` la siguen salteando.
+- **Chequeo de arranque**: fuera de `Development` (la única excepción), la API y `bootstrap-admin` **no arrancan** si el rol de runtime es, o es miembro con o sin `INHERIT` de, un superusuario, un rol con `BYPASSRLS` o el propietario de alguna tabla de `public`.
+- La función del login `auth_find_user_by_email` (`SECURITY DEFINER`) es propiedad del rol `auth_lookup`: `NOLOGIN`, sin tablas propias, con `SELECT` sólo sobre las columnas de autenticación de `users` y la política `auth_lookup_read` (`FOR SELECT TO auth_lookup USING (true)`) que aplica **sólo** a ese rol. Con `FORCE`, si la función fuera del propietario no encontraría a nadie.
 - `TenantMiddleware` ejecuta `SET app.tenant = '{tenantId}'` sobre la `NpgsqlConnection` en request-scope.
 
 ### Inmutabilidad de `TenantId` (FR-004)
@@ -181,7 +184,9 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 - **Excepción del login (T055)**: `POST /api/auth/login` corre SIN `TenantContext`, así que la búsqueda del usuario por email DEBE usar `IgnoreQueryFilters()` de forma explícita y acotada — una sola consulta, que lee únicamente lo necesario para autenticar y obtener el `TenantId`.
 - El filtro NO DEBE volverse permisivo cuando el `TenantContext` está vacío. Hacerlo desactivaría el aislamiento en silencio en cualquier ruta donde el contexto no se haya poblado; la excepción tiene que ser explícita en el punto de uso, nunca un default del filtro.
 - Este es el ÚNICO lugar del sistema que cruza la frontera entre tenants a propósito, y DEBE tener un test que demuestre que por ahí no se puede leer nada más.
-- RLS: política `tenant_isolation` sobre la tabla de usuarios de Identity.
+- RLS: política `tenant_isolation` sobre la tabla de usuarios de Identity, más `auth_lookup_read` para el dueño de la función del login (ADR-017).
+- **Bloqueo** (`LockoutEnabled` + `LockoutEnd` futuro): el usuario no pasa ni el login ni `confirm-device`; los dos responden su `401` uniforme (T080).
+- **Alta atómica**: el usuario y su rol se crean en una transacción (T083).
 
 ---
 
@@ -219,7 +224,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 **Índices**
 
 - PK sobre `Id`.
-- `(TenantId, UserId, DeviceId)` — lookup del login para decidir si el dispositivo es conocido. `[PENDIENTE: unicidad no explicitada en las fuentes; debería ser único si un DeviceId no puede repetirse por usuario]`
+- `(TenantId, UserId, DeviceId)` — lookup del login para decidir si el dispositivo es conocido. **NO es único**, a propósito: un mismo aparato puede tener varias filas a lo largo del tiempo (una vencida, una revocada, una activa). Hacerlo único rompería el caso normal de reconfiar el mismo dispositivo tras vencer o tras una revocación por error, y forzaría a *editar* la fila vieja — que es justo lo que borraría el rastro de la revocación (T020).
 - El índice `(UserId, TrustedAt)` filtrado por `RevokedAt IS NULL` **se elimina**: existía para seleccionar el dispositivo más antiguo y ya no hay selección automática. El único acceso restante es **contar** los activos (`WHERE TenantId = @t AND UserId = @u AND RevokedAt IS NULL`), que se resuelve con el prefijo `(TenantId, UserId)` del índice anterior sobre una cardinalidad de pocas filas por usuario. No se requiere índice adicional.
 
 **Aplicación de `TenantId`**: filtro EF + política RLS.
@@ -240,6 +245,9 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 | `CodeHash` | `string` | Generado con `IPasswordHasher` sobre un valor aleatorio — no se almacena en claro |
 | `ExpiresAt` | `DateTime` | `TrustedAt + 10 min` como máximo (NFR-004) |
 | `ConsumedAt` | `DateTime?` | `[PENDIENTE: las fuentes no definen si el OTP se marca como consumido o se borra tras el uso]` |
+| `InvalidatedAt` | `DateTime?` | Lo quemó el sistema: un OTP nuevo para el mismo dispositivo, o `Otp:MaxAttempts` intentos fallidos. Distinto de `ConsumedAt` (T075, ADR-016) |
+| `FailedAttempts` | `int` | Intentos fallidos persistidos (FR-008). Al llegar a `Otp:MaxAttempts` el OTP queda quemado (T075) |
+| `xmin` | `xid` | Token de concurrencia de Postgres: dos consumos en carrera no gastan el mismo código dos veces (T075) |
 
 **Invariantes**
 
@@ -247,6 +255,8 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 - El OTP DEBE enviarse por SMS al `ApplicationUser.PhoneNumber` del usuario que se loguea, nunca por email (FR-008).
 - Sin `PhoneNumber` cargado no hay destino de envío: el acceso desde un dispositivo no trusted DEBE **bloquearse** con `403 AUTH_PHONE_NOT_ENROLLED` hasta que un admin del tenant cargue el número (T050). Nunca se saltea el 2FA.
 - Un OTP vencido o incorrecto DEBE responder `401` y el intento DEBE quedar registrado (FR-008).
+- A lo sumo **un** OTP vivo por usuario+dispositivo: emitir invalida los anteriores, y cada intento se compara sólo contra el más nuevo (T075).
+- Toda falla responde el mismo `401 AUTH_OTP_REJECTED` (T074).
 
 **Índices**: `(TenantId, UserId, DeviceId)`. `[PENDIENTE: política de purga de OTPs vencidos no definida]`
 
@@ -381,6 +391,7 @@ Migración **única** que crea, en este orden:
 5. Índices: unique `(TenantId, Sku)`, unique parcial `(TenantId, Barcode)`, trigram sobre `Name`, compuesto `(ProductId, ExpirationDate)`
 6. `ENABLE ROW LEVEL SECURITY` + política `tenant_isolation` en cada tabla tenant
 7. Rol **no-propietario** `app_user` con los grants necesarios
+8. (`ForceRowLevelSecurity`, T079) `FORCE ROW LEVEL SECURITY` en las seis tablas con RLS y el rol `auth_lookup` como dueño de `auth_find_user_by_email`
 
 Patrón: migraciones tenant-wide sobre una DB compartida con filtrado lógico. Arranque local: `docker compose up postgres` → `dotnet ef database update` desde `backend/src/Infrastructure`.
 

@@ -1,0 +1,168 @@
+using Stockma.Application.Common;
+using Stockma.Application.Identity;
+
+namespace Stockma.Application.Tests;
+
+public sealed class FakeUserAccounts : IUserAccounts
+{
+    public LoginIdentity? CredentialsResult { get; set; }
+    public LoginIdentity? ByEmailResult { get; set; }
+    public bool EmailTaken { get; set; }
+    public NewUser? Created { get; private set; }
+    public Guid CreatedId { get; set; } = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    public Task<LoginIdentity?> VerifyCredentialsAsync(
+        string email,
+        string password,
+        CancellationToken cancellationToken = default) => Task.FromResult(CredentialsResult);
+
+    public Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ByEmailResult);
+
+    public Func<bool>? LockProbe { get; set; }
+    public bool? CheckedWhileLocked { get; private set; }
+    public bool? CreatedWhileLocked { get; private set; }
+
+    public Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default)
+    {
+        Created = user;
+        CreatedWhileLocked = LockProbe?.Invoke();
+        return Task.FromResult(CreatedId);
+    }
+
+    public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
+        Task.FromResult(EmailTaken);
+
+    public bool HasAnyUser { get; set; }
+
+    public Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default)
+    {
+        CheckedWhileLocked = LockProbe?.Invoke();
+        return Task.FromResult(HasAnyUser);
+    }
+}
+
+public sealed class FakeTenantAccounts : ITenantAccounts
+{
+    public bool Exists { get; set; }
+
+    public Task<bool> ExistsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Exists);
+
+    public Guid? HoldingLockFor { get; private set; }
+
+    public async Task<T> RunExclusivelyAsync<T>(
+        Guid tenantId,
+        Func<Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        HoldingLockFor = tenantId;
+
+        try
+        {
+            return await work();
+        }
+        finally
+        {
+            HoldingLockFor = null;
+        }
+    }
+}
+
+public sealed class FakeTrustedDevices : ITrustedDevices
+{
+    public bool Trusted { get; set; }
+    public bool TrustGranted { get; set; } = true;
+    public List<string> TrustAttempts { get; } = [];
+    public List<string> CheckedDeviceIds { get; } = [];
+    public Task<bool> IsTrustedAsync(Guid userId, string deviceId, CancellationToken cancellationToken = default)
+    {
+        CheckedDeviceIds.Add(deviceId);
+        return Task.FromResult(Trusted);
+    }
+
+    public Exception? TrustThrows { get; set; }
+
+    public Task<bool> TryTrustAsync(
+        Guid userId,
+        string deviceId,
+        string fingerprint,
+        CancellationToken cancellationToken = default)
+    {
+        TrustAttempts.Add(deviceId);
+
+        if (TrustThrows is not null)
+        {
+            throw TrustThrows;
+        }
+
+        return Task.FromResult(TrustGranted);
+    }
+}
+
+public sealed class FakeDeviceOtpService : IDeviceOtpService
+{
+    public List<(Guid UserId, string DeviceId)> Issued { get; } = [];
+    public List<(Guid UserId, string DeviceId, string Code)> Consumed { get; } = [];
+    public Exception? ConsumeThrows { get; set; }
+    public Exception? IssueThrows { get; set; }
+    public Task IssueAsync(Guid userId, string deviceId, CancellationToken cancellationToken = default)
+    {
+        if (IssueThrows is not null)
+        {
+            throw IssueThrows;
+        }
+
+        Issued.Add((userId, deviceId));
+        return Task.CompletedTask;
+    }
+
+    public List<(Guid UserId, string DeviceId, string Code)> Committed { get; } = [];
+
+    public async Task<T> ConsumeAsync<T>(
+        Guid userId,
+        string deviceId,
+        string code,
+        Func<Task<T>> onConsumed,
+        CancellationToken cancellationToken = default)
+    {
+        if (ConsumeThrows is not null)
+        {
+            throw ConsumeThrows;
+        }
+
+        Consumed.Add((userId, deviceId, code));
+
+        var result = await onConsumed();
+
+        Committed.Add((userId, deviceId, code));
+        return result;
+    }
+}
+
+public sealed class FakeJwtTokenService : IJwtTokenService
+{
+    public List<(Guid UserId, Guid TenantId, IReadOnlyCollection<string> Roles)> Requests { get; } = [];
+    public Exception? Throws { get; set; }
+    public AccessToken Create(Guid userId, Guid tenantId, IReadOnlyCollection<string> roles)
+    {
+        if (Throws is not null)
+        {
+            throw Throws;
+        }
+
+        Requests.Add((userId, tenantId, roles));
+        return new AccessToken($"jwt-para-{userId}", 3600);
+    }
+}
+
+public sealed class FakeTenantContext(Guid tenantId) : ITenantContext
+{
+    public Guid TenantId { get; private set; } = tenantId;
+    public bool IsResolved => TenantId != Guid.Empty;
+    public List<Guid> SetCalls { get; } = [];
+    public void Set(Guid value)
+    {
+        SetCalls.Add(value);
+        TenantId = value;
+    }
+}

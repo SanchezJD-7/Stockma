@@ -18,22 +18,28 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
 
             httpContext.Response.StatusCode = status;
 
-            await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
-            {
-                Status = status,
-                Title = TitleFor(status),
-                Detail = exception.Message,
-                Extensions = { ["errorCode"] = exception.ErrorCode },
-            });
+            await httpContext.Response.WriteAsJsonAsync(
+                new ProblemDetails
+                {
+                    Status = status,
+                    Title = TitleFor(status),
+                    Detail = exception.Message,
+                    Extensions = { ["errorCode"] = exception.ErrorCode },
+                },
+                options: null,
+                contentType: ProblemResponses.ContentType);
         }
     }
 
     private static int MapStatus(DomainException exception) => exception switch
     {
+        InvalidCredentialsException or OtpNotUsableException => StatusCodes.Status401Unauthorized,
+        PhoneNotEnrolledException => StatusCodes.Status403Forbidden,
+        EmailAlreadyRegisteredException => StatusCodes.Status409Conflict,
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,
         ConcurrencyConflictException => StatusCodes.Status409Conflict,
         SkuDuplicateException or BarcodeDuplicateException => StatusCodes.Status409Conflict,
-        SkuImmutableException => StatusCodes.Status400BadRequest,
+        SkuImmutableException or ValidationFailedException => StatusCodes.Status400BadRequest,
         ProductNotFoundException
             or BarcodeNotFoundException
             or ProductNotFoundForBatchException
@@ -43,6 +49,8 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
 
     private static string TitleFor(int status) => status switch
     {
+        StatusCodes.Status401Unauthorized => "No autenticado",
+        StatusCodes.Status403Forbidden => "Prohibido",
         StatusCodes.Status409Conflict => "Conflicto",
         StatusCodes.Status404NotFound => "Recurso no encontrado",
         StatusCodes.Status422UnprocessableEntity => "Operación improcesable",

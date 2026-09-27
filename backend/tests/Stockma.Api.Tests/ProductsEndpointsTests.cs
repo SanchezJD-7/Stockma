@@ -44,6 +44,9 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
         return client;
     }
 
+    private HttpClient CreateAuthenticatedClient(Guid tenantId) =>
+        factory.CreateAuthenticatedClient(tenantId);
+
     private HttpClient CreateClientWithRawHeader(string headerValue)
     {
         var client = factory.CreateClient();
@@ -70,7 +73,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Post_WithoutSku_Returns201WithGeneratedSku()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.PostAsJsonAsync("/api/products", NewProduct());
 
@@ -84,7 +87,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Post_SerializesCategoryAsString()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.PostAsJsonAsync("/api/products", NewProduct(category: "Supplement"));
 
@@ -99,7 +102,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Post_WithDuplicateSku_Returns409WithErrorCode()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         await client.PostAsJsonAsync("/api/products", NewProduct(sku: "DUP-1"));
         var response = await client.PostAsJsonAsync("/api/products", NewProduct(sku: "DUP-1"));
@@ -111,7 +114,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Post_WithDuplicateBarcode_Returns409WithErrorCode()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         await client.PostAsJsonAsync("/api/products", NewProduct(barcode: "7701111111111"));
         var response = await client.PostAsJsonAsync("/api/products", NewProduct(barcode: "7701111111111"));
@@ -123,7 +126,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Put_WithDifferentSku_Returns400WithErrorCode()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var created = await client.PostAsJsonAsync("/api/products", NewProduct());
         var product = await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
@@ -140,7 +143,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Put_Valid_Returns200AndKeepsSku()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var created = await client.PostAsJsonAsync("/api/products", NewProduct());
         var product = await created.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
@@ -162,7 +165,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Put_OfMissingProduct_Returns404()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.PutAsJsonAsync(
             $"/api/products/{Guid.NewGuid()}",
@@ -175,7 +178,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Get_SearchByName_ReturnsMatches()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         await client.PostAsJsonAsync("/api/products", NewProduct("Acetaminofén 500mg"));
         await client.PostAsJsonAsync("/api/products", NewProduct("Ibuprofeno 400mg"));
@@ -192,7 +195,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Get_ByBarcode_ReturnsTheProduct()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         await client.PostAsJsonAsync("/api/products", NewProduct(barcode: "7702222222222"));
 
@@ -207,7 +210,7 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Get_ByMissingBarcode_Returns404WithErrorCode()
     {
-        var client = CreateClient(await SeedTenantAsync());
+        var client = CreateAuthenticatedClient(await SeedTenantAsync());
 
         var response = await client.GetAsync("/api/products/by-barcode/0000000000000");
 
@@ -240,8 +243,8 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
     [Fact]
     public async Task Get_ByBarcode_DoesNotCrossTenants()
     {
-        var clientA = CreateClient(await SeedTenantAsync());
-        var clientB = CreateClient(await SeedTenantAsync());
+        var clientA = CreateAuthenticatedClient(await SeedTenantAsync());
+        var clientB = CreateAuthenticatedClient(await SeedTenantAsync());
 
         await clientA.PostAsJsonAsync("/api/products", NewProduct(barcode: "7703333333333"));
 
@@ -250,5 +253,33 @@ public class ProductsEndpointsTests(StockmaApiFactory factory) : IClassFixture<S
         response.StatusCode.Should().Be(
             HttpStatusCode.NotFound,
             "un tenant no debe alcanzar el barcode de otro por HTTP (NFR-007)");
+    }
+
+    [Fact]
+    public async Task Get_WithoutAuthentication_Returns401()
+    {
+        var client = CreateClient(await SeedTenantAsync());
+
+        var response = await client.GetAsync("/api/products?query=aceta");
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.Unauthorized,
+            "T073: la superficie de negocio pasa a exigir autenticación por defecto (FallbackPolicy)");
+    }
+
+    [Fact]
+    public async Task Get_WithATokenForAnotherTenant_Returns403()
+    {
+        var tenantA = await SeedTenantAsync();
+        var tenantB = await SeedTenantAsync();
+
+        var response = await factory
+            .CreateAuthenticatedClient(headerTenantId: tenantB, tokenTenantId: tenantA)
+            .GetAsync("/api/products?query=aceta");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ReadErrorCodeAsync(response)).Should().Be(
+            "TENANT_MISMATCH",
+            "T073: el X-Tenant-ID DEBE coincidir con el tid del JWT, sino RLS se alimenta de un tenant elegido por el cliente");
     }
 }

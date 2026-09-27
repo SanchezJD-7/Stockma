@@ -11,7 +11,8 @@
 | Regla | Detalle |
 |---|---|
 | Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente. Ausente o no parseable → `400` (FR-001) |
-| Autenticación | `Authorization: Bearer {jwt}` DEBE estar presente. `401` si falta o expiró |
+| Autenticación | `Authorization: Bearer {jwt}` DEBE estar presente. `401` si falta o expiró (T073: `FallbackPolicy` autenticado por defecto) |
+| Tenant atado al token | El `X-Tenant-ID` DEBE coincidir con el claim `tid` del JWT. Si no coincide → `403 TENANT_MISMATCH`, antes de tocar el handler (T073) |
 | Acotamiento | Todas las consultas DEBE estar acotadas al `TenantId` — filtro EF + RLS |
 | Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode` |
 | Concurrencia | `Batch` usa `xmin` de PostgreSQL como concurrency token; el pipeline reintenta **una vez** y luego responde `409` (FR-014) |
@@ -103,6 +104,7 @@ Location: /api/batches/c41a7d92-5b60-4e18-a3f2-9d0c7e14b688
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
 | `400` | `VALIDATION_FAILED` | `lotNumber`, `expirationDate`, `currentQuantity` o `locationShelf` ausentes o inválidos |
 | `401` | — | JWT ausente o expirado |
+| `403` | `TENANT_MISMATCH` | El `tid` del JWT no coincide con `X-Tenant-ID` (T073) |
 | `400` / `404` | `BATCH_PRODUCT_NOT_FOUND` | `productId` inexistente en el tenant (FR-012). `[PENDIENTE: la spec dice "rechazada con 404/400" sin decidir cuál; el errorCode tampoco está nombrado en las fuentes]` |
 
 ### Escenarios (Dado/Cuando/Entonces)
@@ -170,6 +172,7 @@ Content-Type: application/json
 | `400` | `VALIDATION_FAILED` | `delta` ausente o igual a `0` |
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
 | `401` | — | JWT ausente o expirado |
+| `403` | `TENANT_MISMATCH` | El `tid` del JWT no coincide con `X-Tenant-ID` (T073) |
 | `404` | `BATCH_NOT_FOUND` | El lote no existe en el tenant activo. `[PENDIENTE: errorCode no nombrado en las fuentes]` |
 | **`422`** | **`BATCH_NEGATIVE_STOCK`** | El ajuste dejaría `currentQuantity < 0`. Rechazo total, stock sin cambios (FR-013) |
 | `409` | `CONCURRENCY_CONFLICT` | Conflicto de `xmin` que persiste tras un reintento (FR-014) |
@@ -292,6 +295,7 @@ El color NO DEBE persistirse (NFR-010).
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
 | `400` | `VALIDATION_FAILED` | `productId` no es un GUID válido |
 | `401` | — | JWT ausente o expirado |
+| `403` | `TENANT_MISMATCH` | El `tid` del JWT no coincide con `X-Tenant-ID` (T073) |
 
 Sin lotes que coincidan: `200` con array vacío.
 

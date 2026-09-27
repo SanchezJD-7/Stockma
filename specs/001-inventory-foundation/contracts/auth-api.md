@@ -10,13 +10,20 @@
 
 | Regla | Detalle |
 |---|---|
-| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo `POST /api/auth/login`** (T055). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001) |
-| Header de dispositivo | `X-Device-Id: {string}` — opcional en `login`, obligatorio en `confirm-device`. `[PENDIENTE: las fuentes lo llaman "deviceId header opcional" en login y campo del body en confirm-device; unificar nombre y ubicación]` |
-| Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode` |
-| Rate limiting | `POST /login` DEBERÍA limitar a 5 intentos por IP por minuto → `429` (NFR-005) |
+| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo la superficie sin autenticar**: `POST /api/auth/login` y `POST /api/auth/confirm-device` (T055, T055a). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001), en `application/problem+json` como el resto de los errores (T081) |
+| Autenticación por defecto (T073) | Toda ruta que no sea `login`/`confirm-device` exige un JWT válido (`FallbackPolicy.RequireAuthenticatedUser()`). Sin token → `401` |
+| Tenant atado al token (T073) | Con JWT presente, el `X-Tenant-ID` DEBE coincidir con el claim `tid`. Si no coincide → `403` `TENANT_MISMATCH`, antes de tocar el controller o la base |
+| Por qué son DOS rutas | `confirm-device` ocurre **antes** de que exista un token: el cliente todavía no sabe a qué tenant pertenece, y la respuesta del login (`requiresDeviceConfirmation`) no se lo dice. Exigirle el header lo volvería inalcanzable. Las dos rutas resuelven el tenant desde el email por la **misma** función acotada `auth_find_user_by_email` (T055b) |
+| Header de dispositivo | `deviceId` es **obligatorio en las dos rutas** y viaja en el **body**, no en un header. Motivo: el OTP se persiste atado a un `deviceId` (`device_otps`), así que sin él no hay dónde clavarlo ni forma de decidir si el dispositivo es confiable — pedirle al usuario un código que nunca se envió es un callejón. `400` `VALIDATION_FAILED` si falta. **Normalización y entropía (T078)**: el servidor recorta espacios en un único lugar (`DeviceIdentifier`) y usa el valor normalizado para emitir, consumir y confiar. Después de recortar DEBE tener entre **16 y 128** caracteres (un GUID sirve); si no, `400` `VALIDATION_FAILED`, antes de mirar credenciales. La seguridad del dispositivo descansa en la entropía del `deviceId` + contraseña + OTP (ADR-016) |
+| Huella (`fingerprint`) | Obligatoria en `confirm-device` y de **1 a 256** caracteres después de recortar espacios (el largo de la columna); si no, `400` `VALIDATION_FAILED` **antes** de mirar el email o tocar el OTP (T080). Se guarda en el `TrustedDevice`, pero es **informativa**: NO se compara en logins posteriores y NO es un control de seguridad — las huellas cambian con cada actualización del navegador (ADR-016) |
+| Formato de error | `application/problem+json` (`ProblemDetails`) con extensión `errorCode`. Un body que no pasa la validación (campo obligatorio ausente, `deviceId` corto, contraseña que Identity rechaza) responde `400` `VALIDATION_FAILED`, nunca `500` (T078) |
+| Rate limiting | La superficie de `auth` limita a 5 intentos por IP por minuto → `429` `AUTH_RATE_LIMITED` en `problem+json` (NFR-005, T078) |
+| IP del cliente detrás de un proxy (T078) | La IP que particiona el rate limit sale de `X-Forwarded-For` **sólo** si el par inmediato está en `ForwardedHeaders:KnownProxies` o `ForwardedHeaders:KnownNetworks` (CIDR). Ambas vacías por defecto: sin configurarlas, `X-Forwarded-For` se ignora y un cliente no puede inventarse una cuota nueva por request (ADR-016). `UseForwardedHeaders()` es el **primer** middleware, antes de la redirección a HTTPS: detrás de un proxy conocido con `X-Forwarded-Proto: https` no hay redirección (T082). Una entrada que no parsea corta el **arranque** de la API con un mensaje que nombra la clave (T082) |
 | Hash de contraseña | PBKDF2 vía ASP.NET Core Identity (NFR-004) |
-| Vigencia del JWT | `exp` ≤ 60 minutos; claims `sub` (userId) y `tid` (tenantId) (NFR-004, FR-006) |
+| Vigencia del JWT | `exp` ≤ 60 minutos; claims `sub` (userId) y `tid` (tenantId) (NFR-004, FR-006). `Jwt:Key` de menos de 32 bytes, `Jwt:Issuer`/`Jwt:Audience` vacíos o `Jwt:ExpiresMinutes` fuera de 1–60 cortan el **arranque**, no la primera request (T082) |
 | Canal del OTP | **SMS** al `ApplicationUser.PhoneNumber`. Ventana de vigencia **≤ 10 min** (NFR-004) — se mantiene sin cambios respecto del canal anterior |
+| Límites del OTP (T075) | Emitir un OTP nuevo **invalida** los anteriores vivos de ese usuario+dispositivo; cada intento se compara sólo contra el **último** vigente. `Otp:MaxAttempts` (def. 5) intentos fallidos lo **queman**. `Otp:MaxIssuesPerWindow` (def. 5) emisiones por usuario en `Otp:IssueWindowMinutes` (def. 15, ventana deslizante): pasado el tope el login responde **exactamente igual** pero no manda SMS (ADR-016) |
+| Sender de SMS (T077) | El sender de consola (escribe código y celular en el log) sólo se registra en `Development`. En cualquier otro entorno sin proveedor real (T049) la API **no arranca** y dice por qué. Nunca se cae en silencio al sender de consola |
 | Origen del `PhoneNumber` | **Alta**: sólo un admin vía `PUT /api/admin/users/{userId}/phone-number` (T050). **Cambio**: el propio usuario vía `PUT /api/auth/phone-number`, confirmando un OTP enviado al número **actual** (T061). La superficie self-service de Identity DEBE seguir cerrada |
 
 ### Forma del error
@@ -35,30 +42,46 @@
 
 ## `POST /api/auth/register` — FR-005
 
-Registra un `ApplicationUser` asociado al `TenantId` del header.
+> **Cerrado por T064.** No es una ruta pública: exige un JWT de `TenantAdmin` **del mismo tenant**
+> del header `X-Tenant-ID`. Antes de T064 cualquiera que conociera un `X-Tenant-ID` (no es secreto)
+> podía registrarse a sí mismo como `TenantAdmin` y tomar el tenant. Ver ADR-014.
+
+Registra un `ApplicationUser` asociado al `TenantId` del header. El `TenantAdmin` que da de alta
+puede fijar el `role` del nuevo usuario (`TenantAdmin` o `Member`; por defecto `Member`).
 
 **Command**: `RegisterUserCommand`
+**Autorización**: `[Authorize(Policy = AuthorizationPolicies.TenantAdmin)]`. La verificación de que
+el claim `tid` del JWT coincide con el tenant resuelto desde `X-Tenant-ID` la hace ahora el
+`TenantMiddleware` para **toda** ruta autenticada (T073), no un chequeo ad hoc del controller — ver
+ADR-015. Si no coincide, `403 TENANT_MISMATCH` **antes** de tocar el comando — no se crea usuario.
 
 ### Request
 
 ```http
 POST /api/auth/register
 X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
+Authorization: Bearer {jwt de un TenantAdmin de ese mismo tenant}
 Content-Type: application/json
 ```
 
 ```json
 {
   "email": "farmacia@ejemplo.co",
-  "password": "S3gura#2026"
+  "password": "S3gura#2026",
+  "phoneNumber": "+573001234567",
+  "role": "Member"
 }
 ```
+
+`phoneNumber` es **obligatorio** (T050/T064): un usuario creado sin celular no puede entrar desde
+un dispositivo no confiable y queda inservible hasta que un admin lo complete.
 
 ### Respuesta `201 Created`
 
 ```json
 {
-  "userId": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31"
+  "userId": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31",
+  "email": "farmacia@ejemplo.co"
 }
 ```
 
@@ -66,21 +89,58 @@ Content-Type: application/json
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
+| `401` | — | Sin JWT, o JWT inválido/expirado |
+| `403` | — | JWT válido pero rol `Member` |
+| `403` | `TENANT_MISMATCH` | `TenantAdmin` de OTRO tenant: el `tid` del JWT no coincide con `X-Tenant-ID` (rechazado por `TenantMiddleware`, T073). En ambos casos de `403` no se crea ningún usuario |
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header `X-Tenant-ID` ausente o no es un GUID (FR-001) |
-| `400` | `VALIDATION_FAILED` | Email o contraseña no cumplen las reglas de Identity |
+| `400` | `VALIDATION_FAILED` | Email, contraseña o celular no cumplen las reglas de Identity |
 | `409` | `AUTH_EMAIL_DUPLICATE` | El email ya existe en **cualquier** tenant de la plataforma (FR-005, T055). El email es único global |
 
 ### Escenarios (Dado/Cuando/Entonces)
 
 **Registro exitoso**
-- **DADO** email y contraseña válidos con header tenant
+- **DADO** un `TenantAdmin` autenticado del mismo tenant del header, con email/password/celular válidos
 - **CUANDO** `POST /api/auth/register`
-- **ENTONCES** crea `ApplicationUser` con `TenantId` y retorna `201`
+- **ENTONCES** crea `ApplicationUser` con `TenantId` y `PhoneNumber`, y retorna `201`
+
+**Sin token**
+- **DADO** ninguna `Authorization`
+- **CUANDO** `POST /api/auth/register`
+- **ENTONCES** responde `401`
+
+**Token de `Member`**
+- **DADO** un JWT válido con rol `Member`
+- **CUANDO** `POST /api/auth/register`
+- **ENTONCES** responde `403` (un `Member` puede leer/ajustar stock pero no dar de alta usuarios)
+
+**`TenantAdmin` de otro tenant**
+- **DADO** un JWT de `TenantAdmin` cuyo `tid` es distinto del tenant resuelto por `X-Tenant-ID`
+- **CUANDO** `POST /api/auth/register`
+- **ENTONCES** responde `403` y no se crea ningún usuario en ningún tenant
 
 **Email duplicado**
-- **DADO** email ya registrado en el tenant
+- **DADO** email ya registrado en la plataforma
 - **CUANDO** registrar
 - **ENTONCES** responde `409 Conflict`
+
+### Bootstrap del primer `TenantAdmin`
+
+Hasta que exista T063 (admin de plataforma), el primer `TenantAdmin` de un tenant se crea con un
+subcomando CLI de `Stockma.Api`, fuera de HTTP:
+
+```
+dotnet run --project backend/src/Stockma.Api -- bootstrap-admin --tenant <guid> --email <email> --phone <telefono>
+```
+
+La contraseña se lee de la variable de entorno `STOCKMA_BOOTSTRAP_PASSWORD` (nunca de argv). Sólo
+corre sobre un tenant **existente** y con **cero usuarios**; si el tenant no existe o ya tiene
+usuarios, falla con un mensaje claro y código de salida distinto de cero, sin tocar la base. Ver
+ADR-014.
+
+El chequeo de "cero usuarios" y el alta corren bajo un `pg_advisory_xact_lock` por tenant: dos
+bootstraps en paralelo dejan **exactamente un** `TenantAdmin` y el otro falla como "ya tiene
+usuarios". El usuario y su rol se crean en **una** transacción: si asignar el rol falla, no queda un
+usuario sin rol que trabe el bootstrap para siempre (T083, ADR-017).
 
 ---
 
@@ -105,16 +165,16 @@ Emite un JWT si el dispositivo es confiable; si no, dispara el 2FA por SMS.
 
 ```http
 POST /api/auth/login
-X-Device-Id: web-chrome-a91f2c
 Content-Type: application/json
 ```
 
-Sin `X-Tenant-ID`: el tenant sale del email.
+Sin `X-Tenant-ID`: el tenant sale del email. El `deviceId` viaja en el body (ver reglas transversales).
 
 ```json
 {
   "email": "farmacia@ejemplo.co",
-  "password": "S3gura#2026"
+  "password": "S3gura#2026",
+  "deviceId": "web-chrome-a91f2c77"
 }
 ```
 
@@ -149,8 +209,11 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
-| `401` | `AUTH_INVALID_CREDENTIALS` | Email inexistente **o** contraseña incorrecta. La respuesta DEBE ser idéntica en los tres casos —email que no existe, contraseña equivocada, usuario de otro tenant— porque distinguirlos habilita enumerar qué correos usan Stockma (FR-006) |
-| `429` | `AUTH_RATE_LIMITED` | Más de 5 intentos por IP por minuto (NFR-005) |
+| `400` | `VALIDATION_FAILED` | Falta `email`, `password` o `deviceId`, o el `deviceId` tiene menos de 16 caracteres. Se decide antes de mirar credenciales: es el mismo `400` para cualquier email (T078) |
+| `401` | `AUTH_INVALID_CREDENTIALS` | Email inexistente **o** contraseña incorrecta. La respuesta DEBE ser idéntica en los tres casos —email que no existe, contraseña equivocada, usuario de otro tenant— porque distinguirlos habilita enumerar qué correos usan Stockma (FR-006). También en **tiempo**: todo camino de falla (email inexistente, usuario sin contraseña, usuario bloqueado) corre una verificación PBKDF2 contra un hash señuelo (T074, ADR-016) |
+| `429` | `AUTH_RATE_LIMITED` | Más de 5 intentos por IP por minuto (NFR-005). Cuerpo `problem+json` |
+
+> **Tope de emisión (T075)**: pasado `Otp:MaxIssuesPerWindow` en la ventana, la respuesta sigue siendo `200` `requiresDeviceConfirmation: true` — idéntica a la de un envío real — pero no se manda SMS. Un `429` o un error distinto revelaría que el email existe.
 
 ### Escenarios (Dado/Cuando/Entonces)
 
@@ -183,14 +246,16 @@ Valida el OTP recibido por **SMS**, marca el dispositivo como confiable y emite 
 
 ```http
 POST /api/auth/confirm-device
-X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
 Content-Type: application/json
 ```
+
+Sin `X-Tenant-ID`: igual que el login, el tenant sale del email (T055a).
 
 ```json
 {
   "email": "farmacia@ejemplo.co",
-  "deviceId": "web-chrome-a91f2c",
+  "deviceId": "web-chrome-a91f2c77",
+  "fingerprint": "chrome-128-win11",
   "otp": "482913"
 }
 ```
@@ -211,7 +276,7 @@ Content-Type: application/json
 
 | # | Efecto | Condición |
 |---|---|---|
-| a | Valida el OTP y emite el JWT | **Siempre**, haya slot libre o no |
+| a | Valida el OTP y emite el JWT | **Siempre**, haya slot libre o no. El consumo del OTP, el alta del `TrustedDevice` y la emisión del JWT son **una** transacción: si algo falla después de aceptar el código, el OTP **no** queda gastado y el usuario puede reintentar con el mismo (T080) |
 | b | Crea el `TrustedDevice` (`TrustedAt = now`, `RevokedAt = null`) y registra el evento de notificación al dispositivo trusted previo | **Sólo si** los `TrustedDevice` activos (`RevokedAt IS NULL`) del usuario son `< MaxTrustedDevices` (def. 2) |
 
 - Sin slot libre: el efecto (a) ocurre igual — el usuario **entra**. El efecto (b) se omite: `deviceTrusted: false`, el dispositivo no queda recordado y deberá hacer OTP en **cada** login.
@@ -222,13 +287,15 @@ Content-Type: application/json
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
-| `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
-| `401` | `AUTH_OTP_INVALID` | OTP incorrecto. El intento DEBE quedar registrado (FR-008) |
-| `401` | `AUTH_OTP_EXPIRED` | OTP vencido (> 10 min). El intento DEBE quedar registrado (FR-008) |
+| `400` | `VALIDATION_FAILED` | Falta `email`, `otp` o `fingerprint`, el `fingerprint` supera 256 caracteres, o el `deviceId` no cumple la regla de entropía (T078, T080) |
+| `401` | `AUTH_OTP_REJECTED` | **Toda** falla del OTP, con el mismo cuerpo byte a byte: email inexistente, usuario bloqueado o deshabilitado (`LockoutEnd` futuro, misma regla que el login; no toca el OTP), ningún OTP vigente, código incorrecto, vencido (> 10 min), quemado por intentos, o perdedor de una carrera contra otro `confirm-device` con el mismo código (T074, T075, T080, ADR-016) |
+| `429` | `AUTH_RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
+
+**Registro del intento (FR-008)**: cada código incorrecto incrementa `DeviceOtp.FailedAttempts` (persistido) y deja un log estructurado `Warning` con `UserId`, intentos y si el código quedó quemado — **nunca** el código ni el celular.
 
 > **No hay error por límite de dispositivos.** `MaxTrustedDevices` NO DEBE producir un status de error: superarlo devuelve `200` con `deviceTrusted: false`. Ver la sección de abajo.
 
-> `[PENDIENTE: las fuentes describen un único 401 para "OTP errado o vencido". La separación en AUTH_OTP_INVALID / AUTH_OTP_EXPIRED es una desagregación; confirmar si se prefiere un errorCode único (p. ej. AUTH_OTP_REJECTED) para no filtrar si el OTP existía]`
+> **Resuelto (T074)**: un único `AUTH_OTP_REJECTED`. Separar `AUTH_OTP_INVALID` / `AUTH_OTP_EXPIRED` —o responder `AUTH_INVALID_CREDENTIALS` para el email inexistente— dice si el email existe y si hay un OTP en vuelo. Ver ADR-016.
 
 ---
 
