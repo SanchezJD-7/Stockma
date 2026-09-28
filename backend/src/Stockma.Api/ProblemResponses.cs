@@ -30,7 +30,7 @@ public static class ProblemResponses
             {
                 Status = StatusCodes.Status429TooManyRequests,
                 Title = "Demasiados intentos",
-                Detail = "Superaste el límite de intentos de autenticación. Esperá un minuto y volvé a probar.",
+                Detail = "Superaste el límite de intentos de autenticación. Espera un minuto y vuelve a intentarlo.",
                 Extensions = { ["errorCode"] = RateLimitedCode },
             },
             options: null,

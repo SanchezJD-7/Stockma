@@ -262,6 +262,33 @@ OTP de 2FA **por SMS**, persistido (FR-008, NFR-004). El código se envía al `A
 
 ---
 
+## 3c. `RefreshToken`
+
+Credencial de larga vida de la sesión (FR-006, T065). Viaja en la cookie `httpOnly` `stockma_refresh`; en la base sólo su hash.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `Id` | `Guid` | PK |
+| `TenantId` | `Guid` | Inmutable. RLS con `ENABLE` + `FORCE` como el resto (ADR-017) |
+| `UserId` | `string` | FK a `ApplicationUser` |
+| `FamilyId` | `Guid` | Agrupa los tokens de **un** login. Reuso o logout revocan la familia entera |
+| `DeviceId` | `string` | `deviceId` normalizado del login (T078). Un `refresh` desde otro dispositivo revoca la familia |
+| `TokenHash` | `string` | `SHA-256` del token, en hex. **Único**. No `IPasswordHasher`: tiene que poder buscarse (ADR-018) |
+| `IssuedAt` | `DateTime` | Emisión de **este** token |
+| `ExpiresAt` | `DateTime` | Vencimiento de la **familia**: login + `RefreshTokenLifetimeHours`. Los tokens rotados lo heredan |
+| `ConsumedAt` | `DateTime?` | Usado para rotar. Presentarlo de nuevo es reuso |
+| `RevokedAt` | `DateTime?` | Revocado por reuso, logout, otro dispositivo o usuario bloqueado |
+
+**Invariantes**
+
+- A lo sumo **un** token vivo (`ConsumedAt IS NULL AND RevokedAt IS NULL`) por familia.
+- Rotar no extiende `ExpiresAt`.
+- El token en claro nunca se persiste ni se loguea.
+
+**Índices**: único `TokenHash`; `(TenantId, FamilyId)`. `[PENDIENTE: política de purga de familias vencidas no definida]`
+
+---
+
 ## 4. `Product`
 
 `Product : ITenantEntity, IAggregateRoot` — agregado raíz del catálogo (FR-009 … FR-011).

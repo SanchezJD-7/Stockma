@@ -12,7 +12,7 @@ filtro global de EF Core y Row-Level Security de PostgreSQL.
 Requisitos: **Docker**, **.NET 9 SDK**, **Node 22**.
 
 ```bash
-# 1. Base de datos
+# 1. Base de datos  →  localhost:5434 (no 5432, para convivir con otros Postgres locales)
 docker compose -f ops/docker-compose.yml up -d
 
 # 2. Migraciones — NO se aplican solas al arrancar la API. Corren con el rol
@@ -45,7 +45,7 @@ no referencia `Microsoft.EntityFrameworkCore.Design`. Las herramientas de EF usa
 | Clave | Rol | Quién la usa |
 | ----- | --- | ------------ |
 | `ConnectionStrings:Postgres` (`appsettings.Development.json` en local, env `ConnectionStrings__Postgres` en cualquier otro entorno) | `app_user`, no propietario | La API en runtime y el subcomando `bootstrap-admin` |
-| env `ConnectionStrings__PostgresMigrations` | propietario de las tablas | Sólo `dotnet ef` (por defecto `stockma`/`stockma` en `localhost`) |
+| env `ConnectionStrings__PostgresMigrations` | propietario de las tablas | Sólo `dotnet ef` (por defecto `stockma`/`stockma` en `localhost:5434`) |
 
 `appsettings.json` **no trae** connection string: la de desarrollo vive en
 `appsettings.Development.json`. Fuera de `Development`, sin `ConnectionStrings__Postgres`

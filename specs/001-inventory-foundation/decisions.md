@@ -25,6 +25,7 @@ Cada decisión trae las alternativas que se evaluaron y se descartaron. Si una t
 | [ADR-015](#adr-015--autenticación-por-defecto-y-el-tenant-atado-al-token) | Autenticación por defecto y el tenant atado al token | T073 |
 | [ADR-016](#adr-016--endurecimiento-del-login-enumeración-fuerza-bruta-del-otp-y-carreras) | Endurecimiento del login: enumeración, fuerza bruta del OTP y carreras | T074–T078 |
 | [ADR-017](#adr-017--la-rls-tiene-que-aplicar-en-runtime-rol-separado-force-y-chequeo-de-arranque) | La RLS tiene que aplicar en runtime: rol separado, `FORCE` y chequeo de arranque | T079–T083 |
+| [ADR-018](#adr-018--refresh-token-sha-256-familia-atada-al-dispositivo-y-reuso-que-corta-la-sesión) | Refresh token: SHA-256, familia atada al dispositivo y reuso que corta la sesión | T065 |
 
 ---
 
@@ -974,6 +975,65 @@ arranca el contenedor).
 - **Migraciones de datos sobre tablas con RLS**: con `FORCE`, el propietario no ve filas sin
   `app.tenant`. Una migración así DEBE setear el tenant por lote o correr como superusuario, y
   decirlo en su comentario.
+
+---
+
+## ADR-018 — Refresh token: SHA-256, familia atada al dispositivo y reuso que corta la sesión
+
+**Estado**: decidido antes de implementar · **Tareas**: T065
+
+### El hallazgo
+
+T065 decía que el refresh token se hashea "con el mismo criterio que el OTP (`IPasswordHasher`)".
+Eso **no funciona**. `IPasswordHasher` es PBKDF2 con salt aleatorio: el mismo token da un hash
+distinto cada vez. El OTP se busca por usuario y dispositivo y **después** se verifica; el refresh
+llega **solo**, en una cookie, sin nada más que lo identifique. Con un hash salado, la única forma de
+encontrar su fila sería verificar contra todas.
+
+### Decisión 1 — SHA-256 sin salt
+
+El token son 32 bytes de un CSPRNG y se persiste `SHA-256(token)`, con índice único. Un hash rápido y
+sin salt es seguro **acá** porque el secreto tiene 256 bits de entropía: no hay diccionario ni
+fuerza bruta posible, a diferencia de una contraseña elegida por una persona. El hash lento existe
+para compensar la baja entropía de las contraseñas; este token no la tiene.
+
+| Alternativa | Por qué no |
+|---|---|
+| `IPasswordHasher` (PBKDF2 con salt) | La fila no se puede buscar por hash |
+| Token con prefijo de id en claro + PBKDF2 | Resuelve la búsqueda, pero agrega costo de CPU en cada renovación sin sumar seguridad sobre 256 bits de entropía |
+| JWT como refresh | No se puede revocar sin guardar estado igual, y es más grande que un token opaco |
+
+### Decisión 2 — La familia queda atada al dispositivo del login
+
+La familia guarda el `deviceId` normalizado. Un `refresh` con otro `deviceId` se trata como reuso y
+revoca la familia. Es lo que hace cumplir la regla de T065: un refresh **no** sirve para entrar desde
+un dispositivo nuevo sin pasar por el 2FA.
+
+### Decisión 3 — El reuso corta la sesión, sin ventana de gracia
+
+Un token consumido que vuelve a aparecer revoca **toda** la familia. Dos pestañas que renuevan a la
+vez con el mismo token disparan esa detección: la solución va en el frontend, que serializa la
+renovación entre pestañas (Web Locks API). No se agrega una ventana de gracia en el servidor: esa
+ventana es justamente el hueco por el que pasaría una copia robada.
+
+### Decisión 4 — `refresh` y `logout` no usan el header de tenant
+
+Los dos son anónimos (el access token puede estar vencido) y el tenant sale de la fila del token, por
+una función acotada propiedad de `auth_lookup`, igual que el login (ADR-017). Un `X-Tenant-ID`
+presente se ignora.
+
+### Consecuencias aceptadas
+
+- Tras un `logout`, el access token ya emitido sigue valiendo hasta su `exp` (≤ 60 min). Revocarlo al
+  instante exigiría consultar la base en cada request.
+- Un usuario con dos pestañas en un frontend que no serialice la renovación pierde la sesión.
+
+### Qué la devolvería a discusión
+
+- Que el frontend no pueda serializar la renovación (navegadores sin Web Locks en el parque real de
+  las droguerías).
+- Que el mostrador se queje de la vigencia absoluta de 8 h: la salida es vigencia deslizante con tope
+  absoluto, no una ventana de gracia.
 
 ---
 

@@ -8,7 +8,7 @@ public sealed class StockmaDbContextFactory : IDesignTimeDbContextFactory<Stockm
 {
     public const string ConnectionStringVariable = "ConnectionStrings__PostgresMigrations";
 
-    private const string DefaultConnectionString = "Host=localhost;Port=5432;Database=stockma;Username=stockma;Password=stockma";
+    private const string DefaultConnectionString = "Host=localhost;Port=5434;Database=stockma;Username=stockma;Password=stockma";
 
     public StockmaDbContext CreateDbContext(string[] args)
     {

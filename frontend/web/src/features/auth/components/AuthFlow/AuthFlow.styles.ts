@@ -1,6 +1,8 @@
-.app-landing {
+import styled from '@emotion/styled'
+
+export const SessionScreen = styled.main`
   min-height: 100dvh;
   display: grid;
   place-items: center;
   text-align: center;
-}
+`

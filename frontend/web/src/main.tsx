@@ -4,7 +4,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './styles.css'
-import { createMuiBridge } from './styles/mui-bridge.ts'
+import { createMuiBridge } from './styles/theme/mui-bridge.ts'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
