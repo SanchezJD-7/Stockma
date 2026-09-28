@@ -10,8 +10,8 @@
 
 | Regla | Detalle |
 |---|---|
-| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo la superficie sin autenticar**: `POST /api/auth/login` y `POST /api/auth/confirm-device` (T055, T055a). Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001), en `application/problem+json` como el resto de los errores (T081) |
-| Autenticación por defecto (T073) | Toda ruta que no sea `login`/`confirm-device` exige un JWT válido (`FallbackPolicy.RequireAuthenticatedUser()`). Sin token → `401` |
+| Header de tenant | `X-Tenant-ID: {guid}` DEBE estar presente en todas las rutas **salvo la superficie sin autenticar**: `POST /api/auth/login`, `POST /api/auth/confirm-device` (T055, T055a), `POST /api/auth/refresh` y `POST /api/auth/logout` (T065), que resuelven el tenant desde el email o desde el refresh token, nunca desde un header. Ausente o no parseable → `400` `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` (FR-001), en `application/problem+json` como el resto de los errores (T081) |
+| Autenticación por defecto (T073) | Toda ruta que no sea `login`/`confirm-device`/`refresh`/`logout` exige un JWT válido (`FallbackPolicy.RequireAuthenticatedUser()`). Sin token → `401` |
 | Tenant atado al token (T073) | Con JWT presente, el `X-Tenant-ID` DEBE coincidir con el claim `tid`. Si no coincide → `403` `TENANT_MISMATCH`, antes de tocar el controller o la base |
 | Por qué son DOS rutas | `confirm-device` ocurre **antes** de que exista un token: el cliente todavía no sabe a qué tenant pertenece, y la respuesta del login (`requiresDeviceConfirmation`) no se lo dice. Exigirle el header lo volvería inalcanzable. Las dos rutas resuelven el tenant desde el email por la **misma** función acotada `auth_find_user_by_email` (T055b) |
 | Header de dispositivo | `deviceId` es **obligatorio en las dos rutas** y viaja en el **body**, no en un header. Motivo: el OTP se persiste atado a un `deviceId` (`device_otps`), así que sin él no hay dónde clavarlo ni forma de decidir si el dispositivo es confiable — pedirle al usuario un código que nunca se envió es un callejón. `400` `VALIDATION_FAILED` si falta. **Normalización y entropía (T078)**: el servidor recorta espacios en un único lugar (`DeviceIdentifier`) y usa el valor normalizado para emitir, consumir y confiar. Después de recortar DEBE tener entre **16 y 128** caracteres (un GUID sirve); si no, `400` `VALIDATION_FAILED`, antes de mirar credenciales. La seguridad del dispositivo descansa en la entropía del `deviceId` + contraseña + OTP (ADR-016) |
@@ -296,6 +296,132 @@ Sin `X-Tenant-ID`: igual que el login, el tenant sale del email (T055a).
 > **No hay error por límite de dispositivos.** `MaxTrustedDevices` NO DEBE producir un status de error: superarlo devuelve `200` con `deviceTrusted: false`. Ver la sección de abajo.
 
 > **Resuelto (T074)**: un único `AUTH_OTP_REJECTED`. Separar `AUTH_OTP_INVALID` / `AUTH_OTP_EXPIRED` —o responder `AUTH_INVALID_CREDENTIALS` para el email inexistente— dice si el email existe y si hay un OTP en vuelo. Ver ADR-016.
+
+---
+
+## `POST /api/auth/refresh` — FR-006, NFR-004 (T065)
+
+Renueva el access token usando el refresh token de la cookie. Rota el refresh: el presentado queda
+consumido y se emite uno nuevo dentro de la **misma familia**.
+
+**Quién puede llamarlo**: anónimo —justamente el access token puede estar vencido— pero sólo con una
+cookie `stockma_refresh` válida. **Sin `X-Tenant-ID`**: el tenant y el usuario salen de la fila del
+refresh token, resuelta por una función acotada propiedad de `auth_lookup`, igual que el login (T055b,
+ADR-017). Un header de tenant presente se ignora; nunca decide a qué tenant se renueva.
+
+### Request
+
+```http
+POST /api/auth/refresh
+Content-Type: application/json
+Cookie: stockma_refresh=<token opaco>
+```
+
+```json
+{
+  "deviceId": "3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c"
+}
+```
+
+### Respuesta `200 OK`
+
+```http
+Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=<segundos hasta el vencimiento de la familia>
+```
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 3600
+}
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `400` | `VALIDATION_FAILED` | `deviceId` ausente o fuera de la regla de entropía (T078) |
+| `401` | `AUTH_REFRESH_REJECTED` | **Toda** falla, con el mismo cuerpo byte a byte y borrando la cookie (`Max-Age=0`): sin cookie, token desconocido, vencido, revocado, ya consumido (reuso), `deviceId` distinto del de la familia, usuario bloqueado o deshabilitado |
+| `429` | `AUTH_RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
+
+### Reglas
+
+| Regla | Detalle |
+|---|---|
+| Token | 32 bytes de un CSPRNG, codificado base64url. Opaco: no es un JWT |
+| Persistencia | Se guarda `SHA-256(token)`, nunca el token. **No** `IPasswordHasher`: con salt aleatorio el mismo token da un hash distinto cada vez y la fila no se puede buscar. SHA-256 sin salt es seguro acá porque el token tiene 256 bits de entropía: no hay diccionario posible, a diferencia de una contraseña (ADR-018) |
+| Rotación | Cada `refresh` exitoso marca `ConsumedAt` en el presentado y emite uno nuevo con el mismo `FamilyId`, en **una** transacción bajo lock por familia |
+| Detección de reuso | Presentar un token con `ConsumedAt` o `RevokedAt` → se revoca **toda la familia** y se registra el evento (log `Warning` con `UserId` y `FamilyId`, nunca el token). La sesión se cae para el legítimo y para quien tenga la copia |
+| Vigencia absoluta | La familia vence al momento del login + `RefreshTokenLifetimeHours` (def. 8, `TenantSettings`). Un token rotado **hereda** ese vencimiento: rotar no extiende la sesión |
+| Atado al dispositivo | La familia guarda el `deviceId` normalizado del login. Un `refresh` con otro `deviceId` se trata como reuso: revoca la familia. Así un refresh no sirve para entrar desde un dispositivo nuevo sin pasar por el 2FA |
+| Usuario bloqueado | Con `LockoutEnd` futuro, `401` y se revoca la familia (misma regla que el login; T068 la usa para el offboarding) |
+| CSRF | `SameSite=Strict` impide que otro sitio mande la cookie; además se exige `Content-Type: application/json`, que fuerza un preflight CORS en un pedido cross-origin |
+| `Path=/api/auth` | La cookie sólo viaja a la superficie de auth, no a cada request de negocio |
+| Varias pestañas | Dos `refresh` en paralelo con el **mismo** token son, para el servidor, un reuso: el segundo revoca la familia. El frontend DEBE serializar la renovación entre pestañas (Web Locks API). Es a propósito: una ventana de gracia afloja justo la detección que se quiere tener |
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Rotación**
+- **DADO** un refresh vigente y sin consumir
+- **CUANDO** `POST /api/auth/refresh` con el mismo `deviceId` del login
+- **ENTONCES** responde `200` con un access token nuevo, rota la cookie y el token anterior queda consumido
+
+**Reuso**
+- **DADO** un refresh ya consumido
+- **CUANDO** se presenta de nuevo
+- **ENTONCES** responde `401 AUTH_REFRESH_REJECTED` y **toda** la familia queda revocada: el último token emitido tampoco sirve
+
+**Otro dispositivo**
+- **DADO** un refresh emitido para el dispositivo A
+- **CUANDO** se presenta con el `deviceId` del dispositivo B
+- **ENTONCES** responde `401` y revoca la familia
+
+**Vencido**
+- **DADO** una familia cuyo login fue hace más de `RefreshTokenLifetimeHours`
+- **CUANDO** se presenta cualquiera de sus tokens
+- **ENTONCES** responde `401`, aunque el token se haya rotado hace minutos
+
+**Aislamiento**
+- **DADO** un refresh del tenant A
+- **CUANDO** se presenta con `X-Tenant-ID` del tenant B
+- **ENTONCES** el access token emitido es del tenant A: el header no decide el tenant
+
+### Emisión en `login` y `confirm-device`
+
+Toda respuesta `200` que entrega un `accessToken` —`login` desde un dispositivo confiable y
+`confirm-device`— DEBE también abrir una familia nueva y devolver el `Set-Cookie` de `stockma_refresh`.
+Un login nunca reutiliza una familia existente.
+
+---
+
+## `POST /api/auth/logout` — FR-006 (T065)
+
+Cierra la sesión **del lado del servidor**: revoca la familia de la cookie y la borra del cliente.
+
+**Quién puede llamarlo**: anónimo, con o sin cookie —un access token vencido no debe impedir cerrar
+sesión—. Sin `X-Tenant-ID`.
+
+### Request
+
+```http
+POST /api/auth/logout
+Content-Type: application/json
+Cookie: stockma_refresh=<token opaco>
+```
+
+### Respuesta `204 No Content`
+
+```http
+Set-Cookie: stockma_refresh=; HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=0
+```
+
+**Siempre `204`**: sin cookie, con un token desconocido, vencido o ya revocado. Es idempotente y no
+revela si la cookie era válida.
+
+### Reglas
+
+- Revoca **toda** la familia (`RevokedAt` en cada token vivo), no sólo el token presentado.
+- **Consecuencia aceptada**: el access token ya emitido sigue siendo válido hasta su `exp` (≤ 60 min, NFR-004). El JWT no se consulta contra la base en cada request; revocarlo al instante exigiría esa consulta. El frontend lo descarta de `localStorage` al hacer logout.
 
 ---
 

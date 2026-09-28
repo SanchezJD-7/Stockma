@@ -229,14 +229,23 @@ emitir un OTP para estar completo.
       Tests: `APooledConnection_ReusedWithoutATenant_SeesNoRows`.
 - [ ] **T065** **Refresh token con rotación y detección de reuso** — `POST /api/auth/refresh` + `POST /api/auth/logout` (FR-006, NFR-004) — depende de T015, T016, T019
       **Bloqueante para cualquier política de re-autenticación.** Hoy el JWT dura ≤ 60 min y **no hay forma de renovarlo**: un turno de 8 horas son **8 logins por persona**. Con OTP en cada login eso da ~1.200 SMS/mes por droguería y convierte al SMS en punto único de falla — si el proveedor se demora, el mostrador no trabaja. Con refresh, el login pasa a **1 por turno**.
-      **Entidad** `RefreshToken : ITenantEntity`: `Id`, `TenantId`, `UserId`, `TokenHash`, `FamilyId`, `IssuedAt`, `ExpiresAt`, `ConsumedAt?`, `RevokedAt?`.
-      El token DEBE persistirse **hasheado**, nunca en plano — mismo criterio que el OTP (`IPasswordHasher`) y la contraseña.
+      **Entidad** `RefreshToken : ITenantEntity`: `Id`, `TenantId`, `UserId`, `FamilyId`, `DeviceId`, `TokenHash`, `IssuedAt`, `ExpiresAt`, `ConsumedAt?`, `RevokedAt?`. Ver [`data-model.md`](./data-model.md) y [`contracts/auth-api.md`](./contracts/auth-api.md).
+      El token DEBE persistirse **hasheado**, nunca en plano, con **SHA-256** — NO con `IPasswordHasher`: con salt aleatorio la fila no se puede buscar por hash, y el token tiene 256 bits de entropía, así que no necesita un hash lento (ADR-018).
       **Rotación**: cada uso consume el refresh presentado y emite uno nuevo dentro de la misma `FamilyId`.
       **Detección de reuso (la propiedad que importa)**: si se presenta un token con `ConsumedAt != null`, el sistema DEBE revocar **toda la familia** y registrar el evento. Un refresh usado dos veces significa que alguien tiene una copia: la sesión se cae entera, para el legítimo y para el ladrón.
       **Vigencia**: el access token NO cambia, sigue en ≤ 60 min (NFR-004). El refresh define la sesión real. `RefreshTokenLifetimeHours` configurable por tenant, default **8 h** (decisión del usuario; la propuesta era 12 h con margen). Vigencia **absoluta** desde el login, no deslizante: da exactamente 1 login por turno. Consecuencia aceptada: quien empalma dos turnos o hace horas extra vuelve a loguearse en medio de la jornada. Si el mostrador se queja, la salida es vigencia deslizante con tope absoluto, no un número más grande.
       **Almacenamiento (decidido)**: el refresh viaja en cookie `httpOnly` + `Secure` + `SameSite=Strict`, **NO** en `localStorage`. Es la credencial de larga vida: en `localStorage` cualquier XSS —una dependencia npm comprometida alcanza— se lleva la sesión completa y renovable. JavaScript no puede leer una cookie `httpOnly`. El access token de ≤ 60 min **sí** sigue en `localStorage`, como estaba decidido: es corto y no renueva nada por sí solo.
       **Reglas**: el refresh DEBE estar acotado al tenant y al usuario; `logout` DEBE revocar la familia **del lado del servidor**, no sólo limpiar el cliente; un refresh NO DEBE servir para saltear el 2FA en un dispositivo nuevo — sólo renueva una sesión ya autenticada en ese dispositivo.
-      Tests: rotación emite token nuevo e invalida el anterior; reusar un token consumido revoca la familia entera; el refresh de un tenant no sirve en otro; `logout` invalida del lado del servidor; el refresh caducado responde `401`.
+      **Criterios de seguridad** (cada uno con su test):
+      - `refresh` y `logout` son anónimos y sin `X-Tenant-ID`; el tenant sale de la fila del token por una función acotada de `auth_lookup`. Un `X-Tenant-ID` de otro tenant no cambia el tenant del access token emitido.
+      - Toda falla de `refresh` responde el mismo `401 AUTH_REFRESH_REJECTED` y borra la cookie: sin cookie, desconocido, vencido, revocado, reusado, otro `deviceId`, usuario bloqueado.
+      - Reusar un token consumido revoca **toda** la familia; el último emitido deja de servir.
+      - Un `refresh` con un `deviceId` distinto del login revoca la familia.
+      - Rotar no extiende el vencimiento absoluto de la familia.
+      - Dos `refresh` en paralelo con el mismo token: exactamente uno rota y la familia queda revocada (test contra Postgres real).
+      - `logout` responde siempre `204`, revoca la familia del lado del servidor y borra la cookie.
+      - La cookie sale `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/auth`; `refresh` exige `Content-Type: application/json`.
+      - El token en claro nunca se persiste ni aparece en logs.
       **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
 - [ ] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
       **El agujero**: hoy `TrustedDevice` no tiene campo de expiración y el invariante de `data-model.md` **prohíbe** la revocación automática. Un dispositivo queda confiable **para siempre**.
