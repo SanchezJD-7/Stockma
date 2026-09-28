@@ -12,6 +12,11 @@
   --status-red: #c62828;
   --status-expired: #6b7280;
 
+  --color-field-bg: #e3eef1;
+  --color-field-accent: #337082;
+
+  --color-shadow: rgba(8, 20, 38, 0.35);
+
   --color-bg-page: #f7f8fa;
   --color-bg-surface: #ffffff;
   --color-border: #e2e5ea;

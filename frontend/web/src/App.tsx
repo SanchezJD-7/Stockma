@@ -1,5 +1,5 @@
 import './App.css'
-import { MutedText, PageTitle } from './styles/texts'
+import { MutedText, PageTitle } from './styles/components/texts'
 
 function App() {
   return (

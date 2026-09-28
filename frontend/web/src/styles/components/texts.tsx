@@ -10,7 +10,7 @@ export const PageTitle = styled.h1`
 export const SectionTitle = styled.h2`
   margin: 0;
   font-size: var(--fs-18);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-primary);
 `
 
