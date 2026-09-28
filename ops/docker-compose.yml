@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: stockma
       POSTGRES_PASSWORD: stockma
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - stockma-pgdata:/var/lib/postgresql/data
     healthcheck:
