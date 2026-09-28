@@ -1,15 +1,7 @@
-import './App.css'
-import { MutedText, PageTitle } from './styles/components/texts'
+import { AuthFlow } from './features/auth'
 
 function App() {
-  return (
-    <div className='app-landing'>
-      <div>
-        <PageTitle>Stockma</PageTitle>
-        <MutedText>Gestión de inventarios con control de lotes y vencimientos</MutedText>
-      </div>
-    </div>
-  )
+  return <AuthFlow />
 }
 
 export default App

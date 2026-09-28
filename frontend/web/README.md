@@ -22,30 +22,68 @@ El proxy apunta al puerto del perfil `http` de la API
 (`backend/src/Stockma.Api/Properties/launchSettings.json`). Si lo cambiás allá,
 cambialo acá.
 
+## Estructura
+
+```
+src/
+├── main.tsx · App.tsx         Entradas de la aplicación
+├── features/<feature>/
+│   ├── index.ts               API pública: el resto de la app importa SÓLO de acá
+│   ├── components/<Nombre>/   Un componente por carpeta: .tsx, .styles.ts y .test.tsx
+│   ├── styles/                Estilos compartidos entre componentes de la feature
+│   ├── api/                   Llamadas HTTP
+│   ├── store/                 Estado (Zustand)
+│   ├── hooks/                 Hooks
+│   └── utils/                 Funciones puras
+└── styles/                    Sistema de diseño global (abajo)
+```
+
+Cada archivo con lógica vive con su test al lado (los `.styles.ts` y el `index.ts`
+no llevan). Una carpeta de tipo (`api/`, `hooks/`...) se
+crea recién cuando la feature tiene algo que poner adentro.
+
 ## Sistema de diseño
 
 ```
-src/styles.css            Hoja raíz: tokens, reset y tipografía del documento
-src/styles/tokens.css     Única fuente de verdad: SÓLO colores y tipografía
-src/styles/buttons.tsx    Botones reutilizables
-src/styles/texts.tsx      Textos reutilizables
-src/styles/mui-bridge.ts  Construye el theme de MUI desde los tokens
-src/styles/branding.ts    Branding por tenant + contraste derivado
+src/styles.css                   Hoja raíz: tokens, reset y tipografía del documento
+src/styles/tokens.css            Única fuente de verdad: SÓLO colores y tipografía
+src/styles/components/buttons.tsx  Botones reutilizables
+src/styles/components/texts.tsx    Textos reutilizables
+src/styles/theme/mui-bridge.ts     Construye el theme de MUI desde los tokens
+src/styles/theme/branding.ts       Branding por tenant + contraste derivado
 ```
 
 Reglas:
 
 - **Ningún color literal fuera de `tokens.css`.** Los componentes leen `var(--...)`.
 - **`tokens.css` sólo lleva colores y tipografía.** Espaciados, radios y sombras van
-  en el componente que los necesita.
+  en el archivo de estilos del componente que los necesita.
 - **Lo único compartido son botones y textos.** El layout no es un primitivo: cada
   componente trae su propio CSS al lado.
+- **Los componentes no definen estilos.** Nada de `styled`, `css`, `sx`, `style` ni
+  `className` en un `.tsx` de `features/`: lo que no sale de `src/styles/` va en un
+  archivo `<Componente>.styles.ts` al lado. Lo verifica
+  `src/styles/no-inline-styles.test.ts`, que además prueba sus propias reglas contra
+  ejemplos para que un patrón mal escrito no pase en silencio.
 - **No hay un theme con valores propios.** `createMuiBridge()` lee de `:root` los
   tokens ya resueltos. Pasarle `var()` a la paleta de MUI no alcanza: sus
   componentes llaman `alpha()` al renderizar y no pueden parsearlo.
 - El theme es una **foto** de los tokens. Después de cambiar el branding hay que
   reconstruirlo.
 - Tipografía única: **Work Sans**.
+
+### Textos de la interfaz
+
+Todo texto que ve el usuario —pantallas, errores, y los `detail` de la API— va en
+**español latinoamericano neutro, tuteando**. Nada de voseo ni de modismos
+regionales: Stockma se vende en toda LATAM.
+
+| Sí                    | No                    |
+| --------------------- | --------------------- |
+| Espera un minuto      | Esperá un minuto      |
+| Intenta de nuevo      | Probá de nuevo        |
+| Ingrésalo para seguir | Ingresalo para seguir |
+| ¿No tienes cuenta?    | ¿No tenés cuenta?     |
 
 ### Branding por tenant
 
