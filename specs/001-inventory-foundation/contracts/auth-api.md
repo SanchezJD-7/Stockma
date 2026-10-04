@@ -20,7 +20,7 @@
 | Rate limiting | La superficie de `auth` limita a 5 intentos por IP por minuto → `429` `AUTH_RATE_LIMITED` en `problem+json` (NFR-005, T078) |
 | IP del cliente detrás de un proxy (T078) | La IP que particiona el rate limit sale de `X-Forwarded-For` **sólo** si el par inmediato está en `ForwardedHeaders:KnownProxies` o `ForwardedHeaders:KnownNetworks` (CIDR). Ambas vacías por defecto: sin configurarlas, `X-Forwarded-For` se ignora y un cliente no puede inventarse una cuota nueva por request (ADR-016). `UseForwardedHeaders()` es el **primer** middleware, antes de la redirección a HTTPS: detrás de un proxy conocido con `X-Forwarded-Proto: https` no hay redirección (T082). Una entrada que no parsea corta el **arranque** de la API con un mensaje que nombra la clave (T082) |
 | Hash de contraseña | PBKDF2 vía ASP.NET Core Identity (NFR-004) |
-| Vigencia del JWT | `exp` ≤ 60 minutos; claims `sub` (userId) y `tid` (tenantId) (NFR-004, FR-006). `Jwt:Key` de menos de 32 bytes, `Jwt:Issuer`/`Jwt:Audience` vacíos o `Jwt:ExpiresMinutes` fuera de 1–60 cortan el **arranque**, no la primera request (T082) |
+| Vigencia del JWT | `exp` de **15 minutos** por defecto (`Jwt:ExpiresMinutes`), dentro del tope de 60 de NFR-004; claims `sub` (userId) y `tid` (tenantId) (FR-006). Tiene que ser más corto que la inactividad de la sesión: si durara más que ella, el corte por inactividad no cortaría nada (ADR-019). `Jwt:Key` de menos de 32 bytes, `Jwt:Issuer`/`Jwt:Audience` vacíos o `Jwt:ExpiresMinutes` fuera de 1–15 cortan el **arranque**, no la primera request (T082, ADR-019) |
 | Canal del OTP | **SMS** al `ApplicationUser.PhoneNumber`. Ventana de vigencia **≤ 10 min** (NFR-004) — se mantiene sin cambios respecto del canal anterior |
 | Límites del OTP (T075) | Emitir un OTP nuevo **invalida** los anteriores vivos de ese usuario+dispositivo; cada intento se compara sólo contra el **último** vigente. `Otp:MaxAttempts` (def. 5) intentos fallidos lo **queman**. `Otp:MaxIssuesPerWindow` (def. 5) emisiones por usuario en `Otp:IssueWindowMinutes` (def. 15, ventana deslizante): pasado el tope el login responde **exactamente igual** pero no manda SMS (ADR-016) |
 | Sender de SMS (T077) | El sender de consola (escribe código y celular en el log) sólo se registra en `Development`. En cualquier otro entorno sin proveedor real (T049) la API **no arranca** y dice por qué. Nunca se cae en silencio al sender de consola |
@@ -187,7 +187,7 @@ Sin `X-Tenant-ID`: el tenant sale del email. El `deviceId` viaja en el body (ver
 }
 ```
 
-`expiresIn` en segundos, ≤ 3600 (NFR-004).
+`expiresIn` en segundos: `900` con la configuración por defecto (ADR-019).
 
 ### Respuesta `200 OK` — dispositivo desconocido (FR-008)
 
@@ -326,13 +326,13 @@ Cookie: stockma_refresh=<token opaco>
 ### Respuesta `200 OK`
 
 ```http
-Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=<segundos hasta el vencimiento de la familia>
+Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth
 ```
 
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 3600
+  "expiresIn": 900
 }
 ```
 
@@ -341,7 +341,7 @@ Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Pa
 | Status | `errorCode` | Cuándo |
 |---|---|---|
 | `400` | `VALIDATION_FAILED` | `deviceId` ausente o fuera de la regla de entropía (T078) |
-| `401` | `AUTH_REFRESH_REJECTED` | **Toda** falla, con el mismo cuerpo byte a byte y borrando la cookie (`Max-Age=0`): sin cookie, token desconocido, vencido, revocado, ya consumido (reuso), `deviceId` distinto del de la familia, usuario bloqueado o deshabilitado |
+| `401` | `AUTH_REFRESH_REJECTED` | **Toda** falla, con el mismo cuerpo byte a byte y borrando la cookie (`Max-Age=0`): sin cookie, token desconocido, vencido por inactividad o por el tope absoluto, revocado, ya consumido (reuso), `deviceId` distinto del de la familia, usuario bloqueado o deshabilitado |
 | `429` | `AUTH_RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
 
 ### Reglas
@@ -352,11 +352,14 @@ Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Pa
 | Persistencia | Se guarda `SHA-256(token)`, nunca el token. **No** `IPasswordHasher`: con salt aleatorio el mismo token da un hash distinto cada vez y la fila no se puede buscar. SHA-256 sin salt es seguro acá porque el token tiene 256 bits de entropía: no hay diccionario posible, a diferencia de una contraseña (ADR-018) |
 | Rotación | Cada `refresh` exitoso marca `ConsumedAt` en el presentado y emite uno nuevo con el mismo `FamilyId`, en **una** transacción bajo lock por familia |
 | Detección de reuso | Presentar un token con `ConsumedAt` o `RevokedAt` → se revoca **toda la familia** y se registra el evento (log `Warning` con `UserId` y `FamilyId`, nunca el token). La sesión se cae para el legítimo y para quien tenga la copia |
-| Vigencia absoluta | La familia vence al momento del login + `RefreshTokenLifetimeHours` (def. 8, `TenantSettings`). Un token rotado **hereda** ese vencimiento: rotar no extiende la sesión |
+| Inactividad | Cada token vence `SessionIdleTimeoutMinutes` (def. 30, `TenantSettings`) después de **su** emisión. Como cada `refresh` emite un token nuevo, eso equivale a "30 minutos sin renovar, la sesión muere". Lo controla el servidor: no depende de que el navegador colabore (ADR-019) |
+| Vigencia absoluta | La familia vence al momento del login + `RefreshTokenLifetimeHours` (def. 8, `TenantSettings`). Ningún token de la familia vence después de ese tope, por más que se renueve: la inactividad acorta la sesión, nunca la alarga |
+| Cookie de sesión | La cookie **no** lleva `Max-Age` ni `Expires`: muere al cerrar el navegador. El vencimiento real lo decide la fila, no la cookie (ADR-019) |
 | Atado al dispositivo | La familia guarda el `deviceId` normalizado del login. Un `refresh` con otro `deviceId` se trata como reuso: revoca la familia. Así un refresh no sirve para entrar desde un dispositivo nuevo sin pasar por el 2FA |
 | Usuario bloqueado | Con `LockoutEnd` futuro, `401` y se revoca la familia (misma regla que el login; T068 la usa para el offboarding) |
 | CSRF | `SameSite=Strict` impide que otro sitio mande la cookie; además se exige `Content-Type: application/json`, que fuerza un preflight CORS en un pedido cross-origin |
 | `Path=/api/auth` | La cookie sólo viaja a la superficie de auth, no a cada request de negocio |
+| Renovación en el frontend | El frontend renueva cuando al access token le quedan menos de 2 minutos **y** hubo actividad del usuario (puntero o teclado) desde la última renovación. Sin actividad no renueva, y la sesión muere sola en el servidor. Además guarda `lastActivityAt` y a los 30 minutos sin actividad cierra la sesión en pantalla, también al volver a abrir la app: el servidor es la barrera, el front es la experiencia exacta (ADR-019) |
 | Varias pestañas | Dos `refresh` en paralelo con el **mismo** token son, para el servidor, un reuso: el segundo revoca la familia. El frontend DEBE serializar la renovación entre pestañas (Web Locks API). Es a propósito: una ventana de gracia afloja justo la detección que se quiere tener |
 
 ### Escenarios (Dado/Cuando/Entonces)
@@ -375,6 +378,16 @@ Set-Cookie: stockma_refresh=<token nuevo>; HttpOnly; Secure; SameSite=Strict; Pa
 - **DADO** un refresh emitido para el dispositivo A
 - **CUANDO** se presenta con el `deviceId` del dispositivo B
 - **ENTONCES** responde `401` y revoca la familia
+
+**Inactividad**
+- **DADO** un refresh emitido hace más de `SessionIdleTimeoutMinutes`
+- **CUANDO** se presenta, aunque la familia esté dentro de su tope absoluto
+- **ENTONCES** responde `401 AUTH_REFRESH_REJECTED`
+
+**Renovar no pasa el tope**
+- **DADO** una familia a 10 minutos de su vencimiento absoluto
+- **CUANDO** se renueva
+- **ENTONCES** el token nuevo vence en 10 minutos, no en `SessionIdleTimeoutMinutes`
 
 **Vencido**
 - **DADO** una familia cuyo login fue hace más de `RefreshTokenLifetimeHours`
@@ -421,7 +434,7 @@ revela si la cookie era válida.
 ### Reglas
 
 - Revoca **toda** la familia (`RevokedAt` en cada token vivo), no sólo el token presentado.
-- **Consecuencia aceptada**: el access token ya emitido sigue siendo válido hasta su `exp` (≤ 60 min, NFR-004). El JWT no se consulta contra la base en cada request; revocarlo al instante exigiría esa consulta. El frontend lo descarta de `localStorage` al hacer logout.
+- **Consecuencia aceptada**: el access token ya emitido sigue siendo válido hasta su `exp` (15 min por defecto, ADR-019). El JWT no se consulta contra la base en cada request; revocarlo al instante exigiría esa consulta. El frontend lo descarta de `localStorage` al hacer logout.
 
 ---
 
@@ -643,5 +656,5 @@ El cliente PUEDE usar `deviceTrusted: false` para avisar que el dispositivo no q
 | FR-006 | `POST /api/auth/login` |
 | FR-007 | `POST /api/auth/confirm-device` (efecto b: marcado trusted bajo `MaxTrustedDevices`) |
 | FR-008 | `POST /api/auth/login` + `POST /api/auth/confirm-device` (OTP por SMS) + `PUT /api/admin/users/{userId}/phone-number` (alta) + `PUT /api/auth/phone-number` (cambio con OTP al número actual) `[PENDIENTE: propuesto]` |
-| NFR-004 | Transversal: PBKDF2, JWT ≤ 60 min, OTP ≤ 10 min |
+| NFR-004 | Transversal: PBKDF2, JWT de 15 min (≤ 60), OTP ≤ 10 min, sesión con 30 min de inactividad y tope de 8 h |
 | NFR-005 | `POST /api/auth/login` (`429`) |

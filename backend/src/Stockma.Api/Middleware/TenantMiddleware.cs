@@ -12,6 +12,8 @@ public sealed class TenantMiddleware(RequestDelegate next)
         {
             "/api/auth/login",
             "/api/auth/confirm-device",
+            "/api/auth/refresh",
+            "/api/auth/logout",
         };
 
     public async Task InvokeAsync(HttpContext httpContext, ITenantContext tenantContext)

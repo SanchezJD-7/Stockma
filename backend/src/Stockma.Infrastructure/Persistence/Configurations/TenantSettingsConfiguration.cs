@@ -13,6 +13,12 @@ public sealed class TenantSettingsConfiguration : IEntityTypeConfiguration<Tenan
         builder.Property(s => s.TenantId).HasColumnName("tenant_id").ValueGeneratedNever();
         builder.Property(s => s.MaxTrustedDevices).HasColumnName("max_trusted_devices");
         builder.Property(s => s.NextSkuNumber).HasColumnName("next_sku_number").HasDefaultValue(TenantSettings.InitialSkuNumber);
+        builder.Property(s => s.RefreshTokenLifetimeHours)
+            .HasColumnName("refresh_token_lifetime_hours")
+            .HasDefaultValue(TenantSettings.DefaultRefreshTokenLifetimeHours);
+        builder.Property(s => s.SessionIdleTimeoutMinutes)
+            .HasColumnName("session_idle_timeout_minutes")
+            .HasDefaultValue(TenantSettings.DefaultSessionIdleTimeoutMinutes);
         builder.OwnsOne(s => s.Thresholds, thresholds =>
         {
             thresholds.Property(t => t.GreenMonths).HasColumnName("green_months");

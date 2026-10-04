@@ -19,9 +19,10 @@ public class ConfirmDeviceCommandTests
     private readonly FakeTrustedDevices devices = new();
     private readonly FakeDeviceOtpService otps = new();
     private readonly FakeJwtTokenService tokens = new();
+    private readonly FakeRefreshTokenService sessions = new();
     private readonly FakeTenantContext tenantContext = new(Guid.Empty);
 
-    private ConfirmDeviceCommandHandler CreateHandler() => new(accounts, devices, otps, tokens, tenantContext);
+    private ConfirmDeviceCommandHandler CreateHandler() => new(accounts, devices, otps, tokens, sessions, tenantContext);
 
     private static ConfirmDeviceCommand Command() => new(Email, DeviceId, Fingerprint, Otp);
 
@@ -36,7 +37,19 @@ public class ConfirmDeviceCommandTests
         var result = await CreateHandler().Handle(Command(), default);
 
         result.AccessToken.Should().Be($"jwt-para-{UserId}");
-        result.ExpiresIn.Should().Be(3600);
+        result.ExpiresIn.Should().Be(900);
+        result.RefreshToken.Should().Be(FakeRefreshTokenService.IssuedToken);
+    }
+
+    [Fact]
+    public async Task Confirm_WithAValidOtp_OpensANewRefreshTokenFamily()
+    {
+        ArrangeKnownUser();
+
+        var result = await CreateHandler().Handle(Command(), default);
+
+        result.RefreshToken.Should().Be(FakeRefreshTokenService.IssuedToken);
+        sessions.Issued.Should().ContainSingle().Which.Should().Be((TenantId, UserId, DeviceId));
     }
 
     [Fact]
@@ -71,7 +84,7 @@ public class ConfirmDeviceCommandTests
         result.AccessToken
             .Should()
             .NotBeNull("FR-007: el acceso NO DEBE bloquearse nunca por el límite de dispositivos");
-        result.ExpiresIn.Should().Be(3600);
+        result.ExpiresIn.Should().Be(900);
     }
 
     [Fact]

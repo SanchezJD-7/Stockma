@@ -18,6 +18,11 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByEmailResult);
 
+    public LoginIdentity? ByIdResult { get; set; }
+
+    public Task<LoginIdentity?> FindByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ByIdResult);
+
     public Func<bool>? LockProbe { get; set; }
     public bool? CheckedWhileLocked { get; private set; }
     public bool? CreatedWhileLocked { get; private set; }
@@ -151,8 +156,34 @@ public sealed class FakeJwtTokenService : IJwtTokenService
         }
 
         Requests.Add((userId, tenantId, roles));
-        return new AccessToken($"jwt-para-{userId}", 3600);
+        return new AccessToken($"jwt-para-{userId}", 900);
     }
+}
+
+public sealed class FakeRefreshTokenService : IRefreshTokenService
+{
+    public const string IssuedToken = "refresh-fake-token";
+
+    public List<(Guid TenantId, Guid UserId, string DeviceId)> Issued { get; } = [];
+
+    public Task<string> IssueNewFamilyAsync(
+        Guid tenantId,
+        Guid userId,
+        string deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        Issued.Add((tenantId, userId, deviceId));
+        return Task.FromResult(IssuedToken);
+    }
+
+    public Task<RefreshTokenSession> RotateAsync(
+        string presentedToken,
+        string deviceId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException("el test de rotación vive en Stockma.Infrastructure.Tests");
+
+    public Task RevokeFamilyAsync(string presentedToken, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
 
 public sealed class FakeTenantContext(Guid tenantId) : ITenantContext

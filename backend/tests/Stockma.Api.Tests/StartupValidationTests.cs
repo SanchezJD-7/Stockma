@@ -104,8 +104,8 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
 
     [Theory]
     [InlineData("0")]
-    [InlineData("61")]
-    public void AJwtLifetimeOutsideOneToSixtyMinutes_FailsAtStartup(string minutes)
+    [InlineData("16")]
+    public void AJwtLifetimeOutsideOneToFifteenMinutes_FailsAtStartup(string minutes)
     {
         using var app = With("Development", ("Jwt:ExpiresMinutes", minutes));
 

@@ -158,7 +158,7 @@ public class RowLevelSecurityTests(PostgresFixture postgres) : IClassFixture<Pos
         }
 
         tables.Keys.Should().BeEquivalentTo(
-            ["batches", "device_otps", "products", "tenant_settings", "trusted_devices", "users"]);
+            ["batches", "device_otps", "products", "refresh_tokens", "tenant_settings", "trusted_devices", "users"]);
         tables.Should().AllSatisfy(table => table.Value.Should().BeTrue(
             $"ADR-017: sin FORCE, el propietario de '{table.Key}' queda fuera de la política"));
     }

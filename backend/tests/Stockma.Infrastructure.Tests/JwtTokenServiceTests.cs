@@ -16,7 +16,7 @@ public class JwtTokenServiceTests
 
     private const string SigningKey = "clave-de-firma-de-al-menos-32-bytes-para-hmac-sha256";
 
-    private static JwtOptions Options(int expiresMinutes = 60) => new()
+    private static JwtOptions Options(int expiresMinutes = 15) => new()
     {
         Issuer = "stockma",
         Audience = "stockma-api",
@@ -67,14 +67,14 @@ public class JwtTokenServiceTests
     }
 
     [Fact]
-    public void Create_ExpiresWithinSixtyMinutes()
+    public void Create_ExpiresWithinFifteenMinutes()
     {
         var token = CreateService().Create(UserId, TenantId, [TenantRoles.Member]);
 
         Decode(token.Value)
             .ValidTo
             .Should()
-            .BeOnOrBefore(Now.AddMinutes(60).UtcDateTime, "NFR-004: el JWT DEBE expirar en <= 60 min");
+            .BeOnOrBefore(Now.AddMinutes(15).UtcDateTime, "ADR-019: el JWT DEBE expirar en <= 15 min");
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class JwtTokenServiceTests
         token.ExpiresInSeconds
             .Should()
             .BePositive()
-            .And.BeLessThanOrEqualTo(3600, "contrato: expiresIn <= 3600");
+            .And.BeLessThanOrEqualTo(900, "contrato: expiresIn <= 900");
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class JwtTokenServiceTests
     [Fact]
     public void Service_RejectsAnExpiryBeyondTheNfrCap()
     {
-        var act = () => CreateService(Options(expiresMinutes: 61));
+        var act = () => CreateService(Options(expiresMinutes: 16));
 
         act.Should()
             .Throw<ArgumentOutOfRangeException>("NFR-004 es un techo, no una sugerencia")

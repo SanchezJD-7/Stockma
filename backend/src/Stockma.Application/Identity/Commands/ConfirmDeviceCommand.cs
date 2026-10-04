@@ -17,6 +17,7 @@ public sealed class ConfirmDeviceCommandHandler(
     ITrustedDevices trustedDevices,
     IDeviceOtpService deviceOtps,
     IJwtTokenService tokens,
+    IRefreshTokenService sessions,
     ITenantContext tenantContext) : IRequestHandler<ConfirmDeviceCommand, ConfirmDeviceResult>
 {
     public async Task<ConfirmDeviceResult> Handle(
@@ -39,8 +40,13 @@ public sealed class ConfirmDeviceCommandHandler(
             {
                 var trusted = await trustedDevices.TryTrustAsync(identity.UserId, deviceId, fingerprint, cancellationToken);
                 var token = tokens.Create(identity.UserId, identity.TenantId, identity.Roles);
+                var refreshToken = await sessions.IssueNewFamilyAsync(
+                    identity.TenantId,
+                    identity.UserId,
+                    deviceId,
+                    cancellationToken);
 
-                return new ConfirmDeviceResult(token.Value, token.ExpiresInSeconds, trusted);
+                return new ConfirmDeviceResult(token.Value, token.ExpiresInSeconds, trusted, refreshToken);
             },
             cancellationToken);
     }

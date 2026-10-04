@@ -33,7 +33,7 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
 
     private static int MapStatus(DomainException exception) => exception switch
     {
-        InvalidCredentialsException or OtpNotUsableException => StatusCodes.Status401Unauthorized,
+        InvalidCredentialsException or OtpNotUsableException or RefreshTokenNotUsableException => StatusCodes.Status401Unauthorized,
         PhoneNotEnrolledException => StatusCodes.Status403Forbidden,
         EmailAlreadyRegisteredException => StatusCodes.Status409Conflict,
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,

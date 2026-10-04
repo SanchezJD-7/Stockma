@@ -118,6 +118,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `MaxTrustedDevices` | `int` | `2` | Límite de dispositivos confiables por usuario (FR-007) |
 | `TrustedDeviceLifetimeDays` | `int` | `15` | Vigencia de un `TrustedDevice` antes de volver a exigir 2FA (FR-007, T070) |
 | `RefreshTokenLifetimeHours` | `int` | `8` | Vigencia **absoluta** de la familia de refresh — la sesión real (FR-006, T065) |
+| `SessionIdleTimeoutMinutes` | `int` | `30` | Minutos sin renovar tras los que la sesión muere (T065, ADR-019) |
 | `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
 | `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
 | `NextSkuNumber` | `int` | `1` | Contador de la secuencia de SKU por tenant (FR-009). Se incrementa con `UPDATE ... RETURNING` dentro de la transacción del alta |
@@ -126,7 +127,9 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 
 - `MaxTrustedDevices` DEBE ser ≥ 1.
 - `TrustedDeviceLifetimeDays` DEBE ser ≥ 1.
-- `RefreshTokenLifetimeHours` DEBE ser ≥ 1 y NO DEBE ser menor que la vigencia del access token (≤ 60 min, NFR-004): un refresh más corto que el access token no renueva nada.
+- `RefreshTokenLifetimeHours` DEBE ser ≥ 1.
+- `SessionIdleTimeoutMinutes` DEBE ser **mayor** que la vigencia del access token (15 min, ADR-019): el frontend renueva poco antes de que venza el access token, así que una inactividad más corta mataría la sesión de un usuario activo.
+- `SessionIdleTimeoutMinutes` NO DEBE superar `RefreshTokenLifetimeHours` × 60.
 - `GreenMonths` DEBE ser > `YellowMonths`.
 - `YellowMonths` DEBE ser > 0.
 
@@ -270,19 +273,20 @@ Credencial de larga vida de la sesión (FR-006, T065). Viaja en la cookie `httpO
 |---|---|---|
 | `Id` | `Guid` | PK |
 | `TenantId` | `Guid` | Inmutable. RLS con `ENABLE` + `FORCE` como el resto (ADR-017) |
-| `UserId` | `string` | FK a `ApplicationUser` |
+| `UserId` | `Guid` | FK a `ApplicationUser` (`IdentityUser<Guid>`) |
 | `FamilyId` | `Guid` | Agrupa los tokens de **un** login. Reuso o logout revocan la familia entera |
 | `DeviceId` | `string` | `deviceId` normalizado del login (T078). Un `refresh` desde otro dispositivo revoca la familia |
 | `TokenHash` | `string` | `SHA-256` del token, en hex. **Único**. No `IPasswordHasher`: tiene que poder buscarse (ADR-018) |
 | `IssuedAt` | `DateTime` | Emisión de **este** token |
-| `ExpiresAt` | `DateTime` | Vencimiento de la **familia**: login + `RefreshTokenLifetimeHours`. Los tokens rotados lo heredan |
+| `ExpiresAt` | `DateTime` | Vencimiento de **este** token: `min(IssuedAt + SessionIdleTimeoutMinutes, FamilyExpiresAt)`. Es lo que implementa la inactividad (ADR-019) |
+| `FamilyExpiresAt` | `DateTime` | Tope absoluto de la **familia**: login + `RefreshTokenLifetimeHours`. Los tokens rotados lo heredan sin cambios |
 | `ConsumedAt` | `DateTime?` | Usado para rotar. Presentarlo de nuevo es reuso |
 | `RevokedAt` | `DateTime?` | Revocado por reuso, logout, otro dispositivo o usuario bloqueado |
 
 **Invariantes**
 
 - A lo sumo **un** token vivo (`ConsumedAt IS NULL AND RevokedAt IS NULL`) por familia.
-- Rotar no extiende `ExpiresAt`.
+- Rotar no extiende `FamilyExpiresAt`, y ningún `ExpiresAt` lo supera.
 - El token en claro nunca se persiste ni se loguea.
 
 **Índices**: único `TokenHash`; `(TenantId, FamilyId)`. `[PENDIENTE: política de purga de familias vencidas no definida]`

@@ -1037,6 +1037,79 @@ presente se ignora.
 
 ---
 
+## ADR-019 — Sesión: 30 minutos de inactividad en el servidor, access token de 15 minutos
+
+**Estado**: decidido antes de implementar · **Tareas**: T065 · **Modifica**: ADR-018 y la vigencia de
+T065
+
+### El problema
+
+La PC del mostrador es compartida. Con la vigencia absoluta de 8 h de ADR-018, una sesión que queda
+abierta la usa el siguiente empleado que se sienta: la vigencia absoluta no protege contra eso. Hace
+falta cortar por **inactividad**.
+
+El servidor sólo ve actividad cuando el frontend le pide algo, y para la sesión eso es el `refresh`.
+Con el access token de 60 minutos no hay forma de cortar a los 30:
+
+- Si el frontend renueva cada 60 minutos, el servidor pasa 60 minutos sin noticias. Una regla de "30
+  minutos sin renovar, la sesión muere" mataría también la sesión de quien está trabajando.
+- Aunque el servidor dejara de aceptar el refresh a los 30 minutos, el access token ya emitido sigue
+  valiendo hasta 60. El que se sienta después opera media hora más.
+
+Un control de 30 minutos no puede apoyarse en una credencial que dura 60.
+
+### Decisión 1 — Access token de 15 minutos
+
+`Jwt:ExpiresMinutes` pasa a **15** por defecto y el arranque rechaza valores fuera de 1–15. Sigue dentro
+del tope de 60 de NFR-004.
+
+### Decisión 2 — La inactividad la controla el servidor
+
+`SessionIdleTimeoutMinutes` (def. 30, `TenantSettings`). Cada refresh token vence esos minutos después
+de **su** emisión, sin pasar nunca el tope absoluto de la familia:
+`ExpiresAt = min(IssuedAt + SessionIdleTimeoutMinutes, FamilyExpiresAt)`. Como cada `refresh` emite un
+token nuevo, no hace falta un campo de "último uso": el `IssuedAt` del token vivo **es** el último uso.
+
+### Decisión 3 — El frontend renueva sólo si hubo actividad
+
+Renueva cuando al access token le quedan menos de 2 minutos **y** hubo puntero o teclado desde la
+última renovación. Sin actividad no renueva, y la sesión muere sola en el servidor.
+
+El servidor corta entre los 30 y los 45 minutos de inactividad, según en qué punto del ciclo de 15
+quedó el usuario. Para que la experiencia sea exacta, el frontend guarda `lastActivityAt` y cierra la
+sesión en pantalla a los 30 minutos, también al volver a abrir la app. **El servidor es la barrera; el
+frontend es la experiencia**: si el frontend fallara, el servidor igual corta.
+
+### Decisión 4 — Cookie de sesión
+
+La cookie `stockma_refresh` no lleva `Max-Age` ni `Expires`: muere al cerrar el navegador. El
+vencimiento real lo decide la fila.
+
+Cerrar la **pestaña** no es un mecanismo: el evento de cierre también se dispara al recargar y no
+siempre se ejecuta. La inactividad cubre el mismo riesgo sin depender de él.
+
+| Alternativa | Por qué no |
+|---|---|
+| Inactividad sólo en el frontend | Quien tenga la cookie sigue renovando: no es un control de seguridad |
+| Access token de 60 minutos + inactividad de 60 | El mostrador queda abierto una hora |
+| Consultar la base en cada request | Revoca al instante, pero agrega una consulta a cada request de negocio |
+| Cerrar sesión al cerrar la pestaña | No es confiable en el navegador (ver Decisión 4) |
+
+### Consecuencias aceptadas
+
+- Un `refresh` cada 15 minutos por usuario activo, en vez de uno cada 60. No pasa por el SMS.
+- Tras un `logout`, el access token ya emitido sirve como mucho **15 minutos**, no 60 como decía
+  ADR-018.
+- El access token sigue en `localStorage`: al volver a abrir el navegador puede quedar vigente unos
+  minutos. `lastActivityAt` acota eso a la misma regla de 30 minutos.
+
+### Qué la devolvería a discusión
+
+- Que el mostrador pida otra ventana: se cambia `SessionIdleTimeoutMinutes` por tenant, no el diseño.
+- Que la carga de `refresh` se note en el servidor, algo improbable con una fila por renovación.
+
+---
+
 ## Decisiones que siguen abiertas
 
 | Tema | Estado |

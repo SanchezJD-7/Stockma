@@ -19,6 +19,7 @@ public class StockmaDbContext(
     public DbSet<Batch> Batches => Set<Batch>();
     public DbSet<TrustedDevice> TrustedDevices => Set<TrustedDevice>();
     public DbSet<DeviceOtp> DeviceOtps => Set<DeviceOtp>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public Guid CurrentTenantId => tenantContext.TenantId;
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

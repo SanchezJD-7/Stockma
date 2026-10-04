@@ -255,7 +255,7 @@ public class TenantMiddlewareTests
         TenantMiddleware.UnauthenticatedPaths
             .Should()
             .BeEquivalentTo(
-                ["/api/auth/login", "/api/auth/confirm-device"],
+                ["/api/auth/login", "/api/auth/confirm-device", "/api/auth/refresh", "/api/auth/logout"],
                 "T055a: agregar una ruta aca amplia la superficie sin autenticar. "
                 + "Este test obliga a que sea un acto consciente");
     }

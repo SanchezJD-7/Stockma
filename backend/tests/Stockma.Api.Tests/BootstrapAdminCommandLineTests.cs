@@ -59,7 +59,7 @@ public class BootstrapAdminCommandLineTests(StockmaApiFactory factory) : IClassF
                 ["Jwt:Issuer"] = "stockma-api",
                 ["Jwt:Audience"] = "stockma-web",
                 ["Jwt:Key"] = jwtKey,
-                ["Jwt:ExpiresMinutes"] = "60",
+                ["Jwt:ExpiresMinutes"] = "15",
             })
             .Build();
 
