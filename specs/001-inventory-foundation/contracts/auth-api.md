@@ -615,7 +615,7 @@ Content-Type: application/json
 | Privilegio de saltear el 2FA (FR-007) | Máximo `MaxTrustedDevices` dispositivos trusted activos por usuario |
 | Al superar el máximo | `confirm-device` responde **`200`** con `accessToken` y `deviceTrusted: false`. No se crea el `TrustedDevice`; ningún dispositivo existente se revoca |
 | Alta de un slot | Manual por un admin. `RevokedAt` se setea SÓLO por acción manual de un admin — **nadie es expulsado automáticamente** y no hay selección del "más antiguo" |
-| Superficie extra requerida | Endpoint admin de revocación/alta de dispositivo — **no existe en las fuentes**. `[PENDIENTE: definir]` |
+| Superficie extra requerida | Endpoints de gestión y revocación de dispositivos (T067) — ver abajo |
 
 ### Respuesta `200` sin slot libre
 
@@ -642,9 +642,37 @@ El cliente PUEDE usar `deviceTrusted: false` para avisar que el dispositivo no q
 - **ENTONCES** responde `200` con `accessToken` y `deviceTrusted: false`; NO DEBE crear el `TrustedDevice` y NO DEBE revocar ninguno existente
 
 **Revocación**
-- **DADO** un dispositivo trusted activo
+- **DADO** un dispositivo trusted activo con una sesión abierta
 - **CUANDO** un admin lo revoca manualmente
-- **ENTONCES** `RevokedAt = now` y el slot queda libre
+- **ENTONCES** `RevokedAt = now`, el slot queda libre y la familia de refresh token de ese dispositivo queda revocada en la misma transacción
+
+### Vigencia del dispositivo confiado (T070)
+
+Un `TrustedDevice` **no dura para siempre**: `ExpiresAt = TrustedAt + TenantSettings.TrustedDeviceLifetimeDays`
+(def. **15**; ADR-007, `data-model.md` 1b).
+
+| Aspecto | Regla |
+|---|---|
+| Activo | `RevokedAt IS NULL AND ExpiresAt > now()`. Fuera de esa condición, `confirm-device` exige OTP de nuevo |
+| Vencer libera el slot | El vencido deja de contar para `MaxTrustedDevices`, así que el límite se destraba solo. Es el antídoto a que los slots se llenen por acumulación de aparatos viejos |
+| Vencer **NO** es revocar | `RevokedAt` queda en `null`. SÓLO una acción manual lo setea: mezclarlos arruina el registro de quién dio de baja qué |
+| Alcance | La caducidad obliga a rehacer el 2FA en ese dispositivo. **NO** corta la sesión viva ni bloquea el acceso — eso es T067/T068 |
+| En el listado | Vencido: `isActive: false` con `revokedAt: null`. Revocado: `isActive: false` con `revokedAt` con fecha. Son estados distintos y el listado los distingue |
+
+**Dispositivo vencido**
+- **DADO** un `TrustedDevice` con `ExpiresAt <= now()`
+- **CUANDO** el usuario vuelve a entrar desde ese mismo dispositivo
+- **ENTONCES** `POST /api/auth/login` exige el 2FA otra vez y NO emite token en un solo paso
+
+**Vencer libera el slot**
+- **DADO** un usuario con los `MaxTrustedDevices` slots llenos, uno de ellos vencido
+- **CUANDO** completa el OTP desde un dispositivo nuevo
+- **ENTONCES** responde `deviceTrusted: true`, porque el vencido ya no cuenta
+
+**Nadie es expulsado por vencer**
+- **DADO** un dispositivo trusted cuya vigencia corre hasta `ExpiresAt`
+- **CUANDO** pasa esa fecha
+- **ENTONCES** `RevokedAt` sigue en `null` y la fila queda como histórica
 
 ---
 
@@ -658,3 +686,172 @@ El cliente PUEDE usar `deviceTrusted: false` para avisar que el dispositivo no q
 | FR-008 | `POST /api/auth/login` + `POST /api/auth/confirm-device` (OTP por SMS) + `PUT /api/admin/users/{userId}/phone-number` (alta) + `PUT /api/auth/phone-number` (cambio con OTP al número actual) `[PENDIENTE: propuesto]` |
 | NFR-004 | Transversal: PBKDF2, JWT de 15 min (≤ 60), OTP ≤ 10 min, sesión con 30 min de inactividad y tope de 8 h |
 | NFR-005 | `POST /api/auth/login` (`429`) |
+
+---
+
+## `GET /api/auth/devices` — FR-007 (T067)
+
+Lista los dispositivos confiables del usuario autenticado.
+
+**Autenticación**: JWT válido. El `userId` sale del claim `sub` del token, nunca del body o la URL.
+
+### Request
+
+```http
+GET /api/auth/devices
+Authorization: Bearer {jwt}
+X-Tenant-ID: {guid}
+```
+
+### Respuesta `200 OK`
+
+```json
+[
+  {
+    "id": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31",
+    "userId": "3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c",
+    "deviceId": "web-chrome-a91f2c77",
+    "trustedAt": "2026-10-04T10:30:00Z",
+    "expiresAt": "2026-10-19T10:30:00Z",
+    "isActive": true,
+    "revokedAt": null
+  }
+]
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `401` | — | JWT ausente o inválido |
+| `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+
+---
+
+## `POST /api/auth/devices/{deviceId}/revoke` — FR-007 (T067)
+
+Revoca un dispositivo confiable del propio usuario. Idempotente.
+
+**Autenticación**: JWT válido. El `userId` sale del claim `sub` del token.
+
+### Request
+
+```http
+POST /api/auth/devices/9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31/revoke
+Authorization: Bearer {jwt}
+X-Tenant-ID: {guid}
+```
+
+### Respuesta `204 No Content`
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `401` | — | JWT ausente o inválido |
+| `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+| `404` | `DEVICE_NOT_FOUND` | El `deviceId` no existe o no pertenece al usuario |
+
+### Reglas
+
+- Revocar un dispositivo DEBE liberar el slot de `MaxTrustedDevices`.
+- Revocar DEBE revocar también las **familias de refresh token** de ese dispositivo (T065), en la misma transacción. Sin eso, el `RevokedAt` sólo impide saltear el 2FA a futuro mientras la sesión sigue viva hasta `FamilyExpiresAt`: revocar sin cerrar la sesión es teatro (tasks.md T067).
+- NO toca los dispositivos ni las sesiones de otro usuario, aunque compartan el mismo `deviceId`.
+- Idempotente: revocar dos veces no falla.
+
+---
+
+## `GET /api/admin/users/{userId}/devices` — FR-007 (T067)
+
+Lista los dispositivos confiables de un usuario del tenant. Solo `TenantAdmin`.
+
+**Autenticación**: JWT con rol `TenantAdmin` del mismo tenant.
+
+### Request
+
+```http
+GET /api/admin/users/3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c/devices
+Authorization: Bearer {jwt de TenantAdmin}
+X-Tenant-ID: {guid}
+```
+
+### Respuesta `200 OK`
+
+```json
+[
+  {
+    "id": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31",
+    "userId": "3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c",
+    "deviceId": "web-chrome-a91f2c77",
+    "trustedAt": "2026-10-04T10:30:00Z",
+    "expiresAt": "2026-10-19T10:30:00Z",
+    "isActive": true,
+    "revokedAt": null
+  }
+]
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `401` | — | JWT ausente o inválido |
+| `403` | — | El llamante no es `TenantAdmin` |
+| `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+| `404` | `USER_NOT_FOUND` | El `userId` no existe en ese tenant |
+
+---
+
+## `POST /api/admin/users/{userId}/devices/{deviceId}/revoke` — FR-007 (T067)
+
+Revoca un dispositivo específico de un usuario. Solo `TenantAdmin`. Idempotente.
+
+### Request
+
+```http
+POST /api/admin/users/3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c/devices/9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31/revoke
+Authorization: Bearer {jwt de TenantAdmin}
+X-Tenant-ID: {guid}
+```
+
+### Respuesta `204 No Content`
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `401` | — | JWT ausente o inválido |
+| `403` | — | El llamante no es `TenantAdmin` |
+| `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+| `404` | `DEVICE_NOT_FOUND` | El `deviceId` no existe o no pertenece al usuario |
+
+---
+
+## `POST /api/admin/users/{userId}/devices/revoke-all` — FR-007 (T067)
+
+Revoca todos los dispositivos confiables de un usuario. Solo `TenantAdmin`. Idempotente.
+
+### Request
+
+```http
+POST /api/admin/users/3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c/devices/revoke-all
+Authorization: Bearer {jwt de TenantAdmin}
+X-Tenant-ID: {guid}
+```
+
+### Respuesta `204 No Content`
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `401` | — | JWT ausente o inválido |
+| `403` | — | El llamante no es `TenantAdmin` |
+| `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+| `404` | `USER_NOT_FOUND` | El `userId` no existe en ese tenant |
+
+### Reglas
+
+- Revocar todos los dispositivos DEBE liberar todos los slots de `MaxTrustedDevices`.
+- Revocar todos DEBE revocar las familias de refresh token de **cada** dispositivo del usuario: `revoke-all` lo deja sin ninguna sesión viva por dispositivo confiado. Las sesiones abiertas desde un dispositivo **no** confiado las mata T068 (deshabilitar la cuenta).
+- Idempotente: revocar dos veces no falla.
