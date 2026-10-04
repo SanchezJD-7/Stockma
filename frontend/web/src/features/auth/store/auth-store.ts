@@ -9,6 +9,7 @@ export interface AuthSession {
 
 interface AuthState {
   session: AuthSession | null
+  refreshKey: number
   setSession: (accessToken: string, expiresIn: number) => void
   clearSession: () => void
 }
@@ -73,10 +74,11 @@ function writeStoredSession(session: AuthSession): void {
 
 export const useAuthStore = create<AuthState>((set) => ({
   session: readStoredSession(),
+  refreshKey: 0,
   setSession: (accessToken, expiresIn) => {
     const session: AuthSession = { accessToken, expiresAt: Date.now() + expiresIn * 1000 }
     writeStoredSession(session)
-    set({ session })
+    set({ session, refreshKey: Date.now() })
   },
   clearSession: () => {
     removeStoredSession()

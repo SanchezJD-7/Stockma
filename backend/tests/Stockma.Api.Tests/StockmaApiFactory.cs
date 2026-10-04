@@ -47,7 +47,7 @@ public sealed class StockmaApiFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["Jwt:Key"] = "clave-de-firma-para-tests-de-al-menos-32-bytes-de-largo",
                 ["Jwt:Issuer"] = "stockma-api",
                 ["Jwt:Audience"] = "stockma-web",
-                ["Jwt:ExpiresMinutes"] = "60",
+                ["Jwt:ExpiresMinutes"] = "15",
             });
         });
     }

@@ -80,3 +80,37 @@ export async function login(request: LoginRequest): Promise<LoginResult> {
 export async function confirmDevice(request: ConfirmDeviceRequest): Promise<ConfirmDeviceResult> {
   return postJson<ConfirmDeviceResult>('/api/auth/confirm-device', request)
 }
+
+export interface RefreshRequest {
+  deviceId: string
+}
+
+export interface RefreshResult {
+  accessToken: string
+  expiresIn: number
+}
+
+export async function refresh(request: RefreshRequest): Promise<RefreshResult> {
+  const response = await fetch('/api/auth/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorCode(response))
+  }
+
+  return response.json() as Promise<RefreshResult>
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorCode(response))
+  }
+}

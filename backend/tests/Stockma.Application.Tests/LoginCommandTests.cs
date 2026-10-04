@@ -18,9 +18,10 @@ public class LoginCommandTests
     private readonly FakeTrustedDevices devices = new();
     private readonly FakeDeviceOtpService otps = new();
     private readonly FakeJwtTokenService tokens = new();
+    private readonly FakeRefreshTokenService sessions = new();
     private readonly FakeTenantContext tenantContext = new(Guid.Empty);
 
-    private LoginCommandHandler CreateHandler() => new(accounts, devices, otps, tokens, tenantContext);
+    private LoginCommandHandler CreateHandler() => new(accounts, devices, otps, tokens, sessions, tenantContext);
 
     private static LoginCommand Command(string? deviceId = DeviceId) =>
         new(Email, Password, deviceId);
@@ -37,7 +38,8 @@ public class LoginCommandTests
         var result = await CreateHandler().Handle(Command(), default);
 
         result.AccessToken.Should().Be($"jwt-para-{UserId}");
-        result.ExpiresIn.Should().Be(3600);
+        result.ExpiresIn.Should().Be(900);
+        result.RefreshToken.Should().Be(FakeRefreshTokenService.IssuedToken);
         result.RequiresDeviceConfirmation.Should().BeFalse("FR-006: el dispositivo confiable saltea el OTP");
         otps.Issued.Should().BeEmpty("no se manda SMS a un dispositivo ya confiable");
     }
@@ -65,6 +67,17 @@ public class LoginCommandTests
         await CreateHandler().Handle(Command(), default);
 
         tokens.Requests[0].Roles.Should().BeEquivalentTo([TenantRoles.TenantAdmin]);
+    }
+
+    [Fact]
+    public async Task Login_FromATrustedDevice_OpensANewRefreshTokenFamily()
+    {
+        ArrangeValidUser();
+        devices.Trusted = true;
+
+        await CreateHandler().Handle(Command(), default);
+
+        sessions.Issued.Should().ContainSingle().Which.Should().Be((TenantId, UserId, DeviceId));
     }
 
     [Fact]

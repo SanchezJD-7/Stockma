@@ -9,6 +9,8 @@ public interface IUserAccounts
 
     Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
 
+    Task<LoginIdentity?> FindByIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
     Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default);
 
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);

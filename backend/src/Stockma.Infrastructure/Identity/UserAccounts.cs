@@ -46,7 +46,8 @@ public sealed class UserAccounts(
     {
         var candidate = await FindCandidateAsync(email, cancellationToken);
 
-        if (candidate is null || string.IsNullOrEmpty(candidate.PasswordHash) || IsLockedOut(candidate))
+        if (candidate is null || string.IsNullOrEmpty(candidate.PasswordHash)
+            || IsLockedOut(candidate.LockoutEnabled, candidate.LockoutEnd))
         {
             passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, password);
             return null;
@@ -62,7 +63,7 @@ public sealed class UserAccounts(
             return null;
         }
 
-        return await ToIdentityAsync(candidate, cancellationToken);
+        return await ToIdentityAsync(candidate.UserId, candidate.TenantId, cancellationToken);
     }
 
     public async Task<LoginIdentity?> FindByEmailAsync(
@@ -71,7 +72,18 @@ public sealed class UserAccounts(
     {
         var candidate = await FindCandidateAsync(email, cancellationToken);
 
-        return candidate is null || IsLockedOut(candidate) ? null : await ToIdentityAsync(candidate, cancellationToken);
+        return candidate is null || IsLockedOut(candidate.LockoutEnabled, candidate.LockoutEnd)
+            ? null
+            : await ToIdentityAsync(candidate.UserId, candidate.TenantId, cancellationToken);
+    }
+
+    public async Task<LoginIdentity?> FindByIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await context.Users.FirstOrDefaultAsync(user => user.Id == userId, cancellationToken);
+
+        return user is null || IsLockedOut(user.LockoutEnabled, user.LockoutEnd)
+            ? null
+            : await ToIdentityAsync(user.Id, user.TenantId, cancellationToken);
     }
 
     public async Task<Guid> CreateAsync(NewUser newUser, CancellationToken cancellationToken = default)
@@ -197,20 +209,21 @@ public sealed class UserAccounts(
         }
     }
 
-    private bool IsLockedOut(LoginCandidate candidate) =>
-        candidate.LockoutEnabled
-        && candidate.LockoutEnd is { } until
+    private bool IsLockedOut(bool lockoutEnabled, DateTimeOffset? lockoutEnd) =>
+        lockoutEnabled
+        && lockoutEnd is { } until
         && until > timeProvider.GetUtcNow();
 
     private async Task<LoginIdentity> ToIdentityAsync(
-        LoginCandidate candidate,
+        Guid userId,
+        Guid tenantId,
         CancellationToken cancellationToken)
     {
         var roles = await context.UserRoles
-            .Where(userRole => userRole.UserId == candidate.UserId)
+            .Where(userRole => userRole.UserId == userId)
             .Join(context.Roles, userRole => userRole.RoleId, role => role.Id, (_, role) => role.Name!)
             .ToListAsync(cancellationToken);
 
-        return new LoginIdentity(candidate.UserId, candidate.TenantId, roles);
+        return new LoginIdentity(userId, tenantId, roles);
     }
 }

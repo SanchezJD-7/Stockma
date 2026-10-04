@@ -65,6 +65,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IUserAccounts, UserAccounts>();
         services.AddScoped<ITrustedDevices, TrustedDevices>();
         services.AddScoped<ITenantAccounts, TenantAccounts>();
+        services.AddScoped<IRefreshTokens, RefreshTokens>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
         return services;
     }

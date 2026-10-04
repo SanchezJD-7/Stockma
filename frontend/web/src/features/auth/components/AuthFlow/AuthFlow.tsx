@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { MutedText, PageTitle } from '../../../../styles/components/texts'
 import { AuthLayout } from '../AuthLayout/AuthLayout'
 import { SessionScreen } from './AuthFlow.styles'
 import { useAuthStore } from '../../store/auth-store'
 import { getOrCreateDeviceId } from '../../utils/device'
+import { useSessionRenewer } from '../../hooks/useSessionRenewer'
 import { DeviceOtpForm } from '../DeviceOtpForm/DeviceOtpForm'
 import { LoginPage } from '../LoginPage/LoginPage'
 
@@ -14,17 +15,9 @@ export function AuthFlow() {
   const deviceId = useMemo(() => getOrCreateDeviceId(), [])
   const session = useAuthStore((state) => state.session)
   const setSession = useAuthStore((state) => state.setSession)
-  const clearSession = useAuthStore((state) => state.clearSession)
   const [screen, setScreen] = useState<Screen>(session ? { name: 'session' } : { name: 'login' })
 
-  useEffect(() => {
-    if (!session) {
-      return
-    }
-
-    const timer = setTimeout(clearSession, Math.max(0, session.expiresAt - Date.now()))
-    return () => clearTimeout(timer)
-  }, [session, clearSession])
+  useSessionRenewer()
 
   function handleAuthenticated(accessToken: string, expiresIn: number) {
     setSession(accessToken, expiresIn)

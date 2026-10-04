@@ -15,6 +15,7 @@ public sealed class LoginCommandHandler(
     ITrustedDevices trustedDevices,
     IDeviceOtpService deviceOtps,
     IJwtTokenService tokens,
+    IRefreshTokenService sessions,
     ITenantContext tenantContext) : IRequestHandler<LoginCommand, LoginResult>
 {
     public async Task<LoginResult> Handle(LoginCommand command, CancellationToken cancellationToken)
@@ -28,7 +29,14 @@ public sealed class LoginCommandHandler(
 
         if (await trustedDevices.IsTrustedAsync(identity.UserId, deviceId, cancellationToken))
         {
-            return LoginResult.Issued(tokens.Create(identity.UserId, identity.TenantId, identity.Roles));
+            var token = tokens.Create(identity.UserId, identity.TenantId, identity.Roles);
+            var refreshToken = await sessions.IssueNewFamilyAsync(
+                identity.TenantId,
+                identity.UserId,
+                deviceId,
+                cancellationToken);
+
+            return LoginResult.Issued(token, refreshToken);
         }
 
         await deviceOtps.IssueAsync(identity.UserId, deviceId, cancellationToken);
