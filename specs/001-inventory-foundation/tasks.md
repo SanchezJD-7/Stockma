@@ -252,7 +252,7 @@ emitir un OTP para estar completo.
       - El token en claro nunca se persiste ni aparece en logs.
       **Entrega en 4 sub-piezas**: 2a spec (esta) · 2b entidad `RefreshToken` + migración + búsqueda por hash vía `auth_lookup` · 2c cookie en `login`/`confirm-device` + `POST /refresh` con rotación, inactividad y tope · 2d renovación en el front por actividad, serializada entre pestañas. La detección de reuso y `logout` completan T065 en las piezas 3 y 4.
       **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
-- [ ] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
+- [x] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
       **El agujero**: hoy `TrustedDevice` no tiene campo de expiración y el invariante de `data-model.md` **prohíbe** la revocación automática. Un dispositivo queda confiable **para siempre**.
       **Campo nuevo `ExpiresAt`, NO reusar `RevokedAt`.** `RevokedAt` DEBE seguir significando "una persona lo dio de baja" — es auditoría, y mezclarlo con vencimiento automático arruina el registro de quién hizo qué.
       ```

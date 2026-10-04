@@ -19,6 +19,9 @@ public sealed class TenantSettingsConfiguration : IEntityTypeConfiguration<Tenan
         builder.Property(s => s.SessionIdleTimeoutMinutes)
             .HasColumnName("session_idle_timeout_minutes")
             .HasDefaultValue(TenantSettings.DefaultSessionIdleTimeoutMinutes);
+        builder.Property(s => s.TrustedDeviceLifetimeDays)
+            .HasColumnName("trusted_device_lifetime_days")
+            .HasDefaultValue(TenantSettings.DefaultTrustedDeviceLifetimeDays);
         builder.OwnsOne(s => s.Thresholds, thresholds =>
         {
             thresholds.Property(t => t.GreenMonths).HasColumnName("green_months");

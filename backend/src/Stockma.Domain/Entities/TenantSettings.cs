@@ -9,6 +9,7 @@ public class TenantSettings : ITenantEntity
     public const int InitialSkuNumber = 1;
     public const int DefaultRefreshTokenLifetimeHours = 8;
     public const int DefaultSessionIdleTimeoutMinutes = 30;
+    public const int DefaultTrustedDeviceLifetimeDays = 15;
     public const int AccessTokenLifetimeMinutes = 15;
 
     private TenantSettings()
@@ -22,7 +23,8 @@ public class TenantSettings : ITenantEntity
         int maxTrustedDevices,
         ExpiryThresholds thresholds,
         int refreshTokenLifetimeHours,
-        int sessionIdleTimeoutMinutes)
+        int sessionIdleTimeoutMinutes,
+        int trustedDeviceLifetimeDays)
     {
         if (tenantId == Guid.Empty)
         {
@@ -53,6 +55,14 @@ public class TenantSettings : ITenantEntity
                 $"SessionIdleTimeoutMinutes debe ser mayor que la vigencia del access token ({AccessTokenLifetimeMinutes} min, ADR-019).");
         }
 
+        if (trustedDeviceLifetimeDays < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(trustedDeviceLifetimeDays),
+                trustedDeviceLifetimeDays,
+                "TrustedDeviceLifetimeDays debe ser mayor o igual a 1.");
+        }
+
         if (sessionIdleTimeoutMinutes > refreshTokenLifetimeHours * 60)
         {
             throw new ArgumentOutOfRangeException(
@@ -67,6 +77,7 @@ public class TenantSettings : ITenantEntity
         Thresholds = thresholds ?? throw new ArgumentNullException(nameof(thresholds));
         RefreshTokenLifetimeHours = refreshTokenLifetimeHours;
         SessionIdleTimeoutMinutes = sessionIdleTimeoutMinutes;
+        TrustedDeviceLifetimeDays = trustedDeviceLifetimeDays;
     }
 
     public Guid TenantId { get; private set; }
@@ -76,6 +87,7 @@ public class TenantSettings : ITenantEntity
     public TenantBranding? Branding { get; private set; }
     public int RefreshTokenLifetimeHours { get; private set; } = DefaultRefreshTokenLifetimeHours;
     public int SessionIdleTimeoutMinutes { get; private set; } = DefaultSessionIdleTimeoutMinutes;
+    public int TrustedDeviceLifetimeDays { get; private set; } = DefaultTrustedDeviceLifetimeDays;
     public void UpdateBranding(TenantBranding? branding) => Branding = branding;
     public static TenantSettings CreateDefault(Guid tenantId) =>
         new(
@@ -83,5 +95,6 @@ public class TenantSettings : ITenantEntity
             DefaultMaxTrustedDevices,
             ExpiryThresholds.Default(),
             DefaultRefreshTokenLifetimeHours,
-            DefaultSessionIdleTimeoutMinutes);
+            DefaultSessionIdleTimeoutMinutes,
+            DefaultTrustedDeviceLifetimeDays);
 }
