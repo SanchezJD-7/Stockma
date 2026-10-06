@@ -113,4 +113,26 @@ public class TenantSettingsTests
 
         settings.TrustedDeviceLifetimeDays.Should().Be(15, "data-model.md 1b, T070");
     }
+
+    [Fact]
+    public void CreateDefault_RequiresTheSecondFactor()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.RequireSecondFactor
+            .Should()
+            .BeTrue("T090: fail-closed, nadie configuró nada y el 2FA sigue exigido");
+    }
+
+    [Fact]
+    public void SetRequireSecondFactor_TurnsItOffAndBackOn()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.SetRequireSecondFactor(false);
+        settings.RequireSecondFactor.Should().BeFalse();
+
+        settings.SetRequireSecondFactor(true);
+        settings.RequireSecondFactor.Should().BeTrue();
+    }
 }

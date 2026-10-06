@@ -1,6 +1,9 @@
 using Stockma.Application.Common;
 using Stockma.Application.Identity;
 using Stockma.Application.Identity.Queries;
+using Stockma.Application.Tenants;
+using Stockma.Domain.Entities;
+using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Application.Tests;
 
@@ -10,6 +13,7 @@ public sealed class FakeUserAccounts : IUserAccounts
     public LoginIdentity? ByEmailResult { get; set; }
     public bool EmailTaken { get; set; }
     public NewUser? Created { get; private set; }
+    public int CreateCalls { get; private set; }
     public Guid CreatedId { get; set; } = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     public Task<LoginIdentity?> VerifyCredentialsAsync(
         string email,
@@ -31,6 +35,7 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default)
     {
         Created = user;
+        CreateCalls++;
         CreatedWhileLocked = LockProbe?.Invoke();
         return Task.FromResult(CreatedId);
     }
@@ -53,6 +58,21 @@ public sealed class FakeTenantAccounts : ITenantAccounts
 
     public Task<bool> ExistsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Exists);
+
+    public Guid? ProvisionedFor { get; private set; }
+    public bool ProvisionedRequireSecondFactor { get; private set; }
+    public int ProvisionCalls { get; private set; }
+
+    public Task ProvisionAsync(
+        Guid tenantId,
+        bool requireSecondFactor,
+        CancellationToken cancellationToken = default)
+    {
+        ProvisionedFor = tenantId;
+        ProvisionedRequireSecondFactor = requireSecondFactor;
+        ProvisionCalls++;
+        return Task.CompletedTask;
+    }
 
     public Guid? HoldingLockFor { get; private set; }
 
@@ -210,5 +230,27 @@ public sealed class FakeTenantContext(Guid tenantId) : ITenantContext
     {
         SetCalls.Add(value);
         TenantId = value;
+    }
+}
+
+public sealed class FakeTenantSettingsProvider(ITenantContext tenantContext) : ITenantSettingsProvider
+{
+    public bool RequireSecondFactor { get; set; } = TenantSettings.DefaultRequireSecondFactor;
+    public int Reads { get; private set; }
+    public Guid? TenantIdWhenRead { get; private set; }
+    public ExpiryThresholds Thresholds { get; set; } = ExpiryThresholds.Default();
+    public TenantBranding? Branding { get; set; }
+
+    public Task<ExpiryThresholds> GetExpiryThresholdsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Thresholds);
+
+    public Task<TenantBranding?> GetBrandingAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Branding);
+
+    public Task<bool> RequireSecondFactorAsync(CancellationToken cancellationToken = default)
+    {
+        Reads++;
+        TenantIdWhenRead = tenantContext.TenantId;
+        return Task.FromResult(RequireSecondFactor);
     }
 }

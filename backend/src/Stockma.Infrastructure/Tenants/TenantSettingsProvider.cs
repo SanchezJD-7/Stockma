@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Stockma.Application.Tenants;
+using Stockma.Domain.Entities;
 using Stockma.Domain.ValueObjects;
 using Stockma.Infrastructure.Persistence;
 
@@ -23,5 +24,16 @@ public sealed class TenantSettingsProvider(StockmaDbContext context) : ITenantSe
             .AsNoTracking()
             .FirstOrDefaultAsync(cancellationToken);
         return settings?.Branding;
+    }
+
+    public async Task<bool> RequireSecondFactorAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await context.TenantSettings
+            .AsNoTracking()
+            .Where(s => s.TenantId == context.CurrentTenantId)
+            .Select(s => new { s.RequireSecondFactor })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return settings?.RequireSecondFactor ?? TenantSettings.DefaultRequireSecondFactor;
     }
 }
