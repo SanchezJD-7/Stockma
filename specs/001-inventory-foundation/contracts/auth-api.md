@@ -203,7 +203,20 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 
 > **Usuario sin `PhoneNumber` cargado**: el acceso DEBE bloquearse con `403 AUTH_PHONE_NOT_ENROLLED`, indicando que un admin del tenant debe cargar el número. NO DEBE permitirse el ingreso salteando el 2FA ni ofrecerle al usuario enrolar el suyo (T050, T061).
 
-> `[PENDIENTE: proveedor de SMS no elegido]`
+> **Proveedor y fallo de envío (T049)**: el canal real es **Twilio** (`Sms:Provider = "twilio"`, con
+> `Sms { AccountSid, ApiKey, Sender }`). Fuera de `Development` la API **no arranca** sin proveedor y
+> credenciales completas (ADR-016, T077); en `Development` se registra el sender de consola salvo que
+> `Sms:Provider` esté cargado, y entonces también se mandan SMS reales.
+>
+> El envío se reintenta hasta `Sms:RetryCount` veces (def. `2`) con backoff, sólo ante errores
+> transitorios (`429`, `408`, `5xx` o timeout). Un `4xx` de Twilio —número inválido, cuenta sin
+> crédito— **no** se reintenta: su detalle queda en el log.
+>
+> **Si el proveedor falla igual, la respuesta NO cambia**: sigue siendo `200`
+> `requiresDeviceConfirmation: true`, idéntica a la de un envío real, y el fallo queda en el log como
+> `error`. Devolver `502`/`503` haría que, durante una caída del proveedor, los emails existentes
+> respondieran distinto que los inexistentes: un oráculo de enumeración, que es exactamente lo que
+> ADR-016 prohíbe para el tope de emisión.
 
 ### Errores
 

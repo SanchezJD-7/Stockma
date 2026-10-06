@@ -37,7 +37,7 @@ FEFO queda **DIFERIDO** (slice 2): el modelo de este plan sólo deja el índice 
 │   IBatchRepository, BatchStatusCalculator)
 ├─────────────────────────────────────────────────┤
 │ Infrastructure (StockmaDbContext, Repos,
-│   JwtTokenService, SmsOtpSender, Hangfire)
+│   JwtTokenService, TwilioSmsSender, Hangfire)
 └─────────────────────────────────────────────────┘
 Worker: Hangfire host (misma infra DI)
 ```
@@ -181,8 +181,8 @@ frontend/web/src/
 
 ## 9. Configuración
 
-- `appsettings.json`: `ConnectionStrings`, `Jwt { Issuer, Audience, Key, ExpiresMinutes: 60 }`, `Sms { Provider, ApiKey, Sender }`, Hangfire PG, `Tenant:ExpiryThresholds` defaults.
-- `Sms { Provider, ApiKey, Sender }` alimenta `SmsOtpSender` (implementación de `ISmsSender`). En dev, sender de consola/log. `[PENDIENTE: proveedor de SMS no elegido]`
+- `appsettings.json`: `ConnectionStrings`, `Jwt { Issuer, Audience, Key, ExpiresMinutes: 60 }`, `Sms { Provider, AccountSid, ApiKey, Sender }`, Hangfire PG, `Tenant:ExpiryThresholds` defaults.
+- `Sms { Provider, AccountSid, ApiKey, Sender }` alimenta `TwilioSmsSender` (implementación de `ISmsSender`, T049). En dev, sender de consola/log salvo que el proveedor esté cargado.
 - Variables de entorno: `ConnectionStrings__Postgres` (runtime, rol `app_user`), `ConnectionStrings__PostgresMigrations` (sólo el paso de migración, rol propietario), `Jwt__Key`, `Sms__ApiKey`, `ASPNETCORE_ENVIRONMENT`. El nombre `StockmaDb` del plan original nunca llegó al código; se reconcilió a `Postgres` (ADR-017).
 - `ops/docker-compose.yml`: `postgres:16-alpine` + volumen; network `stockma`; healthcheck `pg_isready`.
 - CI: `dotnet build`/`test` de los 4 proyectos de test; frontend `npm run build` / `npm run lint`.
@@ -200,7 +200,7 @@ frontend/web/src/
 | `backend/src/Application/Common/Behaviours` | Crear | `Validation` / `Transaction` / `Audit` |
 | `backend/src/Infrastructure/Persistence/StockmaDbContext.cs` | Crear | `ApplyTenantFilters`, `AuditInterceptor` |
 | `backend/src/Infrastructure/Identity/*` | Crear | `JwtTokenService`, `TrustedDevices` |
-| `backend/src/Infrastructure/Notifications/SmsOtpSender.cs` | Crear | `ISmsSender` — envío del OTP por SMS `[PENDIENTE: proveedor de SMS no elegido]` |
+| `backend/src/Infrastructure/Identity/TwilioSmsSender.cs` | Crear | `ISmsSender` — envío del OTP por SMS vía Twilio (T049) |
 | `backend/src/Api/Middleware/TenantMiddleware.cs` | Crear | header → context → variable de sesión RLS |
 | `backend/src/Api/Controllers` | Crear | `Auth`, `Products`, `Batches` |
 | `backend/tests/Architecture.Tests/TenantArchitectureTests.cs` | Crear | Falla sin `ITenantEntity` |

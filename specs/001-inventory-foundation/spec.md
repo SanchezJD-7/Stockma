@@ -30,7 +30,7 @@ Las cuatro capacidades de este slice son **NUEVAS** (proyecto greenfield). No ha
 - Agregados **Product** (Sku, Barcode?, Name, Category) y **Batch** (ProductId, LotNumber, ExpirationDate, CurrentQuantity, Location, `xmin` como token de concurrencia)
 - DbContext + migración inicial + base de `AuditSaveChangesInterceptor`
 - Identity + JWT + dispositivos confiables (máx 2, configurable) + 2FA por SMS en dispositivo nuevo
-- Envío del OTP vía `ISmsSender` / `SmsOtpSender` `[PENDIENTE: proveedor de SMS no elegido]`
+- Envío del OTP vía `ISmsSender` — T049 cerrado con **Twilio** (`TwilioSmsSender`); sender de consola en `Development`
 - `PUT /api/admin/users/{userId}/phone-number` — **alta** del `PhoneNumber` por un admin del tenant, y cierre de la superficie self-service de Identity (`SetPhoneNumberAsync`) `[PENDIENTE: propuesto, no está en las fuentes originales]`
 - `PUT /api/auth/phone-number` — **cambio** del propio `PhoneNumber`, autenticado y confirmando un OTP enviado al número **actual** (T061)
 - Comandos/queries: RegisterProduct, UpdateProduct, RegisterBatch, AdjustBatchStock, SearchProducts, GetProductByBarcode
@@ -413,7 +413,7 @@ Checklist detallado y trazable en [`checklists/requirements.md`](./checklists/re
 - [ ] CI verde: `dotnet build` + `dotnet test` + frontend build/lint
 - [ ] Test de integración: tenant A no ve productos/lotes de tenant B
 - [ ] Test de arquitectura: toda entidad tenant implementa `ITenantEntity`
-- [ ] Login JWT + 2FA por SMS en dispositivo nuevo (`[PENDIENTE: proveedor de SMS no elegido]` — sandbox del proveedor en dev)
+- [ ] Login JWT + 2FA por SMS en dispositivo nuevo (T049: Twilio; sender de consola en `Development`)
 - [ ] Registrar producto y lote vía API con header `X-Tenant-ID`
 
 ### Criterios de aceptación por dominio

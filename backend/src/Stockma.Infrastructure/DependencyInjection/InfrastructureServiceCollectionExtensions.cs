@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Stockma.Application.Common;
 using Stockma.Application.Batches;
@@ -71,18 +72,59 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddSmsSender(this IServiceCollection services, bool isDevelopment)
+    public static IServiceCollection AddSmsSender(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isDevelopment)
     {
-        if (isDevelopment)
-        {
-            services.AddScoped<ISmsSender, ConsoleSmsSender>();
-            return services;
-        }
-
         services
             .AddOptions<SmsOptions>()
-            .Validate(_ => false, SmsOptions.MissingProviderMessage)
+            .Bind(configuration.GetSection(SmsOptions.SectionName))
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.Provider),
+                SmsOptions.MissingProviderMessage)
+            .Validate(options => isDevelopment || !options.IsConsole, SmsOptions.ConsoleOutsideDevelopmentMessage)
+            .Validate(
+                options => string.IsNullOrWhiteSpace(options.Provider) || options.IsConsole || options.IsTwilio,
+                SmsOptions.UnknownProviderMessage)
+            .Validate(
+                options => !options.IsTwilio || !string.IsNullOrWhiteSpace(options.AccountSid),
+                SmsOptions.MissingAccountSidMessage)
+            .Validate(
+                options => !options.IsTwilio || !string.IsNullOrWhiteSpace(options.ApiKey),
+                SmsOptions.MissingApiKeyMessage)
+            .Validate(options => !options.IsTwilio || options.HasWellFormedSender, SmsOptions.InvalidSenderMessage)
+            .Validate(
+                options => options.RetryCount is >= 0 and <= SmsOptions.MaximumRetryCount,
+                SmsOptions.InvalidRetryCountMessage)
+            .Validate(
+                options => options.RetryDelayMs is >= 0 and <= SmsOptions.MaximumRetryDelayMs,
+                SmsOptions.InvalidRetryDelayMessage)
             .ValidateOnStart();
+
+        services.AddHttpClient<TwilioSmsSender>();
+
+        services.AddScoped<ISmsSender>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<SmsOptions>>().Value;
+
+            if (isDevelopment && (options.IsConsole || string.IsNullOrWhiteSpace(options.Provider)))
+            {
+                return new ConsoleSmsSender(provider.GetRequiredService<ILogger<ConsoleSmsSender>>());
+            }
+
+            if (options.IsTwilio)
+            {
+                return provider.GetRequiredService<TwilioSmsSender>();
+            }
+
+            throw new InvalidOperationException(
+                options.IsConsole
+                    ? SmsOptions.ConsoleOutsideDevelopmentMessage
+                    : string.IsNullOrWhiteSpace(options.Provider)
+                        ? SmsOptions.MissingProviderMessage
+                        : SmsOptions.UnknownProviderMessage);
+        });
 
         return services;
     }

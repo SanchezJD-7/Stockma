@@ -34,6 +34,12 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
         }
     }
 
+    private sealed class FailingSmsSender : ISmsSender
+    {
+        public Task SendAsync(string phoneNumber, string message, CancellationToken cancellationToken = default) =>
+            throw new SmsDeliveryException("Twilio respondió 500 InternalServerError");
+    }
+
     private sealed class FixedOtpGenerator(string code) : IOtpGenerator
     {
         public string Generate() => code;
@@ -648,5 +654,41 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
         await act.Should()
             .ThrowAsync<OtpNotUsableException>(
                 "mismo error que un código errado: distinguirlos diría si el OTP existía");
+    }
+
+    [Fact]
+    public async Task Issue_WhenTheProviderFails_DoesNotFailTheLogin()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var logger = new CapturingLogger<DeviceOtpService>();
+        var service = CreateService(context, new FailingSmsSender(), new FixedOtpGenerator("483920"), logger: logger);
+
+        var act = () => service.IssueAsync(userId, DeviceId);
+
+        await act.Should()
+            .NotThrowAsync(
+                "ADR-016: si el proveedor de SMS cae, el login DEBE responder igual que con un envío real");
+        logger.Entries.Should()
+            .Contain(entry => entry.Level == LogLevel.Error, "el fallo sólo se entera el log");
+        (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId))
+            .Should()
+            .Be(1, "el código emitido queda vivo: lo invalida el próximo pedido y la expiración");
+    }
+
+    [Fact]
+    public async Task Issue_WhenTheProviderFails_LogsTheReasonWithoutTheCodeNorThePhone()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var logger = new CapturingLogger<DeviceOtpService>();
+        var service = CreateService(context, new FailingSmsSender(), new FixedOtpGenerator("483920"), logger: logger);
+
+        await service.IssueAsync(userId, DeviceId);
+
+        var error = logger.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Error).Subject;
+
+        error.Message.Should()
+            .Contain(userId.ToString(), "el error tiene que permitir cruzar con el usuario")
+            .And.NotContain("483920", "el log no guarda el código")
+            .And.NotContain(PhoneNumber, "el log no guarda el celular");
     }
 }

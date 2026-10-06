@@ -64,7 +64,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       4. La superficie self-service **de Identity** sobre `PhoneNumber` (`SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, endpoints del Identity UI/API) está **cerrada**: el único camino de cambio es `PUT /api/auth/phone-number`.
       5. Un usuario **sin** `PhoneNumber` cargado que entra desde un dispositivo no trusted recibe `403 AUTH_PHONE_NOT_ENROLLED` y **no** ingresa: no existe ruta que saltee el 2FA por falta de número (T050).
       6. `PUT /api/auth/phone-number` envía el OTP al número **actual** y nunca al nuevo; el `PhoneNumber` no cambia hasta confirmarlo; un usuario sin número previo recibe `403` (T061).
-      `[PENDIENTE: proveedor de SMS no elegido]`
+      `Proveedor de SMS: Twilio (T049, cerrado).`
       `[PENDIENTE: endpoint admin de PhoneNumber propuesto, no está en las fuentes originales]`
 
 ### product-catalog
@@ -172,7 +172,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 - [ ] CI verde: `dotnet build` + `dotnet test` + frontend build/lint
 - [ ] Test de integración: tenant A no ve productos/lotes de tenant B
 - [ ] Test de arquitectura: toda entidad tenant implementa `ITenantEntity`
-- [ ] Login JWT + 2FA por SMS en dispositivo nuevo (sender de consola en dev) `[PENDIENTE: proveedor de SMS no elegido]`
+- [ ] Login JWT + 2FA por SMS en dispositivo nuevo (T049: Twilio; sender de consola en dev)
 - [ ] Registrar producto y lote vía API con header `X-Tenant-ID`
 - [ ] Cobertura ≥ 70% (`.specify/config.yaml` → `verify.coverage_threshold`)
 

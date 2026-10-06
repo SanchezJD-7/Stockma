@@ -107,8 +107,8 @@ La fase creció de 10 a 19 tareas y no cabe en un PR revisable: el presupuesto d
 | **3d** Ciclo de vida del acceso | T050, T061, T067, T068, T069, T070 | Alta y cambio del celular, revocación, offboarding, reset y caducidad | ⬜ |
 | **3e** Plataforma | T063 | Superficie separada del admin de plataforma | ⬜ |
 
-**T049** (proveedor de SMS concreto) queda **diferida**: con el sender de consola de T018 el flujo
-se implementa y se testea completo, y elegir proveedor es una decisión de infra que no bloquea nada.
+**T049** (proveedor de SMS concreto) quedó **diferida** durante la fase 3b y se cerró en esta fase con
+**Twilio**: el sender de consola de T018 sigue siendo el default de `Development`.
 
 **Orden dentro de 3b** (respeta las dependencias): T018 → T017 → T055b → T020 → T019 → T055a →
 T055c → T021/T022. Se arranca por T018 y no por T017 porque el `LoginCommand` necesita poder
@@ -117,15 +117,15 @@ emitir un OTP para estar completo.
 - [x] **T015** Domain: `ApplicationUser`, `TrustedDevice`, `DeviceOtp` (FR-005, FR-007, FR-008)
 - [x] **T016** `[P]` `Infrastructure/Identity/JwtTokenService.cs` — claims `sub`, `tid`, `exp` ≤ 60 min (FR-006, NFR-004)
 - [x] **T017** Application: `RegisterUserCommand`, `LoginCommand`, `ConfirmDeviceCommand` — depende de T015
-- [x] **T018** `[P]` `ISmsSender` / `SmsOtpSender` (sender de consola en dev) + expiración de OTP a 10 min (FR-008, NFR-004)
+- [x] **T018** `[P]` `ISmsSender` / `ConsoleSmsSender` (sender de consola en dev) + expiración de OTP a 10 min (FR-008, NFR-004)
       El OTP viaja por **SMS** al `ApplicationUser.PhoneNumber`, nunca por email. La ventana ≤ 10 min se mantiene.
 - [x] **T019** `Api/Controllers/AuthController` — `register` / `login` / `confirm-device` + rate limiting 5/IP/min (NFR-005) — depende de T017
 - [x] **T020** Marcado condicional de `TrustedDevice` en `confirm-device` bajo `MaxTrustedDevices` (FR-007) — depende de T017
       El JWT se emite **siempre**; el `TrustedDevice` se crea **sólo si** el conteo de activos (`RevokedAt IS NULL`) es `< MaxTrustedDevices`. Sin slot: `200` con `deviceTrusted: false`, sin crear la fila y **sin revocar a nadie**. `RevokedAt` sólo cambia por acción manual de un admin. Ver [`plan.md`](./plan.md#5-autenticación) y [`contracts/auth-api.md`](./contracts/auth-api.md).
 - [x] **T021** `[P]` Unit tests: login desde dispositivo conocido/desconocido, OTP expirado
 - [x] **T022** API tests (`WebApplicationFactory`): `401` credenciales inválidas, `409` email duplicado, `requiresDeviceConfirmation` — depende de T019
-- [ ] **T049** Integración con proveedor de SMS: implementación concreta de `ISmsSender`, config `Sms { Provider, ApiKey, Sender }`, reintento/fallo del envío y sender de consola para dev (FR-008) — depende de T018
-      `[PENDIENTE: proveedor de SMS no elegido]`
+- [x] **T049** Integración con proveedor de SMS: implementación concreta de `ISmsSender`, config `Sms { Provider, AccountSid, ApiKey, Sender }`, reintento/fallo del envío y sender de consola para dev (FR-008) — depende de T018
+      **Proveedor elegido: Twilio.** `TwilioSmsSender` habla con la API Messages con Basic auth y reintenta sólo los transitorios (`429`/`408`/`5xx`/timeout); un `4xx` no se reintenta. Si el envío falla igual, el login **responde igual** y el fallo queda en el log (ADR-016: una respuesta distinta revelaría que el email existe). Fuera de `Development` no arranca sin credenciales completas; en `Development` sigue primando el sender de consola salvo que `Sms:Provider` esté cargado.
 - [ ] **T050** `PUT /api/admin/users/{userId}/phone-number` (sólo admin del tenant) **y cierre de la superficie self-service de Identity** sobre `PhoneNumber` (FR-008) — depende de T019
       El usuario NO DEBE poder registrar ni cambiar su propio `PhoneNumber`. Identity lo expone por defecto (`UserManager.SetPhoneNumberAsync`, `ChangePhoneNumberAsync`, `GenerateChangePhoneNumberTokenAsync` y los endpoints self-service del Identity UI/API): hay que cerrar esa superficie explícitamente, no alcanza con no usarla. Ver [`contracts/auth-api.md`](./contracts/auth-api.md) y [`data-model.md`](./data-model.md).
       `[PENDIENTE: propuesto, no está en las fuentes originales]`
