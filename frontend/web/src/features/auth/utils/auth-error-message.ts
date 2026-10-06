@@ -1,4 +1,4 @@
-import { ApiError } from '../api/auth-api'
+import { ApiError } from '../../../shared/http'
 
 const GENERIC_MESSAGE = 'Ocurrió un error. Intenta de nuevo en un momento.'
 const OFFLINE_MESSAGE =

@@ -1,15 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoginPage } from './LoginPage'
+import { mockPending, restoreHttp } from '../../../../shared/http.testkit'
 
 afterEach(() => {
-  vi.unstubAllGlobals()
+  restoreHttp()
 })
 
 describe('LoginPage', () => {
   it('bloquea el botón mientras espera la respuesta, para no mandar el login dos veces', async () => {
-    const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}))
-    vi.stubGlobal('fetch', fetchMock)
+    const requests = mockPending()
 
     render(
       <LoginPage
@@ -27,6 +27,6 @@ describe('LoginPage', () => {
     expect((button as HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.click(button)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(requests).toHaveLength(1)
   })
 })
