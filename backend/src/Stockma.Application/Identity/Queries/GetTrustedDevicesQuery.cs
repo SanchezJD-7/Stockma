@@ -9,6 +9,7 @@ public sealed record TrustedDeviceInfo(
     Guid UserId,
     string DeviceId,
     DateTimeOffset TrustedAt,
+    DateTimeOffset LastUsedAt,
     DateTimeOffset ExpiresAt,
     bool IsActive,
     DateTimeOffset? RevokedAt);

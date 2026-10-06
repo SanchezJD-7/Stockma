@@ -55,6 +55,7 @@ public class TrustedDevice : ITenantEntity, IAggregateRoot
         Fingerprint = fingerprint.Trim();
         TrustedAt = trustedAt;
         ExpiresAt = expiresAt;
+        LastUsedAt = trustedAt;
     }
 
     public Guid Id { get; private set; }
@@ -63,9 +64,19 @@ public class TrustedDevice : ITenantEntity, IAggregateRoot
     public string DeviceId { get; private set; }
     public string Fingerprint { get; private set; }
     public DateTimeOffset TrustedAt { get; private set; }
+    public DateTimeOffset LastUsedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
     public bool IsActive(DateTimeOffset now) => RevokedAt is null && ExpiresAt > now;
+
+    public void Touch(DateTimeOffset usedAt)
+    {
+        if (usedAt > LastUsedAt)
+        {
+            LastUsedAt = usedAt;
+        }
+    }
+
     public void Revoke(DateTimeOffset revokedAt)
     {
         if (RevokedAt is not null)

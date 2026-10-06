@@ -676,6 +676,28 @@ Un `TrustedDevice` **no dura para siempre**: `ExpiresAt = TrustedAt + TenantSett
 
 ---
 
+### Último uso del dispositivo (T067)
+
+`lastUsedAt` es **evidencia de lectura, nunca regla de negocio**. tasks.md T067 exige que la
+respuesta liste el "último uso", y el access token es stateless: usar el sistema no deja rastro
+en la base. El único heartbeat que sí lo deja es la **rotación del refresh token** (T065), que
+corre cada 15 minutos y ya sabe qué `deviceId` la está pidiendo.
+
+| Aspecto | Regla |
+|---|---|
+| Dónde se escribe | En el alta del dispositivo y en cada rotación del refresh |
+| Piso inicial | `trustedAt`: para llegar al alta hubo OTP en esa misma máquina, así que el alta **ya es** un uso |
+| Nunca retrocede | Un reloj que se atrasa (NTP) no puede borrar el último uso real |
+| **NO** condiciona seguridad | La autorización la siguen mandando `ExpiresAt` (T070) y `RevokedAt` (manual). Si `lastUsedAt` miente, no se abre ni se cierra ninguna puerta |
+| Es por registro | Cada fila guarda su propio uso: el vencido o revocado deja de acumular y el registro nuevo arranca de su `trustedAt` |
+
+**El dueño detecta un dispositivo que no reconoce**
+- **DADO** un usuario con dos dispositivos confiados, uno usado hace 2 minutos y otro hace 12 días
+- **CUANDO** consulta `GET /api/auth/devices`
+- **ENTONCES** ve `trustedAt` y `lastUsedAt` en ambos, y el segundo salta a la vista sin abrir nada más
+
+---
+
 ## Cobertura de requerimientos
 
 | Requerimiento | Endpoint |
@@ -712,6 +734,7 @@ X-Tenant-ID: {guid}
     "userId": "3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c",
     "deviceId": "web-chrome-a91f2c77",
     "trustedAt": "2026-10-04T10:30:00Z",
+    "lastUsedAt": "2026-10-04T11:45:00Z",
     "expiresAt": "2026-10-19T10:30:00Z",
     "isActive": true,
     "revokedAt": null
@@ -725,6 +748,7 @@ X-Tenant-ID: {guid}
 |---|---|---|
 | `401` | — | JWT ausente o inválido |
 | `403` | `TENANT_MISMATCH` | `X-Tenant-ID` no coincide con `tid` del JWT |
+| `404` | `USER_NOT_FOUND` | El `userId` del token ya no existe en ese tenant |
 
 ---
 
@@ -757,6 +781,7 @@ X-Tenant-ID: {guid}
 - Revocar un dispositivo DEBE liberar el slot de `MaxTrustedDevices`.
 - Revocar DEBE revocar también las **familias de refresh token** de ese dispositivo (T065), en la misma transacción. Sin eso, el `RevokedAt` sólo impide saltear el 2FA a futuro mientras la sesión sigue viva hasta `FamilyExpiresAt`: revocar sin cerrar la sesión es teatro (tasks.md T067).
 - NO toca los dispositivos ni las sesiones de otro usuario, aunque compartan el mismo `deviceId`.
+- `404` **sólo cuando el recurso no existe**: un ID inexistente o un dispositivo de otro usuario. Un dispositivo ya revocado sigue en la tabla, así que la segunda revocación responde `204`, no `404`.
 - Idempotente: revocar dos veces no falla.
 
 ---
@@ -784,6 +809,7 @@ X-Tenant-ID: {guid}
     "userId": "3f9a2c1e-7b4d-4e8a-9c21-5d6e7f8a9b0c",
     "deviceId": "web-chrome-a91f2c77",
     "trustedAt": "2026-10-04T10:30:00Z",
+    "lastUsedAt": "2026-10-04T11:45:00Z",
     "expiresAt": "2026-10-19T10:30:00Z",
     "isActive": true,
     "revokedAt": null
@@ -853,5 +879,6 @@ X-Tenant-ID: {guid}
 ### Reglas
 
 - Revocar todos los dispositivos DEBE liberar todos los slots de `MaxTrustedDevices`.
+- `404` sólo cuando el `userId` no existe en el tenant. Un usuario que ya no tiene dispositivos sí existe: eso responde `204`.
 - Revocar todos DEBE revocar las familias de refresh token de **cada** dispositivo del usuario: `revoke-all` lo deja sin ninguna sesión viva por dispositivo confiado. Las sesiones abiertas desde un dispositivo **no** confiado las mata T068 (deshabilitar la cuenta).
 - Idempotente: revocar dos veces no falla.

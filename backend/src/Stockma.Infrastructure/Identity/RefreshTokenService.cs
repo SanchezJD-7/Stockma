@@ -124,6 +124,8 @@ public sealed class RefreshTokenService(
 
         token.Consume(now);
 
+        await TouchTrustedDeviceAsync(lookup.TenantId, token.UserId, token.DeviceId, now, cancellationToken);
+
         var plainToken = RefreshTokenMaterial.GenerateToken();
         var next = token.CreateNextInFamily(
             RefreshTokenMaterial.Hash(plainToken),
@@ -134,6 +136,25 @@ public sealed class RefreshTokenService(
         await context.SaveChangesAsync(cancellationToken);
 
         return new RefreshTokenSession(plainToken, token.UserId, token.TenantId, identity.Roles);
+    }
+
+    private async Task TouchTrustedDeviceAsync(
+        Guid tenantId,
+        Guid userId,
+        string deviceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var device = await context.TrustedDevices
+            .Where(candidate => candidate.TenantId == tenantId
+                && candidate.UserId == userId
+                && candidate.DeviceId == deviceId
+                && candidate.RevokedAt == null
+                && candidate.ExpiresAt > now)
+            .OrderByDescending(candidate => candidate.TrustedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        device?.Touch(now);
     }
 
     private async Task RevokeFamilyInternalAsync(

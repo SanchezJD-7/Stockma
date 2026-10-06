@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Stockma.Application.Identity;
 using Stockma.Application.Identity.Queries;
 using Stockma.Domain.Entities;
+using Stockma.Domain.Exceptions;
 using Stockma.Domain.ValueObjects;
 using Stockma.Infrastructure.Persistence;
 
@@ -41,6 +42,8 @@ public sealed class TrustedDevices(
     {
         var now = timeProvider.GetUtcNow();
 
+        await EnsureUserExistsAsync(userId, cancellationToken);
+
         var devices = await context.TrustedDevices
             .Where(d => d.UserId == userId)
             .OrderByDescending(d => d.TrustedAt)
@@ -49,6 +52,7 @@ public sealed class TrustedDevices(
                 d.UserId,
                 d.DeviceId,
                 d.TrustedAt,
+                d.LastUsedAt,
                 d.ExpiresAt,
                 d.RevokedAt == null && d.ExpiresAt > now,
                 d.RevokedAt))
@@ -68,13 +72,19 @@ public sealed class TrustedDevices(
         var devices = await query.ToListAsync(cancellationToken);
 
         if (devices.Count == 0)
+        {
+            if (deviceId.HasValue)
+            {
+                throw new TrustedDeviceNotFoundException(deviceId.Value);
+            }
+
+            await EnsureUserExistsAsync(userId, cancellationToken);
             return;
+        }
 
         foreach (var device in devices)
             device.Revoke(now);
 
-        // tasks.md T067: revocar sin cerrar la sesión es teatro. El mismo contexto guarda
-        // RevokedAt y las familias de refresh token, así que una sola transacción los lleva a los dos.
         await refreshTokens.RevokeByDeviceAsync(
             userId,
             devices.Select(device => device.DeviceId).Distinct().ToList(),
@@ -137,4 +147,14 @@ public sealed class TrustedDevices(
                 && device.RevokedAt == null
                 && device.ExpiresAt > now,
             cancellationToken);
+
+    private async Task EnsureUserExistsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var exists = await context.Users.AnyAsync(user => user.Id == userId, cancellationToken);
+
+        if (!exists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+    }
 }

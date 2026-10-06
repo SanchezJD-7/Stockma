@@ -198,8 +198,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-viejo', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-viejo', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -219,8 +220,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -257,8 +258,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -278,8 +280,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -304,8 +306,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
             VALUES ({0}, {1}, {2}, {3}, {2}, {3}, true, 'hash', 'stamp', gen_random_uuid()::text,
                     false, false, true, 0);
 
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {1}, {0}, 'dev-ajeno', 'fp', {4}, {5});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {1}, {0}, 'dev-ajeno', 'fp', {4}, {4}, {5});
             """,
             otherUserId,
             tenantId,
@@ -327,8 +330,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -349,8 +352,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -376,8 +379,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-turno', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-turno', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -396,8 +400,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -419,12 +424,13 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
 
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {4}, {5});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {4}, {5});
             """,
             tenantId,
             userId,

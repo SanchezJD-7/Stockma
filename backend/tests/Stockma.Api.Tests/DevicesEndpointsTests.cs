@@ -64,9 +64,10 @@ public class DevicesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
 
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"""
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
             VALUES (gen_random_uuid(), {tenantId}, {userId}, {deviceId}, 'fp',
-                    {stampedAt}, {stampedAt.AddDays(15)});
+                    {stampedAt}, {stampedAt}, {stampedAt.AddDays(15)});
 
             INSERT INTO refresh_tokens (id, tenant_id, user_id, family_id, device_id, token_hash,
                                         issued_at, expires_at, family_expires_at)
@@ -117,6 +118,32 @@ public class DevicesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     }
 
     [Fact]
+    public async Task GetMyDevices_ListsTheLastUseOfEachDevice()
+    {
+        var tenantId = await SeedTenantAsync();
+        var userId = await SeedUserAsync(tenantId, TenantRoles.Member);
+        await SeedTrustedDeviceAsync(tenantId, userId, "web-chrome-a91f2c77", "hash-propio");
+
+        var response = await CreateClient(tenantId, TenantRoles.Member, userId)
+            .GetAsync("/api/auth/devices");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var devices = await response.Content.ReadFromJsonAsync<List<TrustedDeviceInfo>>(JsonOptions);
+
+        var device = devices.Should()
+            .ContainSingle(candidate => candidate.DeviceId == "web-chrome-a91f2c77")
+            .Subject;
+
+        device.LastUsedAt
+            .Should()
+            .BeCloseTo(
+                device.TrustedAt,
+                TimeSpan.FromSeconds(1),
+                "T067: el alta ya es un uso, así que sin registro previo el piso del último uso es trusted_at");
+    }
+
+    [Fact]
     public async Task GetMyDevices_WithoutAToken_Returns401()
     {
         var tenantId = await SeedTenantAsync();
@@ -161,6 +188,24 @@ public class DevicesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
             .BeFalse("tasks.md T067: revocar sin cerrar la sesión es teatro");
     }
 
+    private static async Task<string?> ErrorCodeAsync(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).TryGetProperty("errorCode", out var code)
+            ? code.GetString()
+            : null;
+
+    [Fact]
+    public async Task RevokeMyDevice_ForAnUnknownDevice_Returns404()
+    {
+        var tenantId = await SeedTenantAsync();
+        var userId = await SeedUserAsync(tenantId, TenantRoles.Member);
+
+        var response = await CreateClient(tenantId, TenantRoles.Member, userId)
+            .PostAsync($"/api/auth/devices/{Guid.NewGuid()}/revoke", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await ErrorCodeAsync(response)).Should().Be("DEVICE_NOT_FOUND");
+    }
+
     [Fact]
     public async Task RevokeMyDevice_Twice_Returns204BothTimes()
     {
@@ -192,5 +237,79 @@ public class DevicesEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await AnyLiveSessionAsync(tenantId, targetId)).Should()
             .BeFalse("revoke-all no puede dejar al usuario con sesiones abiertas");
+    }
+
+    [Fact]
+    public async Task GetUserDevices_ForAnUnknownUser_Returns404()
+    {
+        var tenantId = await SeedTenantAsync();
+        var adminId = await SeedUserAsync(tenantId, TenantRoles.TenantAdmin);
+
+        var response = await CreateClient(tenantId, TenantRoles.TenantAdmin, adminId)
+            .GetAsync($"/api/admin/users/{Guid.NewGuid()}/devices");
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.NotFound,
+            "un userId mal tipeado no puede parecer un usuario sin dispositivos");
+        (await ErrorCodeAsync(response)).Should().Be("USER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task RevokeAllAsAnAdmin_ForAUserWithoutDevices_Returns204Not404()
+    {
+        var tenantId = await SeedTenantAsync();
+        var adminId = await SeedUserAsync(tenantId, TenantRoles.TenantAdmin);
+        var targetId = await SeedUserAsync(tenantId, TenantRoles.Member);
+
+        var response = await CreateClient(tenantId, TenantRoles.TenantAdmin, adminId)
+            .PostAsync($"/api/admin/users/{targetId}/devices/revoke-all", null);
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.NoContent,
+            "sin dispositivos que revocar sigue siendo idempotente: no existe es otra cosa");
+    }
+
+    [Fact]
+    public async Task RevokeAllAsAnAdmin_ForAnUnknownUser_Returns404()
+    {
+        var tenantId = await SeedTenantAsync();
+        var adminId = await SeedUserAsync(tenantId, TenantRoles.TenantAdmin);
+
+        var response = await CreateClient(tenantId, TenantRoles.TenantAdmin, adminId)
+            .PostAsync($"/api/admin/users/{Guid.NewGuid()}/devices/revoke-all", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await ErrorCodeAsync(response)).Should().Be("USER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task RevokeAsAnAdmin_TheDeviceOfAnotherUser_Returns404AndKeepsIt()
+    {
+        var tenantId = await SeedTenantAsync();
+        var adminId = await SeedUserAsync(tenantId, TenantRoles.TenantAdmin);
+        var ownerId = await SeedUserAsync(tenantId, TenantRoles.Member);
+        await SeedTrustedDeviceAsync(tenantId, ownerId, "web-chrome-a91f2c77", "hash-propio");
+        var ownedDeviceId = await GetTrustedDeviceIdAsync(tenantId, ownerId);
+
+        var response = await CreateClient(tenantId, TenantRoles.TenantAdmin, adminId)
+            .PostAsync($"/api/admin/users/{Guid.NewGuid()}/devices/{ownedDeviceId}/revoke", null);
+
+        response.StatusCode.Should().Be(
+            HttpStatusCode.NotFound,
+            "el dispositivo pertenece a otro usuario: para ese userId no existe");
+        (await ErrorCodeAsync(response)).Should().Be("DEVICE_NOT_FOUND");
+
+        var stillTrusted = await IsDeviceLiveAsync(tenantId, ownerId);
+        stillTrusted.Should().BeTrue("un 404 no puede revocarle la sesión a nadie");
+    }
+
+    private async Task<bool> IsDeviceLiveAsync(Guid tenantId, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenantId);
+
+        var context = scope.ServiceProvider.GetRequiredService<StockmaDbContext>();
+
+        return await context.TrustedDevices.AnyAsync(device => device.UserId == userId && device.RevokedAt == null);
     }
 }

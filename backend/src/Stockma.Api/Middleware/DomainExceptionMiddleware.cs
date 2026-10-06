@@ -43,7 +43,9 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
         ProductNotFoundException
             or BarcodeNotFoundException
             or ProductNotFoundForBatchException
-            or BatchNotFoundException => StatusCodes.Status404NotFound,
+            or BatchNotFoundException
+            or TrustedDeviceNotFoundException
+            or UserNotFoundException => StatusCodes.Status404NotFound,
         _ => StatusCodes.Status400BadRequest,
     };
 
