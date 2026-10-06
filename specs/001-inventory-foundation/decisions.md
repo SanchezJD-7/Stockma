@@ -1115,7 +1115,7 @@ siempre se ejecuta. La inactividad cubre el mismo riesgo sin depender de él.
 | Tema | Estado |
 |---|---|
 | Alta de tenants | Sin tarea. Hoy el seed es un `INSERT` manual: no se puede dar de alta una droguería sin tocar la base |
-| Proveedor de SMS | Sin elegir (T049). Mientras tanto la API no arranca fuera de `Development` (ADR-016) |
+| Proveedor de SMS | **Elegido: Twilio** (T049, cerrado). La API no arranca fuera de `Development` sin `Sms { AccountSid, ApiKey, Sender }` (ADR-016) |
 | Rate limit con varias instancias | Es en memoria por instancia; con más de una réplica cada una tiene su propia cuota (ADR-016). Sigue abierto tras la segunda revisión de 3b |
 | Password spraying | Una contraseña errada no incrementa `AccessFailedCount`; el único freno es el rate limit por IP. El lockout por intentos queda en los criterios de T068 |
 | Tiempo de `confirm-device` | Un email con OTP vigente cuesta un PBKDF2 y uno inexistente o bloqueado no: unos milisegundos de diferencia. Sólo distingue cuentas en las que alguien acaba de acertar la contraseña (ADR-016) |

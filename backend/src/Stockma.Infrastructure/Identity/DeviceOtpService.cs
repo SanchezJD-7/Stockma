@@ -61,10 +61,21 @@ public sealed class DeviceOtpService : IDeviceOtpService
             return;
         }
 
-        await smsSender.SendAsync(
-            delivery.Value.PhoneNumber,
-            $"Tu código de acceso a Stockma es {delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
-            cancellationToken);
+        try
+        {
+            await smsSender.SendAsync(
+                delivery.Value.PhoneNumber,
+                $"Tu código de acceso a Stockma es {delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+                cancellationToken);
+        }
+        catch (SmsDeliveryException exception)
+        {
+            logger.LogError(
+                exception,
+                "Falló el envío del SMS de OTP para el usuario {UserId}: {Reason}",
+                userId,
+                exception.Message);
+        }
     }
 
     public Task ConsumeAsync(Guid userId, string deviceId, string code, CancellationToken cancellationToken = default) =>

@@ -88,7 +88,7 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddSmsSender(builder.Environment.IsDevelopment());
+builder.Services.AddSmsSender(builder.Configuration, builder.Environment.IsDevelopment());
 
 if (RuntimeDatabaseRoleCheck.AppliesTo(builder.Environment))
 {
