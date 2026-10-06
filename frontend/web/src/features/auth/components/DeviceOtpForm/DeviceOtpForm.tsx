@@ -3,7 +3,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import { useState, type FormEvent } from 'react'
-import { confirmDevice } from '../../api/auth-api'
+import { AuthService } from '../../../../services/auth-service'
 import {
   ActionRow,
   BackButton,
@@ -24,6 +24,7 @@ interface DeviceOtpFormProps {
 }
 
 export function DeviceOtpForm({ email, deviceId, onAuthenticated, onBack }: DeviceOtpFormProps) {
+  const authService = new AuthService()
   const [otp, setOtp] = useState('')
   const { error, showError, clearError } = useFlashError()
   const [submitting, setSubmitting] = useState(false)
@@ -34,7 +35,12 @@ export function DeviceOtpForm({ email, deviceId, onAuthenticated, onBack }: Devi
     setSubmitting(true)
 
     try {
-      const result = await confirmDevice({ email, deviceId, fingerprint: getFingerprint(), otp })
+      const result = await authService.confirmDevice({
+        email,
+        deviceId,
+        fingerprint: getFingerprint(),
+        otp,
+      })
       onAuthenticated(result.accessToken, result.expiresIn)
     } catch (err) {
       showError(authErrorMessage(err))

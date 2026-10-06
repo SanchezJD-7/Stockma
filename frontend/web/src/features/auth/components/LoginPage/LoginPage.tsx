@@ -1,7 +1,7 @@
 import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import { useState, type FormEvent } from 'react'
-import { login } from '../../api/auth-api'
+import { AuthService } from '../../../../services/auth-service'
 import { FormBody, FormTitle, SubmitButton } from '../../styles/auth-form.styles'
 import { useFlashError } from '../../hooks/useFlashError'
 import { authErrorMessage } from '../../utils/auth-error-message'
@@ -19,6 +19,7 @@ export function LoginPage({
   onAuthenticated,
   onRequiresConfirmation,
 }: LoginPageProps) {
+  const authService = new AuthService()
   const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const { error, showError, clearError } = useFlashError()
@@ -30,7 +31,7 @@ export function LoginPage({
     setSubmitting(true)
 
     try {
-      const result = await login({ email, password, deviceId })
+      const result = await authService.login({ email, password, deviceId })
 
       if (result.kind === 'requires-confirmation') {
         onRequiresConfirmation(email)

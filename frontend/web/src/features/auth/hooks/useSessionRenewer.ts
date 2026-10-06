@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/auth-store'
-import { refresh } from '../api/auth-api'
+import { AuthService } from '../../../services/auth-service'
 import { getOrCreateDeviceId } from '../utils/device'
 
 const RENEW_THRESHOLD_MS = 2 * 60 * 1000
@@ -39,8 +39,9 @@ export function useSessionRenewer() {
       }
 
       try {
+        const authService = new AuthService()
         await navigator.locks.request('stockma-refresh', async () => {
-          const result = await refresh({ deviceId: getOrCreateDeviceId() })
+          const result = await authService.refresh({ deviceId: getOrCreateDeviceId() })
           setSession(result.accessToken, result.expiresIn)
         })
       } catch {

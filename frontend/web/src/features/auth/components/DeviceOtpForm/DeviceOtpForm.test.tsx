@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DeviceOtpForm } from './DeviceOtpForm'
+import { mockPending, restoreHttp } from '../../../../shared/http.testkit'
 
 afterEach(() => {
-  vi.unstubAllGlobals()
+  restoreHttp()
 })
 
 function renderForm() {
@@ -24,7 +25,7 @@ function renderForm() {
 
 describe('DeviceOtpForm', () => {
   it('bloquea Volver y Continuar mientras valida el código', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+    mockPending()
     const { onBack } = renderForm()
 
     fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '123456' } })

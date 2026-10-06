@@ -119,6 +119,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `TrustedDeviceLifetimeDays` | `int` | `15` | Vigencia de un `TrustedDevice` antes de volver a exigir 2FA (FR-007, T070) |
 | `RefreshTokenLifetimeHours` | `int` | `8` | Vigencia **absoluta** de la familia de refresh — la sesión real (FR-006, T065) |
 | `SessionIdleTimeoutMinutes` | `int` | `30` | Minutos sin renovar tras los que la sesión muere (T065, ADR-019) |
+| `RequireSecondFactor` | `bool` | `true` | ¿El login exige OTP por SMS? **Por tenant, no por usuario** (T090). Fail-closed: sin fila de `tenant_settings` también vale `true` |
 | `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
 | `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
 | `NextSkuNumber` | `int` | `1` | Contador de la secuencia de SKU por tenant (FR-009). Se incrementa con `UPDATE ... RETURNING` dentro de la transacción del alta |

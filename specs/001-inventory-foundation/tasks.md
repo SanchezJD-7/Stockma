@@ -34,7 +34,7 @@ Riesgo del presupuesto de 400 líneas: High
 | ---- | ------------------------------------------------------ | -------- | --------------------- | ---------------- |
 | 1    | Scaffolding monorepo + CI + docker-compose             | **PR 1** | T001–T007             | — (base)         |
 | 2    | Tenant isolation (Domain + Infra + RLS)                | **PR 2** | T008–T014             | PR 1             |
-| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T070 | PR 2             |
+| 3    | Identity + JWT + dispositivos confiables + 2FA por SMS | **PR 3** | T015–T022, T049, T050, T061–T065, T067–T070, T090, T091 | PR 2             |
 | 4    | Product catalog (Domain + App + Api)                   | **PR 4** | T023–T030             | PR 2             |
 | 5    | Batch inventory (Domain + App + Api)                   | **PR 5** | T031–T038             | PR 4             |
 | 6    | Frontend auth + inventory + branding por tenant        | **PR 6** | T039–T043, T051–T060  | PR 3, PR 4, PR 5 |
@@ -106,6 +106,7 @@ La fase creció de 10 a 19 tareas y no cabe en un PR revisable: el presupuesto d
 | **3c** Sesión | T065 | Refresh token con rotación y detección de reuso | ⬜ |
 | **3d** Ciclo de vida del acceso | T050, T061, T067, T068, T069, T070 | Alta y cambio del celular, revocación, offboarding, reset y caducidad | ⬜ |
 | **3e** Plataforma | T063 | Superficie separada del admin de plataforma | ⬜ |
+| **3f** Ambiente demo | T090, T091 | Flag por tenant `require_second_factor` y seed del tenant demo | ✅ |
 
 **T049** (proveedor de SMS concreto) quedó **diferida** durante la fase 3b y se cerró en esta fase con
 **Twilio**: el sender de consola de T018 sigue siendo el default de `Development`.
@@ -289,6 +290,21 @@ emitir un OTP para estar completo.
       - Un usuario sin `PhoneNumber` cargado o deshabilitado (T068) NO DEBE poder iniciar el flujo — ese caso es del admin.
       - Rate limiting igual que el resto de `auth` (NFR-005).
       Tests: respuesta idéntica para email existente e inexistente; token usado dos veces es rechazado; el reset mata las sesiones vivas; tras el reset, un dispositivo desconocido sigue pidiendo OTP; el deshabilitado no puede iniciar el flujo.
+- [x] **T090** **Flag por tenant `require_second_factor` (el 2FA deja de ser inevitable)** — depende de T018, T062
+      **Un visitante del demo no puede entrar.** Desde T018 todo login exige OTP por SMS en todo dispositivo no confiable, y el número va enrolado por un admin. Quien entra por primera vez a probar Stockma no tiene número ni admin que se lo cargue: se queda mirando la pantalla de código, siempre.
+      **El interruptor es de la cuenta-tenant, no de la persona.** `tenant_settings.require_second_factor boolean NOT NULL DEFAULT true`, con la rama en `LoginCommand` **después** de `tenantContext.Set(...)`. Leerlo antes dejaría `CurrentTenantId` vacío, no habría fila y el default fail-closed apagaría el feature en silencio — por eso hay un test que fija ese orden. IP, user-agent y query params no sirven de señal: cualquiera los fabrica, así que "entrar desde la IP de la oficina" no es una política de seguridad.
+      **Fail-closed en las tres capas**: el dominio lo nace en `true`, la migración backfillea a `true` las filas ya existentes, y el provider devuelve `true` si la fila no existe.
+      **No es `user_accounts.two_factor_enabled`.** Esa columna está mapeada en el esquema y **no la lee ni la escribe nadie**: es un fail-open disfrazado (al crear usuarios por código se olvidaría de setearla) y mezclaría una preferencia de la persona con una política del ambiente.
+      **Apagado**, el login emite access token y familia de refresh en un solo paso y **no toca** `TrustedDevices`: la confianza de un dispositivo es consecuencia de superar el OTP (FR-007), y con el OTP fuera de escena no hay nada que confirmar — confiar igual sería derivar una decisión que el tenant ya tomó. **Encendido**, el flujo es el actual, byte a byte: ni el registro ni `confirm-device` cambian.
+      Sólo se apaga en el tenant demo (alta por seed + credenciales en el README, tarea aparte de este flag).
+      Tests: flag apagado entrega token y refresh sin `requiresDeviceConfirmation` y sin emitir SMS; el flag se lee después de resolver el tenant; sin fila de `tenant_settings` devuelve `true`; apagar un tenant no lo apaga del vecino.
+- [x] **T091** **Semilla del ambiente demo (`bootstrap-demo`)** — depende de T090
+      **T090 dejó el interruptor, pero nadie lo accionaba.** La base arranca vacía, no existe ningún código que cree tenants, y `bootstrap-admin` sólo alta el primer `TenantAdmin` de un tenant que ya existe — encima se niega a correr dos veces. Sin semilla, el demo sigue sin poder entrar.
+      **Un comando idempotente**: `dotnet run --project src/Stockma.Api -- bootstrap-demo`. Crea el tenant si no existe, le escribe `require_second_factor = false` y crea el usuario con rol **`Member`** si todavía no está. Re-correrlo no duplica ni falla — y **repara**: si alguien apagó el flag a mano, la siguiente corrida lo vuelve a poner en `false`.
+      **`Member`, no `TenantAdmin`.** El demo está para probar que se pueden cargar productos; no para que quien tenga la contraseña del README administre cuentas de ese tenant.
+      **El email está tomado**: si ya pertenece a otro tenant se responde `AUTH_EMAIL_DUPLICATE` en vez de pisarlo. Una semilla que puede apropiarse de una cuenta ajena no es una semilla.
+      **Contraseña por defecto documentada en el README**, pisable con `STOCKMA_DEMO_PASSWORD`. Decisión deliberada: el tenant demo es descartable, está aislado por RLS y su propósito es que entre cualquiera. **Nunca** se corre contra un tenant productivo.
+      Tests: crea el tenant con el flag en `false` y un `Member`; dos corridas crean el usuario una sola vez; el email de otro tenant se rechaza; `ProvisionAsync` no duplica filas y restaura el flag.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 

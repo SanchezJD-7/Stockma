@@ -2,10 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthFlow } from './AuthFlow'
 import { useAuthStore } from '../../store/auth-store'
-
-function jsonResponse(status: number, body: unknown): Response {
-  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response
-}
+import { json, mockApi, restoreHttp } from '../../../../shared/http.testkit'
 
 async function fillLoginForm(email = 'farmacia@ejemplo.co', password = 'S3gura#2026') {
   fireEvent.change(screen.getByLabelText(/email/i), { target: { value: email } })
@@ -24,19 +21,16 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  vi.unstubAllGlobals()
+  restoreHttp()
   vi.useRealTimers()
 })
 
 describe('AuthFlow', () => {
   it('dispositivo desconocido: pide OTP, reutiliza el deviceId y guarda el token al confirmar', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { requiresDeviceConfirmation: true }))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { accessToken: 'xyz', expiresIn: 1800, deviceTrusted: true }),
-      )
-    vi.stubGlobal('fetch', fetchMock)
+    const requests = mockApi(
+      json(200, { requiresDeviceConfirmation: true }),
+      json(200, { accessToken: 'xyz', expiresIn: 1800, deviceTrusted: true }),
+    )
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -44,20 +38,17 @@ describe('AuthFlow', () => {
 
     submitOtp('482913')
     await screen.findByText('Sesión iniciada')
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(requests).toHaveLength(2))
 
-    const loginBody = JSON.parse(fetchMock.mock.calls[0][1].body)
-    const confirmBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    const loginBody = JSON.parse(String(requests[0].data))
+    const confirmBody = JSON.parse(String(requests[1].data))
     expect(confirmBody.deviceId).toBe(loginBody.deviceId)
     expect(loginBody.deviceId.length).toBeGreaterThanOrEqual(16)
     expect(useAuthStore.getState().session?.accessToken).toBe('xyz')
   })
 
   it('inicia sesión directo y guarda el token cuando el dispositivo es confiable', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(200, { accessToken: 'abc', expiresIn: 3600 })),
-    )
+    mockApi(json(200, { accessToken: 'abc', expiresIn: 3600 }))
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -67,11 +58,10 @@ describe('AuthFlow', () => {
   })
 
   it('muestra un error cuando el OTP es rechazado', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { requiresDeviceConfirmation: true }))
-      .mockResolvedValueOnce(jsonResponse(401, { errorCode: 'AUTH_OTP_REJECTED' }))
-    vi.stubGlobal('fetch', fetchMock)
+    mockApi(
+      json(200, { requiresDeviceConfirmation: true }),
+      json(401, { errorCode: 'AUTH_OTP_REJECTED' }),
+    )
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -82,10 +72,7 @@ describe('AuthFlow', () => {
   })
 
   it('muestra un mensaje genérico cuando las credenciales son inválidas', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(401, { errorCode: 'AUTH_INVALID_CREDENTIALS' })),
-    )
+    mockApi(json(401, { errorCode: 'AUTH_INVALID_CREDENTIALS' }))
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -94,10 +81,7 @@ describe('AuthFlow', () => {
   })
 
   it('avisa cuando se superó el límite de intentos', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(429, { errorCode: 'AUTH_RATE_LIMITED' })),
-    )
+    mockApi(json(429, { errorCode: 'AUTH_RATE_LIMITED' }))
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -122,10 +106,7 @@ describe('AuthFlow', () => {
   })
 
   it('explica qué hacer cuando el usuario no tiene celular cargado, en vez del error genérico', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(403, { errorCode: 'AUTH_PHONE_NOT_ENROLLED' })),
-    )
+    mockApi(json(403, { errorCode: 'AUTH_PHONE_NOT_ENROLLED' }))
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -136,10 +117,7 @@ describe('AuthFlow', () => {
   })
 
   it('muestra el error como alerta', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(401, { errorCode: 'AUTH_INVALID_CREDENTIALS' })),
-    )
+    mockApi(json(401, { errorCode: 'AUTH_INVALID_CREDENTIALS' }))
 
     render(<AuthFlow />)
     await fillLoginForm()
@@ -150,10 +128,7 @@ describe('AuthFlow', () => {
   })
 
   it('al volver del código conserva el email y borra la contraseña', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(200, { requiresDeviceConfirmation: true })),
-    )
+    mockApi(json(200, { requiresDeviceConfirmation: true }))
 
     render(<AuthFlow />)
     await fillLoginForm('farmacia@ejemplo.co', 'S3gura#2026')
@@ -167,10 +142,7 @@ describe('AuthFlow', () => {
   })
 
   it('pone Volver y Continuar en la misma fila, con flecha a la izquierda y a la derecha', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(200, { requiresDeviceConfirmation: true })),
-    )
+    mockApi(json(200, { requiresDeviceConfirmation: true }))
 
     render(<AuthFlow />)
     await fillLoginForm()

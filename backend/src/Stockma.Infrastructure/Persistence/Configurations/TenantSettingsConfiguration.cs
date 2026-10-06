@@ -22,6 +22,9 @@ public sealed class TenantSettingsConfiguration : IEntityTypeConfiguration<Tenan
         builder.Property(s => s.TrustedDeviceLifetimeDays)
             .HasColumnName("trusted_device_lifetime_days")
             .HasDefaultValue(TenantSettings.DefaultTrustedDeviceLifetimeDays);
+        builder.Property(s => s.RequireSecondFactor)
+            .HasColumnName("require_second_factor")
+            .HasDefaultValue(TenantSettings.DefaultRequireSecondFactor);
         builder.OwnsOne(s => s.Thresholds, thresholds =>
         {
             thresholds.Property(t => t.GreenMonths).HasColumnName("green_months");

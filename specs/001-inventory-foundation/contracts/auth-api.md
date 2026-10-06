@@ -189,6 +189,15 @@ Sin `X-Tenant-ID`: el tenant sale del email. El `deviceId` viaja en el body (ver
 
 `expiresIn` en segundos: `900` con la configuración por defecto (ADR-019).
 
+> **2FA por tenant (T090)**: si `tenant_settings.require_second_factor = false`, `login` devuelve
+> este mismo `200` con `accessToken` **tanto para dispositivo conocido como desconocido**, sin
+> `requiresDeviceConfirmation`, sin emitir OTP y sin consultar `TrustedDevices`. El flag es del
+> **tenant**, no del usuario, y se evalúa **después** de resolver el tenant desde el email.
+> Default `true` en las tres capas —dominio, migración y provider— y también cuando **no existe**
+> fila de `tenant_settings` (fail-closed). La apagada es una decisión del ambiente, no una
+> condición del request: IP, user-agent y query params no se usan como señal porque cualquiera
+> los fabrica.
+
 ### Respuesta `200 OK` — dispositivo desconocido (FR-008)
 
 ```json
@@ -244,6 +253,11 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 - **DADO** credenciales válidas desde dispositivo desconocido
 - **CUANDO** `POST /api/auth/login`
 - **ENTONCES** responde `requiresDeviceConfirmation` y envía el OTP por SMS al `PhoneNumber` del usuario
+
+**Tenant sin segundo factor (T090)**
+- **DADO** un tenant con `require_second_factor = false` y credenciales válidas
+- **CUANDO** `POST /api/auth/login` desde un dispositivo desconocido
+- **ENTONCES** retorna `accessToken` y `refreshToken` sin `requiresDeviceConfirmation`, sin emitir SMS y sin tocar los dispositivos confiables
 
 ---
 

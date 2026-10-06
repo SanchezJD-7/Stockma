@@ -20,8 +20,12 @@ public class LoginCommandTests
     private readonly FakeJwtTokenService tokens = new();
     private readonly FakeRefreshTokenService sessions = new();
     private readonly FakeTenantContext tenantContext = new(Guid.Empty);
+    private readonly FakeTenantSettingsProvider tenantSettings;
 
-    private LoginCommandHandler CreateHandler() => new(accounts, devices, otps, tokens, sessions, tenantContext);
+    public LoginCommandTests() => tenantSettings = new FakeTenantSettingsProvider(tenantContext);
+
+    private LoginCommandHandler CreateHandler() =>
+        new(accounts, devices, otps, tokens, sessions, tenantContext, tenantSettings);
 
     private static LoginCommand Command(string? deviceId = DeviceId) =>
         new(Email, Password, deviceId);
@@ -91,6 +95,57 @@ public class LoginCommandTests
         result.RequiresDeviceConfirmation.Should().BeTrue();
         result.AccessToken.Should().BeNull("FR-008: sin superar el OTP no hay token");
         otps.Issued.Should().ContainSingle().Which.Should().Be((UserId, DeviceId));
+    }
+
+    [Fact]
+    public async Task Login_WhenTheTenantDisablesSecondFactor_IssuesTheTokenWithoutOtp()
+    {
+        ArrangeValidUser();
+        devices.Trusted = false;
+        tenantSettings.RequireSecondFactor = false;
+
+        var result = await CreateHandler().Handle(Command(), default);
+
+        result.RequiresDeviceConfirmation
+            .Should()
+            .BeFalse("T090: el tenant pidió entrar con la contraseña sola, sin esperar un SMS");
+        result.AccessToken.Should().Be($"jwt-para-{UserId}");
+        result.RefreshToken.Should().Be(
+            FakeRefreshTokenService.IssuedToken,
+            "saltear el 2FA no saltea la sesión: la familia de refresh se emite igual");
+        otps.Issued.Should().BeEmpty("si el flag está apagado no se emite ningún código");
+    }
+
+    [Fact]
+    public async Task Login_WhenTheTenantDisablesSecondFactor_NeverConsultsTrustedDevices()
+    {
+        ArrangeValidUser();
+        tenantSettings.RequireSecondFactor = false;
+
+        await CreateHandler().Handle(Command(), default);
+
+        devices.CheckedDeviceIds.Should()
+            .BeEmpty("con el 2FA apagado no hay dispositivo confiable que consultar");
+        devices.TrustAttempts.Should()
+            .BeEmpty("la confianza de un dispositivo es consecuencia de superar el OTP (FR-007)");
+    }
+
+    [Fact]
+    public async Task Login_ReadsTheSecondFactorPolicyAfterResolvingTheTenant()
+    {
+        ArrangeValidUser();
+        devices.Trusted = false;
+
+        await CreateHandler().Handle(Command(), default);
+
+        tenantSettings.Reads.Should().Be(1, "T090: el login decide con la política del tenant");
+        tenantSettings.TenantIdWhenRead
+            .Should()
+            .Be(
+                TenantId,
+                "el flag se lee DESPUES de tenantContext.Set(): antes, CurrentTenantId esta vacio, "
+                + "no hay fila de tenant_settings y el default fail-closed dejaria el 2FA siempre "
+                + "activo, matando el feature en silencio");
     }
 
     [Theory]

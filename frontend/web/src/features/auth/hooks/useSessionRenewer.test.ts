@@ -1,13 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { useSessionRenewer } from './useSessionRenewer'
 import { useAuthStore } from '../store/auth-store'
-import { refresh } from '../api/auth-api'
-
-vi.mock('../api/auth-api', () => ({
-  refresh: vi.fn(),
-}))
-
-const refreshMock = vi.mocked(refresh)
+import { json, mockApi, restoreHttp } from '../../../shared/http.testkit'
 
 function setSession(accessToken: string, expiresIn: number) {
   useAuthStore.getState().setSession(accessToken, expiresIn)
@@ -18,15 +12,21 @@ function clearSession() {
 }
 
 describe('useSessionRenewer', () => {
+  let requests: ReturnType<typeof mockApi>
+
   beforeEach(() => {
     clearSession()
-    refreshMock.mockReset()
+    requests = mockApi(json(200, { accessToken: 'renovado', expiresIn: 900 }))
+  })
+
+  afterEach(() => {
+    restoreHttp()
   })
 
   it('does nothing when there is no session', () => {
     renderHook(() => useSessionRenewer())
 
-    expect(refreshMock).not.toHaveBeenCalled()
+    expect(requests).toHaveLength(0)
   })
 
   it('does not renew immediately when the session is fresh', () => {
@@ -34,6 +34,6 @@ describe('useSessionRenewer', () => {
 
     renderHook(() => useSessionRenewer())
 
-    expect(refreshMock).not.toHaveBeenCalled()
+    expect(requests).toHaveLength(0)
   })
 })

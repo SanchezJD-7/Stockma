@@ -11,6 +11,7 @@ public class TenantSettings : ITenantEntity
     public const int DefaultSessionIdleTimeoutMinutes = 30;
     public const int DefaultTrustedDeviceLifetimeDays = 15;
     public const int AccessTokenLifetimeMinutes = 15;
+    public const bool DefaultRequireSecondFactor = true;
 
     private TenantSettings()
     {
@@ -88,7 +89,10 @@ public class TenantSettings : ITenantEntity
     public int RefreshTokenLifetimeHours { get; private set; } = DefaultRefreshTokenLifetimeHours;
     public int SessionIdleTimeoutMinutes { get; private set; } = DefaultSessionIdleTimeoutMinutes;
     public int TrustedDeviceLifetimeDays { get; private set; } = DefaultTrustedDeviceLifetimeDays;
+    public bool RequireSecondFactor { get; private set; } = DefaultRequireSecondFactor;
     public void UpdateBranding(TenantBranding? branding) => Branding = branding;
+    public void SetRequireSecondFactor(bool requireSecondFactor) =>
+        RequireSecondFactor = requireSecondFactor;
     public static TenantSettings CreateDefault(Guid tenantId) =>
         new(
             tenantId,
