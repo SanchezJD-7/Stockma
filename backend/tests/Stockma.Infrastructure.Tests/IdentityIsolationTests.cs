@@ -53,10 +53,11 @@ public class IdentityIsolationTests(PostgresFixture postgres) : IClassFixture<Po
                  true, 'hash-b', 'stamp-b', gen_random_uuid()::text, false, false, true, 0)
             ON CONFLICT DO NOTHING;
 
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
             VALUES
-                ('{DeviceA}', '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now() + interval '15 days'),
-                ('{DeviceB}', '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now() + interval '15 days')
+                ('{DeviceA}', '{TenantA}', '{UserA}', 'dev-a', 'fp-a', now(), now(), now() + interval '15 days'),
+                ('{DeviceB}', '{TenantB}', '{UserB}', 'dev-b', 'fp-b', now(), now(), now() + interval '15 days')
             ON CONFLICT DO NOTHING;
             """);
 #pragma warning restore EF1002

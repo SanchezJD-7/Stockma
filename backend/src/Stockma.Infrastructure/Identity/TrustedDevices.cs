@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Stockma.Application.Identity;
+using Stockma.Application.Identity.Queries;
 using Stockma.Domain.Entities;
+using Stockma.Domain.Exceptions;
 using Stockma.Domain.ValueObjects;
 using Stockma.Infrastructure.Persistence;
 
@@ -8,10 +10,9 @@ namespace Stockma.Infrastructure.Identity;
 
 public sealed class TrustedDevices(
     StockmaDbContext context,
-    TimeProvider timeProvider) : ITrustedDevices
+    TimeProvider timeProvider,
+    IRefreshTokens refreshTokens) : ITrustedDevices
 {
-    public static readonly TimeSpan DefaultLifetime = TimeSpan.FromDays(15);
-
     private const string LockScope = "trusted_devices";
 
     public Task<bool> IsTrustedAsync(
@@ -35,6 +36,64 @@ public sealed class TrustedDevices(
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TrustedDeviceInfo>> GetDevicesAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var now = timeProvider.GetUtcNow();
+
+        await EnsureUserExistsAsync(userId, cancellationToken);
+
+        var devices = await context.TrustedDevices
+            .Where(d => d.UserId == userId)
+            .OrderByDescending(d => d.TrustedAt)
+            .Select(d => new TrustedDeviceInfo(
+                d.Id,
+                d.UserId,
+                d.DeviceId,
+                d.TrustedAt,
+                d.LastUsedAt,
+                d.ExpiresAt,
+                d.RevokedAt == null && d.ExpiresAt > now,
+                d.RevokedAt))
+            .ToListAsync(cancellationToken);
+
+        return devices;
+    }
+
+    public async Task RevokeAsync(Guid userId, Guid? deviceId, CancellationToken cancellationToken = default)
+    {
+        var now = timeProvider.GetUtcNow();
+        var query = context.TrustedDevices.Where(d => d.UserId == userId);
+
+        if (deviceId.HasValue)
+            query = query.Where(d => d.Id == deviceId.Value);
+
+        var devices = await query.ToListAsync(cancellationToken);
+
+        if (devices.Count == 0)
+        {
+            if (deviceId.HasValue)
+            {
+                throw new TrustedDeviceNotFoundException(deviceId.Value);
+            }
+
+            await EnsureUserExistsAsync(userId, cancellationToken);
+            return;
+        }
+
+        foreach (var device in devices)
+            device.Revoke(now);
+
+        await refreshTokens.RevokeByDeviceAsync(
+            userId,
+            devices.Select(device => device.DeviceId).Distinct().ToList(),
+            now,
+            cancellationToken);
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<bool> TryTrustLockedAsync(
         Guid userId,
         string deviceId,
@@ -48,17 +107,17 @@ public sealed class TrustedDevices(
             return true;
         }
 
-        var maxTrustedDevices = await context.TenantSettings
-            .Where(settings => settings.TenantId == context.CurrentTenantId)
-            .Select(settings => (int?)settings.MaxTrustedDevices)
+        var settings = await context.TenantSettings
+            .Where(s => s.TenantId == context.CurrentTenantId)
+            .Select(s => new { s.MaxTrustedDevices, s.TrustedDeviceLifetimeDays })
             .SingleOrDefaultAsync(cancellationToken)
-            ?? TenantSettings.DefaultMaxTrustedDevices;
+            ?? new { MaxTrustedDevices = TenantSettings.DefaultMaxTrustedDevices, TrustedDeviceLifetimeDays = TenantSettings.DefaultTrustedDeviceLifetimeDays };
 
         var active = await context.TrustedDevices.CountAsync(
             device => device.UserId == userId && device.RevokedAt == null && device.ExpiresAt > now,
             cancellationToken);
 
-        if (active >= maxTrustedDevices)
+        if (active >= settings.MaxTrustedDevices)
         {
             return false;
         }
@@ -70,7 +129,7 @@ public sealed class TrustedDevices(
                 deviceId,
                 fingerprint,
                 now,
-                now.Add(DefaultLifetime)));
+                now.AddDays(settings.TrustedDeviceLifetimeDays)));
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -88,4 +147,14 @@ public sealed class TrustedDevices(
                 && device.RevokedAt == null
                 && device.ExpiresAt > now,
             cancellationToken);
+
+    private async Task EnsureUserExistsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var exists = await context.Users.AnyAsync(user => user.Id == userId, cancellationToken);
+
+        if (!exists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+    }
 }

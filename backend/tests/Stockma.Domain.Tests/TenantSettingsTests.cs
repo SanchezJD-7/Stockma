@@ -11,8 +11,9 @@ public class TenantSettingsTests
     private static TenantSettings Create(
         int maxTrustedDevices = 2,
         int refreshTokenLifetimeHours = TenantSettings.DefaultRefreshTokenLifetimeHours,
-        int sessionIdleTimeoutMinutes = TenantSettings.DefaultSessionIdleTimeoutMinutes) =>
-        new(TenantId, maxTrustedDevices, ExpiryThresholds.Default(), refreshTokenLifetimeHours, sessionIdleTimeoutMinutes);
+        int sessionIdleTimeoutMinutes = TenantSettings.DefaultSessionIdleTimeoutMinutes,
+        int trustedDeviceLifetimeDays = TenantSettings.DefaultTrustedDeviceLifetimeDays) =>
+        new(TenantId, maxTrustedDevices, ExpiryThresholds.Default(), refreshTokenLifetimeHours, sessionIdleTimeoutMinutes, trustedDeviceLifetimeDays);
 
     [Fact]
     public void CreateDefault_UsesTheDocumentedDefaults()
@@ -85,5 +86,31 @@ public class TenantSettingsTests
         var act = () => Create(refreshTokenLifetimeHours: 1, sessionIdleTimeoutMinutes: 60);
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void TrustedDeviceLifetimeDays_RejectsZero()
+    {
+        var act = () => Create(trustedDeviceLifetimeDays: 0);
+
+        act.Should()
+            .Throw<ArgumentOutOfRangeException>("data-model.md: TrustedDeviceLifetimeDays DEBE ser >= 1")
+            .WithParameterName("trustedDeviceLifetimeDays");
+    }
+
+    [Fact]
+    public void TrustedDeviceLifetimeDays_AcceptsOne()
+    {
+        var act = () => Create(trustedDeviceLifetimeDays: 1);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void CreateDefault_UsesTheDocumentedTrustedDeviceLifetimeDays()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.TrustedDeviceLifetimeDays.Should().Be(15, "data-model.md 1b, T070");
     }
 }

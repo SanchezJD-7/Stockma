@@ -46,5 +46,13 @@ public sealed class TenantAlreadyBootstrappedException(Guid tenantId)
         "TENANT_ALREADY_BOOTSTRAPPED",
         $"El tenant '{tenantId}' ya tiene usuarios; el bootstrap sólo corre sobre un tenant vacío.");
 
+public sealed class TrustedDeviceNotFoundException(Guid deviceId)
+    : DomainException(
+        "DEVICE_NOT_FOUND",
+        $"No existe un dispositivo confiado con Id '{deviceId}' para ese usuario.");
+
+public sealed class UserNotFoundException(Guid userId)
+    : DomainException("USER_NOT_FOUND", $"No existe un usuario con Id '{userId}' en este tenant.");
+
 public sealed class RefreshTokenNotUsableException()
     : DomainException("AUTH_REFRESH_REJECTED", "El refresh token es inválido, ya fue usado o ya no es utilizable.");

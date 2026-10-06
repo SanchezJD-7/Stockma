@@ -142,4 +142,42 @@ public class TrustedDeviceTests
             .Should()
             .Be(firstRevocation, "T067: revocar dos veces no falla y conserva el primer instante");
     }
+
+    // T067: "último uso" — evidencia de lectura, nunca condiciona seguridad.
+
+    [Fact]
+    public void NewDevice_StartsBeingUsedAtItsTrust()
+    {
+        CreateDevice()
+            .LastUsedAt.Should()
+            .Be(
+                TrustedAt,
+                "el alta ya es un uso: para llegar ahí hubo OTP en esa misma máquina");
+    }
+
+    [Fact]
+    public void Touch_MovesTheLastUseForward()
+    {
+        var device = CreateDevice();
+        var usedAt = TrustedAt.AddMinutes(15);
+
+        device.Touch(usedAt);
+
+        device.LastUsedAt.Should().Be(usedAt, "la rotación del refresh registra el último uso");
+    }
+
+    [Fact]
+    public void Touch_NeverMovesTheLastUseBackwards()
+    {
+        var device = CreateDevice();
+        device.Touch(TrustedAt.AddMinutes(15));
+
+        var act = () => device.Touch(TrustedAt.AddMinutes(1));
+
+        act.Should()
+            .NotThrow("vive en el camino caliente del refresh: jamás puede tirar excepción");
+        device.LastUsedAt
+            .Should()
+            .Be(TrustedAt.AddMinutes(15), "un retroceso de reloj (NTP) no puede borrar el último uso real");
+    }
 }

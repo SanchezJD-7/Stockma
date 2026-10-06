@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Stockma.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Stockma.Infrastructure.Persistence;
 namespace Stockma.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(StockmaDbContext))]
-    partial class StockmaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004165532_AddTrustedDeviceLifetimeDays")]
+    partial class AddTrustedDeviceLifetimeDays
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -465,10 +468,6 @@ namespace Stockma.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("fingerprint");
-
-                    b.Property<DateTimeOffset>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_used_at");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone")

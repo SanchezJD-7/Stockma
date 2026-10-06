@@ -252,7 +252,7 @@ emitir un OTP para estar completo.
       - El token en claro nunca se persiste ni aparece en logs.
       **Entrega en 4 sub-piezas**: 2a spec (esta) · 2b entidad `RefreshToken` + migración + búsqueda por hash vía `auth_lookup` · 2c cookie en `login`/`confirm-device` + `POST /refresh` con rotación, inactividad y tope · 2d renovación en el front por actividad, serializada entre pestañas. La detección de reuso y `logout` completan T065 en las piezas 3 y 4.
       **Reevaluar después**: con 1 login por turno en vez de 8, el costo de exigir OTP en cada sesión cae de ~1.200 a ~150 SMS/mes por droguería. Ahí hay que decidir si `TrustedDevice` (FR-007) sigue haciendo falta o se elimina junto con `MaxTrustedDevices`, la caducidad y el endpoint de revocación.
-- [ ] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
+- [x] **T070** **Caducidad de `TrustedDevice`** — `ExpiresAt` + `TrustedDeviceLifetimeDays` (FR-007) — depende de T015, T067
       **El agujero**: hoy `TrustedDevice` no tiene campo de expiración y el invariante de `data-model.md` **prohíbe** la revocación automática. Un dispositivo queda confiable **para siempre**.
       **Campo nuevo `ExpiresAt`, NO reusar `RevokedAt`.** `RevokedAt` DEBE seguir significando "una persona lo dio de baja" — es auditoría, y mezclarlo con vencimiento automático arruina el registro de quién hizo qué.
       ```
@@ -262,7 +262,7 @@ emitir un OTP para estar completo.
       **Beneficio lateral**: el slot de `MaxTrustedDevices` se libera solo. Hoy, con el límite en 2, llenar los dos slots requiere un admin para destrabar; los slots no se llenan por uso simultáneo sino por **acumulación** de aparatos viejos, y esto lo ataca en la causa.
       **Alcance de la caducidad**: obliga a rehacer el 2FA en ese dispositivo. NO corta la sesión viva ni bloquea el acceso — eso es T067 (revocación) y T068 (deshabilitar), que son inmediatos. La caducidad es la **red de seguridad** para lo que nadie se acordó de revocar.
       Tests: un dispositivo vencido exige OTP de nuevo; vencer libera el slot; `RevokedAt` sigue siendo exclusivamente manual; un dispositivo vencido y otro revocado se distinguen en el listado de T067.
-- [ ] **T067** **Gestión y revocación de dispositivos y sesiones** (FR-007) — depende de T062, T065
+- [x] **T067** **Gestión y revocación de dispositivos y sesiones** (FR-007) — depende de T062, T065
       **El endpoint no existe.** `contracts/auth-api.md` lo dice textual: *"Endpoint admin de revocación/alta de dispositivo — no existe en las fuentes `[PENDIENTE: definir]`"*. Y FR-007 apoya todo su diseño en que `RevokedAt` lo setea un admin — con un botón que nadie construyó.
       **Superficie admin**: `GET /api/admin/users/{userId}/devices` (no se puede revocar lo que no se ve), `POST /api/admin/users/{userId}/devices/{deviceId}/revoke`, `POST /api/admin/users/{userId}/devices/revoke-all`.
       **Superficie propia**: `GET /api/auth/devices` y `POST /api/auth/devices/{deviceId}/revoke`. Que cada uno vea sus dispositivos NO es una comodidad: es cómo el usuario detecta uno que no reconoce. El admin no mira las sesiones de otro todos los días; el dueño de la cuenta sí.

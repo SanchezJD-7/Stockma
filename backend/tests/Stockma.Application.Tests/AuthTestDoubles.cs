@@ -1,5 +1,6 @@
 using Stockma.Application.Common;
 using Stockma.Application.Identity;
+using Stockma.Application.Identity.Queries;
 
 namespace Stockma.Application.Tests;
 
@@ -101,6 +102,20 @@ public sealed class FakeTrustedDevices : ITrustedDevices
         }
 
         return Task.FromResult(TrustGranted);
+    }
+
+    public List<(Guid UserId, Guid? DeviceId)> Revocations { get; } = [];
+    public IReadOnlyList<TrustedDeviceInfo> Devices { get; set; } = [];
+
+    public Task<IReadOnlyList<TrustedDeviceInfo>> GetDevicesAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Devices);
+
+    public Task RevokeAsync(Guid userId, Guid? deviceId, CancellationToken cancellationToken = default)
+    {
+        Revocations.Add((userId, deviceId));
+        return Task.CompletedTask;
     }
 }
 

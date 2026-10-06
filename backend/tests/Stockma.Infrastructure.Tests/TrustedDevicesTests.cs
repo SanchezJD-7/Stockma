@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Stockma.Domain.Entities;
 using Stockma.Infrastructure.Identity;
 using Stockma.Infrastructure.Persistence;
 using Stockma.Infrastructure.Tenancy;
@@ -56,7 +57,7 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         var context = NewContext(tenantId);
 
-        return (new TrustedDevices(context, new FixedTimeProvider(Now)), context, tenantId, userId);
+        return (new TrustedDevices(context, new FixedTimeProvider(Now), new RefreshTokens(context)), context, tenantId, userId);
     }
 
     private static Task<bool> TrustAsync(TrustedDevices devices, Guid userId, string deviceId) =>
@@ -167,8 +168,27 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         var stored = await context.TrustedDevices.SingleAsync(device => device.UserId == userId);
 
         stored.TrustedAt.Should().Be(Now);
-        stored.ExpiresAt.Should().Be(Now.Add(TrustedDevices.DefaultLifetime));
+        stored.ExpiresAt.Should().Be(
+            Now.AddDays(TenantSettings.DefaultTrustedDeviceLifetimeDays),
+            "T070: ExpiresAt = TrustedAt + TrustedDeviceLifetimeDays");
         stored.RevokedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TryTrust_TakesTheLifetimeFromTheTenantSettings()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE tenant_settings SET trusted_device_lifetime_days = 5 WHERE tenant_id = {tenantId}");
+
+        await TrustAsync(devices, userId, "dev-1");
+
+        var stored = await context.TrustedDevices.SingleAsync(device => device.UserId == userId);
+
+        stored.ExpiresAt.Should().Be(
+            Now.AddDays(5),
+            "T070: la vigencia sale de TrustedDeviceLifetimeDays del tenant, no de una constante");
     }
 
     [Fact]
@@ -178,8 +198,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-viejo', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-viejo', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -199,8 +220,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -237,8 +258,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -258,8 +280,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -284,8 +306,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
             VALUES ({0}, {1}, {2}, {3}, {2}, {3}, true, 'hash', 'stamp', gen_random_uuid()::text,
                     false, false, true, 0);
 
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {1}, {0}, 'dev-ajeno', 'fp', {4}, {5});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {1}, {0}, 'dev-ajeno', 'fp', {4}, {4}, {5});
             """,
             otherUserId,
             tenantId,
@@ -307,8 +330,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -329,8 +352,8 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
-                                         trusted_at, expires_at, revoked_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {3}, {4});
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-laptop', 'fp', {2}, {2}, {3}, {4});
             """,
             tenantId,
             userId,
@@ -356,8 +379,9 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint, trusted_at, expires_at)
-            VALUES (gen_random_uuid(), {0}, {1}, 'dev-turno', 'fp', {2}, {3});
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-turno', 'fp', {2}, {2}, {3});
             """,
             tenantId,
             userId,
@@ -368,12 +392,210 @@ public class TrustedDevicesTests(PostgresFixture postgres) : IClassFixture<Postg
             .Should()
             .BeTrue("el mismo aparato vuelve a confiarse tras vencer: es el caso normal cada 15 dias");
     }
+
+    [Fact]
+    public async Task AnExpiredDevice_KeepsRevokedAtNull()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync();
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
+            """,
+            tenantId,
+            userId,
+            Now.AddDays(-30),
+            Now.AddDays(-1));
+
+        await TrustAsync(devices, userId, "dev-nuevo");
+
+        var expired = await context.TrustedDevices.SingleAsync(device => device.DeviceId == "dev-vencido");
+
+        expired.RevokedAt.Should().BeNull(
+            "ADR-007: vencer NO es revocar. RevokedAt sigue siendo exclusivamente manual");
+    }
+
+    [Fact]
+    public async Task GetDevices_TellsAnExpiredDeviceFromARevokedOne()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync();
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-vencido', 'fp', {2}, {2}, {3});
+
+            INSERT INTO trusted_devices (id, tenant_id, user_id, device_id, fingerprint,
+                                         trusted_at, last_used_at, expires_at, revoked_at)
+            VALUES (gen_random_uuid(), {0}, {1}, 'dev-revocado', 'fp', {2}, {2}, {4}, {5});
+            """,
+            tenantId,
+            userId,
+            Now.AddDays(-30),
+            Now.AddDays(-1),
+            Now.AddDays(15),
+            Now);
+
+        var listed = await devices.GetDevicesAsync(userId);
+
+        var expired = listed.Single(device => device.DeviceId == "dev-vencido");
+        expired.IsActive.Should().BeFalse("T070: el vencido ya no sirve para saltarse el 2FA");
+        expired.RevokedAt.Should().BeNull("T070: nadie lo dio de baja, se vencio solo");
+
+        var revoked = listed.Single(device => device.DeviceId == "dev-revocado");
+        revoked.IsActive.Should().BeFalse();
+        revoked.RevokedAt.Should().Be(Now, "T067: el revocado tiene RevokedAt, y por eso se distingue del vencido");
+    }
+
+    private async Task SeedRefreshFamilyAsync(
+        StockmaDbContext context,
+        Guid tenantId,
+        Guid userId,
+        string deviceId,
+        string tokenHash)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO refresh_tokens (id, tenant_id, user_id, family_id, device_id, token_hash,
+                                        issued_at, expires_at, family_expires_at)
+            VALUES (gen_random_uuid(), {0}, {1}, {2}, {3}, {4}, {5}, {6}, {7});
+            """,
+            tenantId,
+            userId,
+            Guid.CreateVersion7(),
+            deviceId,
+            $"{tokenHash}-{Guid.NewGuid():N}",
+            Now,
+            Now.AddMinutes(30),
+            Now.AddHours(8));
+    }
+
+    [Fact]
+    public async Task Revoke_TheDevice_KillsItsRefreshTokenFamilies()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync();
+        await TrustAsync(devices, userId, "dev-1");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-1", "hash-uno");
+
+        var trusted = await context.TrustedDevices.SingleAsync(device => device.UserId == userId);
+
+        await devices.RevokeAsync(userId, trusted.Id);
+
+        trusted.RevokedAt.Should().Be(Now);
+        var token = await context.RefreshTokens.SingleAsync(
+            row => row.UserId == userId && row.DeviceId == "dev-1");
+        token.RevokedAt.Should().Be(Now, "tasks.md T067: revocar sin cerrar la sesión es teatro");
+    }
+
+    [Fact]
+    public async Task Revoke_LeavesTheOtherDevicesSessionsAlive()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+        await TrustAsync(devices, userId, "dev-1");
+        await TrustAsync(devices, userId, "dev-2");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-1", "hash-uno");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-2", "hash-dos");
+
+        var revoked = await context.TrustedDevices.SingleAsync(device => device.DeviceId == "dev-1");
+
+        await devices.RevokeAsync(userId, revoked.Id);
+
+        var other = await context.RefreshTokens.SingleAsync(
+            row => row.UserId == userId && row.DeviceId == "dev-2");
+        other.RevokedAt.Should().BeNull("revocar un dispositivo no mata la sesión de otro");
+    }
+
+    [Fact]
+    public async Task Revoke_AllDevices_KillsEveryFamilyOfThatUser()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+        await TrustAsync(devices, userId, "dev-1");
+        await TrustAsync(devices, userId, "dev-2");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-1", "hash-uno");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-2", "hash-dos");
+
+        await devices.RevokeAsync(userId, deviceId: null);
+
+        var live = await context.RefreshTokens.CountAsync(row => row.UserId == userId && row.RevokedAt == null);
+        live.Should().Be(0, "revoke-all deja al usuario sin ninguna sesión viva por dispositivo confiado");
+    }
+
+    [Fact]
+    public async Task Revoke_AllDevices_DoesNotKillAnotherUsersSessions()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+        var otherUserId = Guid.CreateVersion7();
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO users (id, tenant_id, email, normalized_email, user_name, normalized_user_name,
+                               email_confirmed, password_hash, security_stamp, concurrency_stamp,
+                               phone_number_confirmed, two_factor_enabled, lockout_enabled, access_failed_count)
+            VALUES ({0}, {1}, {2}, {3}, {2}, {3}, true, 'hash', 'stamp', gen_random_uuid()::text,
+                    false, false, true, 0);
+            """,
+            otherUserId,
+            tenantId,
+            $"{otherUserId:N}@droga.co",
+            $"{otherUserId:N}@DROGA.CO".ToUpperInvariant());
+
+        await TrustAsync(devices, userId, "dev-comun");
+        await TrustAsync(devices, otherUserId, "dev-comun");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-comun", "hash-propio");
+        await SeedRefreshFamilyAsync(context, tenantId, otherUserId, "dev-comun", "hash-ajeno");
+
+        await devices.RevokeAsync(userId, deviceId: null);
+
+        var other = await context.RefreshTokens.SingleAsync(row => row.UserId == otherUserId);
+        other.RevokedAt.Should().BeNull(
+            "el deviceId se comparte entre usuarios: revocar uno no puede matar la sesión del otro");
+    }
+
+    [Fact]
+    public async Task Revoke_FreesTheSlot()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync(maxTrustedDevices: 2);
+        await TrustAsync(devices, userId, "dev-1");
+        await TrustAsync(devices, userId, "dev-2");
+
+        var revoked = await context.TrustedDevices.SingleAsync(device => device.DeviceId == "dev-1");
+
+        await devices.RevokeAsync(userId, revoked.Id);
+
+        (await TrustAsync(devices, userId, "dev-3"))
+            .Should()
+            .BeTrue("FR-007: revocar libera el slot");
+    }
+
+    [Fact]
+    public async Task Revoke_TheSameDeviceTwice_DoesNotFail()
+    {
+        var (devices, context, tenantId, userId) = await BuildAsync();
+        await TrustAsync(devices, userId, "dev-1");
+        await SeedRefreshFamilyAsync(context, tenantId, userId, "dev-1", "hash-uno");
+
+        var trusted = await context.TrustedDevices.SingleAsync(device => device.UserId == userId);
+
+        await devices.RevokeAsync(userId, trusted.Id);
+        var second = () => devices.RevokeAsync(userId, trusted.Id);
+
+        await second.Should().NotThrowAsync("revocar es idempotente");
+        trusted.RevokedAt.Should().Be(Now, "la revocación original no se sobreescribe");
+
+        var token = await context.RefreshTokens.SingleAsync(
+            row => row.UserId == userId && row.DeviceId == "dev-1");
+        token.RevokedAt.Should().Be(Now);
+    }
+
     private async Task<bool[]> TrustInParallelAsync(Guid tenantId, Guid userId, IEnumerable<string> deviceIds)
     {
         var attempts = deviceIds.Select(async deviceId =>
         {
             await using var parallel = NewContext(tenantId);
-            return await new TrustedDevices(parallel, new FixedTimeProvider(Now)).TryTrustAsync(userId, deviceId, Fingerprint);
+            return await new TrustedDevices(parallel, new FixedTimeProvider(Now), new RefreshTokens(parallel)).TryTrustAsync(userId, deviceId, Fingerprint);
         });
 
         return await Task.WhenAll(attempts);

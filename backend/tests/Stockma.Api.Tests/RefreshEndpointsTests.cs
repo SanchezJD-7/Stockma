@@ -29,7 +29,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
         factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
             services.Replace(ServiceDescriptor.Singleton<IOtpGenerator, FixedOtpGenerator>())));
 
-    private async Task<(string Email, string RefreshCookie)> ArrangeSessionAsync(WebApplicationFactory<Program> app)
+    private async Task<(Guid TenantId, string Email, string RefreshCookie)> ArrangeSessionAsync(WebApplicationFactory<Program> app)
     {
         var tenantId = Guid.NewGuid();
         var email = $"refresh-{Guid.NewGuid():N}@droga.co";
@@ -59,7 +59,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
         var cookie = confirm.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("stockma_refresh="));
         cookie.Should().NotBeNullOrEmpty();
 
-        return (email, cookie);
+        return (tenantId, email, cookie);
     }
 
     private static async Task<HttpResponseMessage> RefreshAsync(
@@ -89,7 +89,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     public async Task Refresh_WithAValidCookie_RotatesAndReturnsNewTokens()
     {
         using var app = WithKnownOtp();
-        var (_, cookie) = await ArrangeSessionAsync(app);
+        var (_, _, cookie) = await ArrangeSessionAsync(app);
         var client = app.CreateClient();
 
         var response = await RefreshAsync(client, DeviceId, cookie);
@@ -102,6 +102,56 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
 
         var newCookie = response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("stockma_refresh="));
         newCookie.Should().NotBe(cookie, "la rotación emite un token nuevo, no el mismo");
+    }
+
+    [Fact]
+    public async Task Refresh_RecordsTheLastUseOnTheTrustedDevice()
+    {
+        using var app = WithKnownOtp();
+        var (tenantId, _, cookie) = await ArrangeSessionAsync(app);
+        var client = app.CreateClient();
+
+        // tasks.md T067 pide el "último uso" en el listado. Se lo dejamos viejo a propósito para
+        // que sólo la rotación pueda moverlo: el access token es stateless y no toca la base.
+        var stale = DateTimeOffset.UtcNow.AddHours(-3);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider
+                .GetRequiredService<Stockma.Application.Common.ITenantContext>()
+                .Set(tenantId);
+
+            var context = scope.ServiceProvider
+                .GetRequiredService<Stockma.Infrastructure.Persistence.StockmaDbContext>();
+
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE trusted_devices SET last_used_at = {stale} WHERE tenant_id = {tenantId} AND device_id = {DeviceId}");
+        }
+
+        var response = await RefreshAsync(client, DeviceId, cookie);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        DateTimeOffset lastUsedAt;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider
+                .GetRequiredService<Stockma.Application.Common.ITenantContext>()
+                .Set(tenantId);
+
+            var context = scope.ServiceProvider
+                .GetRequiredService<Stockma.Infrastructure.Persistence.StockmaDbContext>();
+
+            var device = await context.TrustedDevices
+                .SingleAsync(candidate => candidate.TenantId == tenantId && candidate.DeviceId == DeviceId);
+
+            lastUsedAt = device.LastUsedAt;
+        }
+
+        lastUsedAt.Should().BeAfter(
+            stale,
+            "tasks.md T067: la rotación del refresh es el único heartbeat y tiene que registrar el último uso");
     }
 
     [Fact]
@@ -132,7 +182,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     public async Task Refresh_WithAConsumedToken_RevokesTheWholeFamily()
     {
         using var app = WithKnownOtp();
-        var (_, cookie) = await ArrangeSessionAsync(app);
+        var (_, _, cookie) = await ArrangeSessionAsync(app);
         var client = app.CreateClient();
 
         var first = await RefreshAsync(client, DeviceId, cookie);
@@ -148,7 +198,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     public async Task Refresh_WithADifferentDeviceId_RevokesTheFamily()
     {
         using var app = WithKnownOtp();
-        var (_, cookie) = await ArrangeSessionAsync(app);
+        var (_, _, cookie) = await ArrangeSessionAsync(app);
         var client = app.CreateClient();
 
         var response = await RefreshAsync(client, "otro-dispositivo-9999", cookie);
@@ -161,7 +211,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     public async Task Refresh_IgnoresTheTenantHeader()
     {
         using var app = WithKnownOtp();
-        var (_, cookie) = await ArrangeSessionAsync(app);
+        var (_, _, cookie) = await ArrangeSessionAsync(app);
         var client = app.CreateClient();
         client.DefaultRequestHeaders.Add("X-Tenant-ID", Guid.NewGuid().ToString());
 
@@ -191,7 +241,7 @@ public class RefreshEndpointsTests(StockmaApiFactory factory) : IClassFixture<St
     public async Task Refresh_TwoParallelRefreshesWithTheSameToken_ExactlyOneRotatesAndTheFamilyIsRevoked()
     {
         using var app = WithKnownOtp();
-        var (_, cookie) = await ArrangeSessionAsync(app);
+        var (_, _, cookie) = await ArrangeSessionAsync(app);
         var client = app.CreateClient();
 
         var first = RefreshAsync(client, DeviceId, cookie);

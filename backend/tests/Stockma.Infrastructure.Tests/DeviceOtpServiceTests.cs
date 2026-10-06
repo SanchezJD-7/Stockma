@@ -295,7 +295,7 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
         var (context, userId) = await ArrangeAsync();
         var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
         await service.IssueAsync(userId, DeviceId);
-        var devices = new TrustedDevices(context, new FixedTimeProvider(Now));
+        var devices = new TrustedDevices(context, new FixedTimeProvider(Now), new RefreshTokens(context));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ConsumeAsync<bool>(
             userId,
