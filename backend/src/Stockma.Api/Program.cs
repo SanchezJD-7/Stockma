@@ -102,6 +102,11 @@ if (args.Length > 0 && string.Equals(args[0], BootstrapAdminCommandLine.CommandN
     return await BootstrapAdminCommandLine.RunAsync(args, app.Services, Console.Out, Console.Error);
 }
 
+if (args.Length > 0 && string.Equals(args[0], BootstrapDemoCommandLine.CommandName, StringComparison.OrdinalIgnoreCase))
+{
+    return await BootstrapDemoCommandLine.RunAsync(args, app.Services, Console.Out, Console.Error);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
