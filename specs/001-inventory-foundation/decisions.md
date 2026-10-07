@@ -1108,6 +1108,14 @@ siempre se ejecuta. La inactividad cubre el mismo riesgo sin depender de él.
 - Que el mostrador pida otra ventana: se cambia `SessionIdleTimeoutMinutes` por tenant, no el diseño.
 - Que la carga de `refresh` se note en el servidor, algo improbable con una fila por renovación.
 
+### Enmienda (T092, 2026-10-06)
+
+El **default** de `SessionIdleTimeoutMinutes` pasó de 30 a **120 minutos (2 h)**: el dueño del producto
+quiere que la sesión se cierre a las 2 horas de inactividad. No cambia el diseño — ventana deslizante
+controlada por el servidor, renovación silenciosa y precedencia servidor/front siguen idénticos; cambia
+sólo el número por defecto (cada tenant sigue pudiendo personalizarlo). El front espeja el default en
+`IDLE_TIMEOUT_MS` y la migración actualiza las filas que estaban en el default viejo.
+
 ---
 
 ## Decisiones que siguen abiertas

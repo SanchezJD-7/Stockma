@@ -8,7 +8,7 @@ public class TenantSettings : ITenantEntity
     public const int DefaultMaxTrustedDevices = 2;
     public const int InitialSkuNumber = 1;
     public const int DefaultRefreshTokenLifetimeHours = 8;
-    public const int DefaultSessionIdleTimeoutMinutes = 30;
+    public const int DefaultSessionIdleTimeoutMinutes = 120;
     public const int DefaultTrustedDeviceLifetimeDays = 15;
     public const int AccessTokenLifetimeMinutes = 15;
     public const bool DefaultRequireSecondFactor = true;
