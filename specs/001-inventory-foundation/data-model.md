@@ -118,7 +118,7 @@ Configuración por tenant. `TenantSettings : ITenantEntity`.
 | `MaxTrustedDevices` | `int` | `2` | Límite de dispositivos confiables por usuario (FR-007) |
 | `TrustedDeviceLifetimeDays` | `int` | `15` | Vigencia de un `TrustedDevice` antes de volver a exigir 2FA (FR-007, T070) |
 | `RefreshTokenLifetimeHours` | `int` | `8` | Vigencia **absoluta** de la familia de refresh — la sesión real (FR-006, T065) |
-| `SessionIdleTimeoutMinutes` | `int` | `30` | Minutos sin renovar tras los que la sesión muere (T065, ADR-019) |
+| `SessionIdleTimeoutMinutes` | `int` | `120` | Minutos sin renovar tras los que la sesión muere — 2 h (T065, ADR-019 enmendado por T092) |
 | `RequireSecondFactor` | `bool` | `true` | ¿El login exige OTP por SMS? **Por tenant, no por usuario** (T090). Fail-closed: sin fila de `tenant_settings` también vale `true` |
 | `ExpiryThresholds.GreenMonths` | `int` | `6` | Verde si faltan **más** de N meses (FR-015) |
 | `ExpiryThresholds.YellowMonths` | `int` | `3` | Amarillo entre `YellowMonths` y `GreenMonths` (FR-015) |
