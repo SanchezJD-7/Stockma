@@ -10,4 +10,6 @@ public interface IDeviceOtpService
         string code,
         Func<Task<T>> onConsumed,
         CancellationToken cancellationToken = default);
+
+    Task InvalidateAllForUserAsync(Guid userId, DateTimeOffset invalidatedAt, CancellationToken cancellationToken = default);
 }

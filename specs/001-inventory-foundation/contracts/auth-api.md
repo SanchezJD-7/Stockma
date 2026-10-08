@@ -467,11 +467,9 @@ revela si la cookie era válida.
 
 ## `PUT /api/admin/users/{userId}/phone-number` — FR-008
 
-`[PENDIENTE: propuesto, no está en las fuentes originales]`
-
 Único camino para cargar o cambiar el `PhoneNumber` que recibe el OTP por SMS. **Sólo un admin del tenant.**
 
-**Command**: `SetUserPhoneNumberCommand` `[PENDIENTE: propuesto]`
+**Command**: `SetUserPhoneNumberCommand`
 
 ### Request
 
@@ -503,7 +501,7 @@ Content-Type: application/json
 | Status | `errorCode` | Cuándo |
 |---|---|---|
 | `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
-| `400` | `VALIDATION_FAILED` | `phoneNumber` no es un número móvil válido en formato E.164 `[PENDIENTE: formato/validación a confirmar]` |
+| `400` | `VALIDATION_FAILED` | `phoneNumber` no cumple E.164: `^\+[1-9]\d{6,14}$`, sin espacios ni símbolos (`PhoneNumber.Parse`) |
 | `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
 | `403` | `AUTH_FORBIDDEN` | El llamante no es admin del tenant, o intenta modificar su propio número sin ser admin |
 | `404` | `USER_NOT_FOUND` | El `userId` no existe **en ese tenant** |
@@ -513,7 +511,7 @@ Content-Type: application/json
 - El usuario objetivo NO DEBE poder invocar este endpoint sobre sí mismo salvo que sea admin del tenant. Para cambiar el suyo tiene `PUT /api/auth/phone-number` (T061), que exige OTP al número actual.
 - Identity expone `SetPhoneNumberAsync` / `ChangePhoneNumberAsync` y los endpoints self-service de Identity por defecto: esa superficie DEBE cerrarse explícitamente (ver T050). Dejarla abierta permitiría al usuario desviar su propio segundo factor.
 - El cambio DEBE quedar auditado (`AuditSaveChangesInterceptor`) con el admin que lo ejecutó.
-- `[PENDIENTE: definir si el cambio de PhoneNumber revoca los OTP en vuelo y/o los TrustedDevice del usuario]`
+- **El cambio revoca TODO lo que dependía del número viejo** (decidido en T050): los `TrustedDevice` del usuario, todas sus familias de refresh (sesiones) y los OTP en vuelo. El número ES el segundo factor: cambiarlo sin cortar lo anterior dejaría el celular robado operando. El orden es fail-closed y no necesita transacción — primero dispositivos (que además dispara `USER_NOT_FOUND` si el usuario no existe), después sesiones, después OTP, recién entonces el número: la ventana "número nuevo con sesión u OTP viva" no existe. Un access token ya emitido sigue vivo hasta su `exp` (≤15 min, ADR-019), consecuencia aceptada.
 
 ### Escenarios (Dado/Cuando/Entonces)
 

@@ -13,6 +13,8 @@ public interface IRefreshTokens
     Task RevokeFamilyAsync(Guid familyId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
 
     Task RevokeByDeviceAsync(Guid userId, IReadOnlyCollection<string> deviceIds, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
+
+    Task RevokeAllForUserAsync(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
 }
 
 public sealed record RefreshTokenLookup(

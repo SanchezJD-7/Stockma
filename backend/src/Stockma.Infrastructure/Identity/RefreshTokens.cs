@@ -125,4 +125,21 @@ public sealed class RefreshTokens(StockmaDbContext context) : IRefreshTokens
 
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task RevokeAllForUserAsync(
+        Guid userId,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var live = await context.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in live)
+        {
+            token.Revoke(revokedAt);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
 }

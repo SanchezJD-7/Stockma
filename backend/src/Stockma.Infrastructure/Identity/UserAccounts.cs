@@ -108,6 +108,31 @@ public sealed class UserAccounts(
         }
     }
 
+    public async Task SetPhoneNumberAsync(
+        Guid userId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        user.PhoneNumber = phoneNumber;
+        user.PhoneNumberConfirmed = true;
+
+        var updated = await userManager.UpdateAsync(user);
+
+        if (!updated.Succeeded)
+        {
+            throw new ValidationFailedException(
+                "No se pudo guardar el número: " + string.Join(", ", updated.Errors.Select(error => error.Code)));
+        }
+    }
+
     private async Task<Guid> CreateWithRoleAsync(NewUser newUser)
     {
         var user = new ApplicationUser(newUser.TenantId, newUser.Email)

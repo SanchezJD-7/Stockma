@@ -78,6 +78,31 @@ public sealed class DeviceOtpService : IDeviceOtpService
         }
     }
 
+    public async Task InvalidateAllForUserAsync(
+        Guid userId,
+        DateTimeOffset invalidatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        await context.RunLockedAsync(
+            LockScope,
+            userId,
+            async () =>
+            {
+                var live = await context.DeviceOtps
+                    .Where(otp => otp.UserId == userId && otp.ConsumedAt == null && otp.InvalidatedAt == null)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var otp in live)
+                {
+                    otp.Invalidate(invalidatedAt);
+                }
+
+                await context.SaveChangesAsync(cancellationToken);
+                return live.Count;
+            },
+            cancellationToken);
+    }
+
     public Task ConsumeAsync(Guid userId, string deviceId, string code, CancellationToken cancellationToken = default) =>
         ConsumeAsync(userId, deviceId, code, () => Task.FromResult(true), cancellationToken);
 
