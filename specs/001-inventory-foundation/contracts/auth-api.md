@@ -527,6 +527,80 @@ Content-Type: application/json
 
 ---
 
+## `PUT /api/admin/users/{userId}/role` — FR-005 (T094)
+
+Promueve (`Member` → `TenantAdmin`) o degrada (`TenantAdmin` → `Member`) a un usuario existente. **Sólo un admin del tenant.** Hoy `register` asigna rol sólo al crear: este endpoint es el único camino para cambiarlo después (rescate de admin, baja, reorganización).
+
+**Command**: `SetUserRoleCommand`
+
+### Request
+
+```http
+PUT /api/admin/users/9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31/role
+X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
+Authorization: Bearer {jwt-de-admin}
+Content-Type: application/json
+```
+
+```json
+{
+  "role": "TenantAdmin"
+}
+```
+
+### Respuesta `200 OK`
+
+```json
+{
+  "userId": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31",
+  "role": "TenantAdmin"
+}
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
+| `400` | `VALIDATION_FAILED` | `role` no es `TenantAdmin` ni `Member` |
+| `400` | `VALIDATION_FAILED` | Degradar al **último** `TenantAdmin` vivo del tenant |
+| `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
+| `403` | `AUTH_FORBIDDEN` | El llamante no es admin del tenant |
+| `404` | `USER_NOT_FOUND` | El `userId` no existe **en ese tenant** |
+
+### Reglas
+
+- Un usuario tiene UN rol (`TenantAdmin` o `Member`); `SetRoleAsync` garantiza el invariante: quita los roles viejos antes de asignar el nuevo.
+- **El tenant nunca se queda sin admin**: degradar sólo pasa si queda OTRO `TenantAdmin` vivo (misma regla de T062). La validación corre ANTES de cualquier efecto — si se rechaza, no se tocó nada.
+- **Degradar es fail-closed** (misma lógica que T050): primero se revocan todas las sesiones del usuario (familias de refresh) y sus dispositivos confiables, recién después se escribe el rol. Si algo falla a mitad de camino, la persona queda MENOS privilegiada, nunca más. El rol vive dentro del JWT: el token ya emitido conserva `role: TenantAdmin` hasta su `exp` (≤15 min, ADR-019), consecuencia aceptada — por eso además se mata la sesión, para que el re-login emita claims frescos con `Member`.
+- **Promover no expulsa a nadie**: los roles se releen de la DB en cada rotación (`RefreshCommand` → `session.Roles`), así que el rol nuevo surte efecto en el próximo refresh o login (≤15 min con el token vivo).
+- Idempotente: pedir el rol que ya tiene responde `200` sin efectos secundarios.
+- El cambio DEBE quedar auditado (`AuditSaveChangesInterceptor`) con el admin que lo ejecutó.
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Promover a admin**
+- **DADO** un admin del tenant, un `Member` con sesión activa
+- **CUANDO** `PUT /api/admin/users/{userId}/role` con `"role": "TenantAdmin"`
+- **ENTONCES** responde `200`, persiste el rol nuevo y la sesión del usuario sigue viva (el rol llega con el próximo refresh)
+
+**Degradar al último admin**
+- **DADO** un tenant con UN solo `TenantAdmin` (él es admin y llamante)
+- **CUANDO** se intenta degradarlo a sí mismo
+- **ENTONCES** responde `400 VALIDATION_FAILED` y el rol queda sin cambios
+
+**Degradar un admin con respaldo**
+- **DADO** un tenant con dos `TenantAdmin`; el objetivo tiene sesión y dispositivo confiable
+- **CUANDO** el otro admin lo degrada a `Member`
+- **ENTONCES** responde `200`, el rol pasa a `Member` y sus sesiones quedan revocadas
+
+**Un Member intenta tocar roles**
+- **DADO** un usuario `Member` autenticado
+- **CUANDO** invoca el endpoint
+- **ENTONCES** responde `403`
+
+---
+
 ## `PUT /api/auth/phone-number` — FR-008 (T061)
 
 `[PENDIENTE: propuesto, no está en las fuentes originales]`

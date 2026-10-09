@@ -3,6 +3,7 @@ using Stockma.Application.Identity;
 using Stockma.Application.Identity.Queries;
 using Stockma.Application.Tenants;
 using Stockma.Domain.Entities;
+using Stockma.Domain.Exceptions;
 using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Application.Tests;
@@ -45,6 +46,31 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default)
     {
         PhoneNumberSet = (userId, phoneNumber);
+        return Task.CompletedTask;
+    }
+
+    public bool RoleUserExists { get; set; } = true;
+    public string CurrentRole { get; set; } = TenantRoles.Member;
+    public int OtherTenantAdmins { get; set; }
+    public (Guid UserId, string Role)? RoleSet { get; private set; }
+
+    public Task<string> GetRoleAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (!RoleUserExists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        return Task.FromResult(CurrentRole);
+    }
+
+    public Task<int> CountOtherTenantAdminsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(OtherTenantAdmins);
+
+    public Task SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        RoleSet = (userId, role);
+        CurrentRole = role;
         return Task.CompletedTask;
     }
 
