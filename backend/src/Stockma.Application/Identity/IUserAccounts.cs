@@ -13,6 +13,8 @@ public interface IUserAccounts
 
     Task<Guid> CreateAsync(NewUser user, CancellationToken cancellationToken = default);
 
+    Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default);
+
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);

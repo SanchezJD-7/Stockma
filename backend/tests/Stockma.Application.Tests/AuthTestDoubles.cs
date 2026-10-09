@@ -40,6 +40,14 @@ public sealed class FakeUserAccounts : IUserAccounts
         return Task.FromResult(CreatedId);
     }
 
+    public (Guid UserId, string PhoneNumber)? PhoneNumberSet { get; private set; }
+
+    public Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        PhoneNumberSet = (userId, phoneNumber);
+        return Task.CompletedTask;
+    }
+
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(EmailTaken);
 
@@ -139,6 +147,40 @@ public sealed class FakeTrustedDevices : ITrustedDevices
     }
 }
 
+public sealed class FakeRefreshTokens : IRefreshTokens
+{
+    public List<(Guid UserId, DateTimeOffset RevokedAt)> UserRevocations { get; } = [];
+    public List<(Guid FamilyId, DateTimeOffset RevokedAt)> FamilyRevocations { get; } = [];
+
+    public Task<RefreshTokenLookup?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        Task.FromResult<RefreshTokenLookup?>(null);
+
+    public Task AddAsync(RefreshToken token, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task RevokeFamilyAsync(Guid familyId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
+    {
+        FamilyRevocations.Add((familyId, revokedAt));
+        return Task.CompletedTask;
+    }
+
+    public Task RevokeByDeviceAsync(
+        Guid userId,
+        IReadOnlyCollection<string> deviceIds,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task RevokeAllForUserAsync(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
+    {
+        UserRevocations.Add((userId, revokedAt));
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class FakeDeviceOtpService : IDeviceOtpService
 {
     public List<(Guid UserId, string DeviceId)> Issued { get; } = [];
@@ -157,6 +199,14 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
     }
 
     public List<(Guid UserId, string DeviceId, string Code)> Committed { get; } = [];
+
+    public List<(Guid UserId, DateTimeOffset InvalidatedAt)> Invalidations { get; } = [];
+
+    public Task InvalidateAllForUserAsync(Guid userId, DateTimeOffset invalidatedAt, CancellationToken cancellationToken = default)
+    {
+        Invalidations.Add((userId, invalidatedAt));
+        return Task.CompletedTask;
+    }
 
     public async Task<T> ConsumeAsync<T>(
         Guid userId,
