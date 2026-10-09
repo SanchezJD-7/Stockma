@@ -133,6 +133,67 @@ public sealed class UserAccounts(
         }
     }
 
+    public async Task<string> GetRoleAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+
+        return roles.FirstOrDefault() ?? TenantRoles.Member;
+    }
+
+    public async Task<int> CountOtherTenantAdminsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Los roles no tienen tenant_id (ADR-017): el aislamiento se apoya en el TenantId
+        // del usuario, que además lo refuerza el filtro RLS sobre la consulta de usuarios.
+        var admins = await userManager.GetUsersInRoleAsync(TenantRoles.TenantAdmin);
+
+        return admins.Count(admin => admin.TenantId == context.CurrentTenantId && admin.Id != userId);
+    }
+
+    public async Task SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        var current = await userManager.GetRolesAsync(user);
+
+        if (current.Contains(role))
+        {
+            return;
+        }
+
+        foreach (var oldRole in current)
+        {
+            var removed = await userManager.RemoveFromRoleAsync(user, oldRole);
+
+            if (!removed.Succeeded)
+            {
+                throw new ValidationFailedException(
+                    "No se pudo quitar el rol anterior: " + string.Join(", ", removed.Errors.Select(error => error.Code)));
+            }
+        }
+
+        var assigned = await userManager.AddToRoleAsync(user, role);
+
+        if (!assigned.Succeeded)
+        {
+            throw new ValidationFailedException(
+                "No se pudo asignar el rol: " + string.Join(", ", assigned.Errors.Select(error => error.Code)));
+        }
+    }
+
     private async Task<Guid> CreateWithRoleAsync(NewUser newUser)
     {
         var user = new ApplicationUser(newUser.TenantId, newUser.Email)

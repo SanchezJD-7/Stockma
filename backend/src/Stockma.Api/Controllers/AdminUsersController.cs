@@ -39,4 +39,26 @@ public sealed class AdminUsersController(ISender sender, ILogger<AdminUsersContr
     }
 
     public sealed record SetPhoneNumberRequest(string PhoneNumber);
+
+    [HttpPut("admin/users/{userId:guid}/role")]
+    [Authorize(Policy = AuthorizationPolicies.TenantAdmin)]
+    public async Task<ActionResult<SetUserRoleResult>> SetUserRole(
+        Guid userId,
+        [FromBody] SetUserRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetUserIdFromClaims();
+
+        var result = await sender.Send(new SetUserRoleCommand(userId, request.Role), cancellationToken);
+
+        logger.LogInformation(
+            "{AdminId} cambió el rol del usuario {TargetUserId} a {Role} (T094).",
+            adminId,
+            userId,
+            result.Role);
+
+        return Ok(result);
+    }
+
+    public sealed record SetUserRoleRequest(string Role);
 }
