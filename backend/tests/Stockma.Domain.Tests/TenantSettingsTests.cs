@@ -21,7 +21,7 @@ public class TenantSettingsTests
         var settings = TenantSettings.CreateDefault(TenantId);
 
         settings.RefreshTokenLifetimeHours.Should().Be(8, "data-model.md 1b");
-        settings.SessionIdleTimeoutMinutes.Should().Be(120, "data-model.md 1b, ADR-019 enmendado por T092");
+        settings.SessionIdleTimeoutMinutes.Should().Be(30, "ADR-019 original; la enmienda T092 (2 h) quedó revocada");
     }
 
     [Fact]
