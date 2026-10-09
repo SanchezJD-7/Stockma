@@ -4,7 +4,7 @@ import { AuthService } from '../../../services/auth-service'
 import { getOrCreateDeviceId } from '../utils/device'
 
 const RENEW_THRESHOLD_MS = 2 * 60 * 1000
-const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000
 const CHECK_INTERVAL_MS = 30 * 1000
 
 export function useSessionRenewer() {

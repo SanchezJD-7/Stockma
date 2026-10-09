@@ -1116,6 +1116,11 @@ controlada por el servidor, renovación silenciosa y precedencia servidor/front 
 sólo el número por defecto (cada tenant sigue pudiendo personalizarlo). El front espeja el default en
 `IDLE_TIMEOUT_MS` y la migración actualiza las filas que estaban en el default viejo.
 
+**Revocada (2026-10-09)**: el dueño del producto volvió a la decisión original — el default vuelve a
+**30 minutos** (migración `SetSessionIdleTimeoutDefaultTo30`, `IDLE_TIMEOUT_MS` del front espeja 30 min).
+La enmienda queda en el registro como historia, pero la ADR-019 original vige tal cual: 30 min de
+inactividad y access token de 15 min.
+
 ---
 
 ## Decisiones que siguen abiertas

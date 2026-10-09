@@ -103,7 +103,7 @@ La fase creció de 10 a 19 tareas y no cabe en un PR revisable: el presupuesto d
 |---|---|---|---|
 | **3a** Cimientos | T015, T016, T062 | Entidades, emisión del JWT, roles, persistencia con RLS y la función acotada del login | ✅ en `main` |
 | **3b** Flujo de login | T017, T018, T019, T020, T055a, T055b, T055c, T021, T022, T064, T073, T074, T075, T076, T077, T078, T079, T080, T081, T082, T083, T084, T085, T086, T087, T088, T089 | `register`, `login`, `confirm-device`, OTP por SMS, las tres reglas de T055, el cierre de `register`, la autenticación por defecto de toda la superficie de negocio, el endurecimiento del login (anti-enumeración, fuerza bruta y carreras del OTP, sender de SMS, conformidad del contrato) y el cierre de la segunda revisión adversarial (RLS efectiva en runtime, `confirm-device` atómico, bootstrap sin carreras, arranque que falla temprano) y el de la tercera (chequeo de rol por membresía, `bootstrap-admin` con los chequeos de arranque, `auth_lookup` con requisito explícito y `search_path` seguro, configuración base sin credenciales, carrera de registro entre tenants, pool fail-closed) | ✅ |
-| **3c** Sesión | T065, T092 | Refresh token con rotación y detección de reuso, inactividad de 2 h | ✅ |
+| **3c** Sesión | T065, T092 | Refresh token con rotación y detección de reuso, inactividad de 30 min (T092 revocada) | ✅ |
 | **3d** Ciclo de vida del acceso | T050, T061, T067, T068, T069, T070 | Alta y cambio del celular, revocación, offboarding, reset y caducidad | ⬜ — T067 y T070 ya en `main` |
 | **3e** Plataforma | T063 | Superficie separada del admin de plataforma | ⬜ |
 | **3f** Ambiente demo | T090, T091 | Flag por tenant `require_second_factor` y seed del tenant demo | ✅ |
@@ -306,10 +306,9 @@ emitir un OTP para estar completo.
       **Contraseña por defecto documentada en el README**, pisable con `STOCKMA_DEMO_PASSWORD`. Decisión deliberada: el tenant demo es descartable, está aislado por RLS y su propósito es que entre cualquiera. **Nunca** se corre contra un tenant productivo.
       Tests: crea el tenant con el flag en `false` y un `Member`; dos corridas crean el usuario una sola vez; el email de otro tenant se rechaza; `ProvisionAsync` no duplica filas y restaura el flag.
 
-- [x] **T092** **Inactividad de sesión a 2 horas (enmienda a ADR-019)** — depende de T065
-      **El default de `SessionIdleTimeoutMinutes` pasó de 30 a 120 minutos.** El dueño del producto quiere que la sesión se cierre a las 2 horas de inactividad, no a los 30. El diseño de ADR-019 no cambia: sigue siendo el servidor quien pone la ventana deslizante en cada rotación (`ExpiresAt = min(IssuedAt + Idle, FamilyExpires)`); sólo cambia el default.
-      **Tres números + la data**: `TenantSettings.DefaultSessionIdleTimeoutMinutes` (120), la migración `ChangeSessionIdleTimeoutDefault` (default de columna **y** `UPDATE` de las filas que estaban en el default viejo, sin tocar las personalizadas) y `IDLE_TIMEOUT_MS` del front (2 h). Las reglas de dominio siguen valiendo: `idle > AccessTokenLifetimeMinutes` (15) e `idle ≤ RefreshTokenLifetimeHours × 60`.
-      Docs: `data-model.md`, `contracts/auth-api.md` (inactividad, renovación y NFR-004) y la enmienda al ADR-019. Test del default actualizado a 120.
+- [x] **T092** **Inactividad de sesión a 2 horas (enmienda a ADR-019)** — depende de T065 — **DESCARTADA 2026-10-09**
+      La enmienda se implementó (PR #11: default 30 → 120, migración, front y specs) y **se revirtió al día siguiente por decisión del dueño del producto**: el default vuelve a **30 minutos**, el valor del ADR-019 original. El retorno se hizo como migración hacia adelante (`SetSessionIdleTimeoutDefaultTo30`: default de columna **y** `UPDATE` de las filas en 120), no borrando la migración ya mergeada.
+      `TenantSettings.DefaultSessionIdleTimeoutMinutes` = **30**, `IDLE_TIMEOUT_MS` del front = 30 min, y la enmienda al ADR-019 quedó marcada como revocada. El diseño de ADR-019 nunca cambió (ventana deslizante en cada rotación); las reglas de dominio siguen valiendo: `idle > AccessTokenLifetimeMinutes` (15) e `idle ≤ RefreshTokenLifetimeHours × 60`.
 
 ## Fase 4 — Product Catalog · spec `product-catalog` (PR 4, depende de PR 2)
 
