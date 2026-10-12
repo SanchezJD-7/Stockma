@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using Stockma.Application.Common;
 using Stockma.Application.Identity;
 using Stockma.Domain.Exceptions;
 using Stockma.Infrastructure.Persistence;
@@ -9,10 +11,12 @@ namespace Stockma.Infrastructure.Identity;
 
 public sealed class UserAccounts(
     StockmaDbContext context,
+    ITenantContext tenantContext,
     UserManager<ApplicationUser> userManager,
     ILookupNormalizer lookupNormalizer,
     IPasswordHasher<ApplicationUser> passwordHasher,
-    TimeProvider timeProvider) : IUserAccounts
+    TimeProvider timeProvider,
+    IOptions<IdentityOptions> identityOptions) : IUserAccounts
 {
     private const string FindByEmailSql =
         """
@@ -60,10 +64,70 @@ public sealed class UserAccounts(
 
         if (verification == PasswordVerificationResult.Failed)
         {
+            await RecordFailedAccessAsync(candidate, cancellationToken);
             return null;
         }
 
+        await ResetFailedAccessAsync(candidate, cancellationToken);
+
         return await ToIdentityAsync(candidate.UserId, candidate.TenantId, cancellationToken);
+    }
+
+    private async Task RecordFailedAccessAsync(LoginCandidate candidate, CancellationToken cancellationToken)
+    {
+        await ActivateTenantAsync(candidate.TenantId, cancellationToken);
+
+        var user = await context.Users.FirstOrDefaultAsync(
+            entity => entity.Id == candidate.UserId, cancellationToken);
+
+        if (user is null) return;
+
+        user.AccessFailedCount++;
+
+        if (user.AccessFailedCount >= identityOptions.Value.Lockout.MaxFailedAccessAttempts)
+        {
+            user.LockoutEnd = timeProvider.GetUtcNow() + identityOptions.Value.Lockout.DefaultLockoutTimeSpan;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ResetFailedAccessAsync(LoginCandidate candidate, CancellationToken cancellationToken)
+    {
+        await ActivateTenantAsync(candidate.TenantId, cancellationToken);
+
+        var user = await context.Users.FirstOrDefaultAsync(
+            entity => entity.Id == candidate.UserId, cancellationToken);
+
+        if (user is null || user.AccessFailedCount == 0)
+        {
+            return;
+        }
+
+        user.AccessFailedCount = 0;
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ActivateTenantAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        tenantContext.Set(tenantId);
+
+        var connection = context.Database.GetDbConnection();
+
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            return;
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT set_config('app.tenant', @tenant, false);";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "tenant";
+        parameter.Value = tenantId.ToString();
+        command.Parameters.Add(parameter);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<LoginIdentity?> FindByEmailAsync(
@@ -130,6 +194,26 @@ public sealed class UserAccounts(
         {
             throw new ValidationFailedException(
                 "No se pudo guardar el número: " + string.Join(", ", updated.Errors.Select(error => error.Code)));
+        }
+    }
+
+    public async Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString()) ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId) throw new UserNotFoundException(userId);
+
+        user.LockoutEnabled = true;
+        user.LockoutEnd = enabled ? null : DateTimeOffset.MaxValue;
+        user.AccessFailedCount = 0;
+
+        var updated = await userManager.UpdateAsync(user);
+
+        if (!updated.Succeeded)
+        {
+            throw new ValidationFailedException(
+                "No se pudo guardar el estado de la cuenta: "
+                + string.Join(", ", updated.Errors.Select(error => error.Code)));
         }
     }
 

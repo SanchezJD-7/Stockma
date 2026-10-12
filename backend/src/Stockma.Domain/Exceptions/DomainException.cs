@@ -34,6 +34,9 @@ public sealed class PhoneChangePendingException(int pendingExpiresInSeconds) : D
 public sealed class InvalidCredentialsException() : DomainException(
     "AUTH_INVALID_CREDENTIALS", "Email o contraseña incorrectos.");
 
+public sealed class AccountDisabledException() : DomainException(
+    "AUTH_ACCOUNT_DISABLED", "La cuenta está bloqueada. Un administrador debe habilitarla de nuevo.");
+
 public sealed class EmailAlreadyRegisteredException() : DomainException(
     "AUTH_EMAIL_DUPLICATE", "Ese email ya está registrado en la plataforma.");
 

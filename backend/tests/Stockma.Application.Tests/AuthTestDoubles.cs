@@ -24,7 +24,8 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByEmailResult);
 
-    public LoginIdentity? ByIdResult { get; set; }
+    public LoginIdentity? ByIdResult { get; set; } =
+        new(Guid.Empty, Guid.Empty, Array.Empty<string>());
 
     public Task<LoginIdentity?> FindByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByIdResult);
@@ -84,6 +85,14 @@ public sealed class FakeUserAccounts : IUserAccounts
     {
         RoleSet = (userId, role);
         CurrentRole = role;
+        return Task.CompletedTask;
+    }
+
+    public (Guid UserId, bool Enabled)? AccountEnabledSet { get; private set; }
+
+    public Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        AccountEnabledSet = (userId, enabled);
         return Task.CompletedTask;
     }
 

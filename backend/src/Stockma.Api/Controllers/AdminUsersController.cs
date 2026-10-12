@@ -20,15 +20,8 @@ public sealed class AdminUsersController(ISender sender, ILogger<AdminUsersContr
         CancellationToken cancellationToken)
     {
         var adminId = GetUserIdFromClaims();
-
-        var result = await sender.Send(
-            new SetUserPhoneNumberCommand(userId, request.PhoneNumber),
-            cancellationToken);
-
-        logger.LogInformation(
-            "{AdminId} cambió el PhoneNumber del usuario {TargetUserId} a {PhoneNumberMasked}",
-            adminId, userId, result.PhoneNumberMasked);
-
+        var result = await sender.Send(new SetUserPhoneNumberCommand(userId, request.PhoneNumber), cancellationToken);
+        logger.LogInformation("{AdminId} cambió el PhoneNumber del usuario {TargetUserId} a {PhoneNumberMasked}", adminId, userId, result.PhoneNumberMasked);
         return Ok(result);
     }
 
@@ -48,15 +41,30 @@ public sealed class AdminUsersController(ISender sender, ILogger<AdminUsersContr
         CancellationToken cancellationToken)
     {
         var adminId = GetUserIdFromClaims();
-
         var result = await sender.Send(new SetUserRoleCommand(userId, request.Role), cancellationToken);
-
-        logger.LogInformation(
-            "{AdminId} cambió el rol del usuario {TargetUserId} a {Role} (T094).",
-            adminId, userId, result.Role);
-
+        logger.LogInformation("{AdminId} cambió el rol del usuario {TargetUserId} a {Role}.", adminId, userId, result.Role);
         return Ok(result);
     }
 
     public sealed record SetUserRoleRequest(string Role);
+
+    [HttpPost("admin/users/{userId:guid}/disable")]
+    [Authorize(Policy = AuthorizationPolicies.TenantAdmin)]
+    public async Task<ActionResult<SetUserEnabledResult>> DisableUser(Guid userId, CancellationToken cancellationToken)
+    {
+        var adminId = GetUserIdFromClaims();
+        var result = await sender.Send(new SetUserEnabledCommand(userId, Enabled: false), cancellationToken);
+        logger.LogInformation("{AdminId} deshabilitó al usuario {TargetUserId}", adminId, userId);
+        return Ok(result);
+    }
+
+    [HttpPost("admin/users/{userId:guid}/enable")]
+    [Authorize(Policy = AuthorizationPolicies.TenantAdmin)]
+    public async Task<ActionResult<SetUserEnabledResult>> EnableUser(Guid userId, CancellationToken cancellationToken)
+    {
+        var adminId = GetUserIdFromClaims();
+        var result = await sender.Send(new SetUserEnabledCommand(userId, Enabled: true), cancellationToken);
+        logger.LogInformation("{AdminId} rehabilitó al usuario {TargetUserId}.", adminId, userId);
+        return Ok(result);
+    }
 }

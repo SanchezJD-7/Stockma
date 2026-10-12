@@ -24,6 +24,8 @@ public sealed class ConfirmPhoneNumberChangeCommandHandler(
     {
         var oldPhoneNumber = await accounts.GetUserPhoneNumberAsync(command.UserId, cancellationToken) ?? throw new PhoneNotEnrolledException();
 
+        if (await accounts.FindByIdAsync(command.UserId, cancellationToken) is null) throw new AccountDisabledException();
+
         var masked = await deviceOtps.ConsumePhoneNumberChangeAsync(command.UserId, command.Otp, async newPhoneNumber =>
             {
                 await trustedDevices.RevokeAsync(command.UserId, null, cancellationToken);

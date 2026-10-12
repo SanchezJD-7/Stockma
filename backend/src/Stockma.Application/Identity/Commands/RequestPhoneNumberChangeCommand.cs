@@ -20,17 +20,14 @@ public sealed class RequestPhoneNumberChangeCommandHandler(
         var newPhoneNumber = PhoneNumber.Parse(command.NewPhoneNumber);
         CountryPhoneRules.Validate(await tenantSettings.GetCountryCodeAsync(cancellationToken), newPhoneNumber);
         var currentPhoneNumber = await accounts.GetUserPhoneNumberAsync(command.UserId, cancellationToken) ?? throw new PhoneNotEnrolledException();
-        if (currentPhoneNumber == newPhoneNumber)
-        {
-            throw new ValidationFailedException("El número pedido y el actual son los mismos.");
-        }
+
+        if (await accounts.FindByIdAsync(command.UserId, cancellationToken) is null) throw new AccountDisabledException();
+
+        if (currentPhoneNumber == newPhoneNumber) throw new ValidationFailedException("El número pedido y el actual son los mismos.");
 
         var issue = await deviceOtps.IssuePhoneNumberChangeAsync(command.UserId, newPhoneNumber, cancellationToken);
 
-        if (issue.Status == PhoneChangeIssueStatus.PendingExists)
-        {
-            throw new PhoneChangePendingException(issue.PendingExpiresInSeconds);
-        }
+        if (issue.Status == PhoneChangeIssueStatus.PendingExists) throw new PhoneChangePendingException(issue.PendingExpiresInSeconds);
 
         return new RequestPhoneNumberChangeResult(PhoneNumber.Mask(currentPhoneNumber), (int)DeviceOtp.MaxLifetime.TotalSeconds);
     }

@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Stockma.Application.Common;
 using Stockma.Application.Identity;
 using Stockma.Domain.Exceptions;
@@ -69,10 +70,12 @@ public class UserAccountsTests(PostgresFixture postgres) : IClassFixture<Postgre
 
         var accounts = new UserAccounts(
             context,
+            provider.GetRequiredService<ITenantContext>(),
             provider.GetRequiredService<UserManager<ApplicationUser>>(),
             provider.GetRequiredService<ILookupNormalizer>(),
             hasher ?? provider.GetRequiredService<IPasswordHasher<ApplicationUser>>(),
-            new FixedTimeProvider(Now));
+            new FixedTimeProvider(Now),
+            provider.GetRequiredService<IOptions<IdentityOptions>>());
 
         return (accounts, context, tenant);
     }
@@ -428,5 +431,117 @@ public class UserAccountsTests(PostgresFixture postgres) : IClassFixture<Postgre
             () => accounts.CreateAsync(new NewUser(TenantA, UniqueEmail(), "corta", "+573001234567", TenantRoles.Member)));
 
         exception.ErrorCode.Should().Be("VALIDATION_FAILED", "auth-api.md: 400, no un 500");
+    }
+
+    private const int MaxFailedAccessAttempts = 5;
+
+    private async Task<int> FailedAccessCountAsync(StockmaDbContext context, Guid userId) =>
+        await context.Users
+            .Where(user => user.Id == userId)
+            .Select(user => user.AccessFailedCount)
+            .SingleAsync();
+
+    private async Task<DateTimeOffset?> LockoutEndAsync(StockmaDbContext context, Guid userId) =>
+        await context.Users
+            .Where(user => user.Id == userId)
+            .Select(user => user.LockoutEnd)
+            .SingleAsync();
+
+    [Fact]
+    public async Task Verify_WithTheWrongPassword_IncrementsTheFailedAccessCount()
+    {
+        var (setup, context, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await setup.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+
+        (await login.VerifyCredentialsAsync(email, "OtraClave#2026Larga")).Should().BeNull();
+
+        (await FailedAccessCountAsync(context, userId)).Should().Be(1, "un fallo cuenta uno");
+    }
+
+    [Fact]
+    public async Task Verify_AfterMaxFailedAttempts_BlocksEvenTheCorrectPassword()
+    {
+        var (setup, context, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await setup.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+
+        for (var attempt = 1; attempt <= MaxFailedAccessAttempts; attempt++)
+        {
+            (await login.VerifyCredentialsAsync(email, $"Errada-{attempt}#2026Larga")).Should().BeNull();
+        }
+
+        (await FailedAccessCountAsync(context, userId)).Should().Be(MaxFailedAccessAttempts);
+        (await LockoutEndAsync(context, userId)).Should().NotBeNull("al tope de intentos se setea LockoutEnd");
+
+        (await login.VerifyCredentialsAsync(email, Password)).Should()
+            .BeNull("agotados los intentos ni la contraseña correcta sirve, y la respuesta sigue siendo el mismo null");
+    }
+
+    [Fact]
+    public async Task Verify_WithTheRightPassword_ResetsTheFailedAccessCount()
+    {
+        var (setup, context, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await setup.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+        await login.VerifyCredentialsAsync(email, "Errada-1#2026Larga");
+        await login.VerifyCredentialsAsync(email, "Errada-2#2026Larga");
+
+        (await FailedAccessCountAsync(context, userId)).Should().Be(2);
+
+        (await login.VerifyCredentialsAsync(email, Password)).Should().NotBeNull();
+
+        (await FailedAccessCountAsync(context, userId)).Should()
+            .Be(0, "un login exitoso deja el contador en cero: los fallos viejos no acumulan");
+    }
+
+    [Fact]
+    public async Task Verify_ForALockedOutUser_DoesNotMoveTheLockoutEnd()
+    {
+        var (setup, context, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await setup.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        var lockedUntil = Now.AddHours(1);
+        await context.Database.ExecuteSqlRawAsync(
+            "UPDATE users SET lockout_end = {0}, lockout_enabled = true, access_failed_count = 0 WHERE id = {1};",
+            lockedUntil,
+            userId);
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+
+        (await login.VerifyCredentialsAsync(email, "OtraClave#2026Larga")).Should().BeNull();
+
+        (await LockoutEndAsync(context, userId))
+            .Should().Be(lockedUntil, "contar sobre un bloqueo activo lo extendería: un atacante dejaría afuera al dueño para siempre");
+        (await FailedAccessCountAsync(context, userId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Disable_RejectsTheCorrectPasswordAndEnableReadmitsIt()
+    {
+        var (setup, context, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await setup.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        await setup.SetAccountEnabledAsync(userId, enabled: false);
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+
+        (await login.VerifyCredentialsAsync(email, Password))
+            .Should().BeNull("T068: el deshabilitado no entra ni con la contraseña correcta");
+        (await setup.FindByIdAsync(userId))
+            .Should().BeNull("el refresh también lo rechaza: sin FindById no hay sesión que renovar");
+
+        await setup.SetAccountEnabledAsync(userId, enabled: true);
+
+        (await login.VerifyCredentialsAsync(email, Password))
+            .Should().NotBeNull("rehabilitar reabre el acceso; lo viejo no resucita porque se revocó en el disable");
     }
 }

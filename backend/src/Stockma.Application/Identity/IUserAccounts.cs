@@ -21,6 +21,8 @@ public interface IUserAccounts
 
     Task SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default);
 
+    Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default);
+
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);
