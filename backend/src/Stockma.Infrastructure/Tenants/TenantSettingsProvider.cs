@@ -36,4 +36,15 @@ public sealed class TenantSettingsProvider(StockmaDbContext context) : ITenantSe
 
         return settings?.RequireSecondFactor ?? TenantSettings.DefaultRequireSecondFactor;
     }
+
+    public async Task<string?> GetCountryCodeAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await context.TenantSettings
+            .AsNoTracking()
+            .Where(s => s.TenantId == context.CurrentTenantId)
+            .Select(s => new { s.CountryCode })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return settings?.CountryCode;
+    }
 }

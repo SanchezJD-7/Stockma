@@ -13,18 +13,11 @@ public sealed class TenantSettingsConfiguration : IEntityTypeConfiguration<Tenan
         builder.Property(s => s.TenantId).HasColumnName("tenant_id").ValueGeneratedNever();
         builder.Property(s => s.MaxTrustedDevices).HasColumnName("max_trusted_devices");
         builder.Property(s => s.NextSkuNumber).HasColumnName("next_sku_number").HasDefaultValue(TenantSettings.InitialSkuNumber);
-        builder.Property(s => s.RefreshTokenLifetimeHours)
-            .HasColumnName("refresh_token_lifetime_hours")
-            .HasDefaultValue(TenantSettings.DefaultRefreshTokenLifetimeHours);
-        builder.Property(s => s.SessionIdleTimeoutMinutes)
-            .HasColumnName("session_idle_timeout_minutes")
-            .HasDefaultValue(TenantSettings.DefaultSessionIdleTimeoutMinutes);
-        builder.Property(s => s.TrustedDeviceLifetimeDays)
-            .HasColumnName("trusted_device_lifetime_days")
-            .HasDefaultValue(TenantSettings.DefaultTrustedDeviceLifetimeDays);
-        builder.Property(s => s.RequireSecondFactor)
-            .HasColumnName("require_second_factor")
-            .HasDefaultValue(TenantSettings.DefaultRequireSecondFactor);
+        builder.Property(s => s.RefreshTokenLifetimeHours).HasColumnName("refresh_token_lifetime_hours").HasDefaultValue(TenantSettings.DefaultRefreshTokenLifetimeHours);
+        builder.Property(s => s.SessionIdleTimeoutMinutes).HasColumnName("session_idle_timeout_minutes").HasDefaultValue(TenantSettings.DefaultSessionIdleTimeoutMinutes);
+        builder.Property(s => s.TrustedDeviceLifetimeDays).HasColumnName("trusted_device_lifetime_days").HasDefaultValue(TenantSettings.DefaultTrustedDeviceLifetimeDays);
+        builder.Property(s => s.RequireSecondFactor).HasColumnName("require_second_factor").HasDefaultValue(TenantSettings.DefaultRequireSecondFactor);
+        builder.Property(s => s.CountryCode).HasColumnName("country_code").HasMaxLength(2).HasDefaultValue(TenantSettings.DefaultCountryCode);
         builder.OwnsOne(s => s.Thresholds, thresholds =>
         {
             thresholds.Property(t => t.GreenMonths).HasColumnName("green_months");

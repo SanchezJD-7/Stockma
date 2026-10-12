@@ -603,13 +603,13 @@ Content-Type: application/json
 
 ## `PUT /api/auth/phone-number` — FR-008 (T061)
 
-`[PENDIENTE: propuesto, no está en las fuentes originales]`
+Diseñado y cerrado en T061 (2026-10-09). Decisiones del titular revisadas y aplicadas (2026-10-10): `409` sobre reemplazo silencioso, revocación total al confirmar, aviso al viejo, E.164, y validación de móvil del país del tenant.
 
 Único camino para que un usuario cambie **su propio** `PhoneNumber`. Exige estar autenticado **y** confirmar un OTP enviado al número **actual**.
 
 > **Alta ≠ cambio.** Enrolar el primer número con sólo la contraseña sería dejar que un factor se autoenrole: quien tuviera la contraseña decidiría a dónde llegan los OTP. Cambiar uno existente es seguro porque exige demostrar posesión del canal vigente — un atacante con la contraseña robada no tiene el celular viejo. Por eso el **alta** es `PUT /api/admin/users/{userId}/phone-number` (admin, T050) y el **cambio** es este endpoint.
 
-**Commands**: `RequestPhoneNumberChangeCommand` / `ConfirmPhoneNumberChangeCommand` `[PENDIENTE: propuesto]`
+**Commands**: `RequestPhoneNumberChangeCommand` / `ConfirmPhoneNumberChangeCommand` (T061)
 
 ### Paso 1 — Request del cambio
 
@@ -664,21 +664,28 @@ Content-Type: application/json
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
-| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no es un número móvil válido en formato E.164 `[PENDIENTE: formato/validación a confirmar]` |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no es E.164 válido (`PhoneNumber.Parse`: `^\+[1-9]\d{6,14}$`, sin espacios ni símbolos) |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no corresponde a un móvil del país del tenant (`CountryPhoneRules`: hoy Colombia, `^\+573\d{9}$`) |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` es el mismo que el actual: no hay nada que cambiar |
 | `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
-| `401` | `AUTH_OTP_REJECTED` | OTP errado o vencido en el paso 2 |
+| `401` | `AUTH_OTP_REJECTED` | OTP errado o vencido en el paso 2, o no hay cambio pendiente |
 | `403` | `AUTH_PHONE_NOT_ENROLLED` | El usuario **no tiene** `PhoneNumber` cargado: ese caso es alta por admin (T050), no cambio |
-| `409` | `AUTH_PHONE_CHANGE_PENDING` | Ya hay un cambio en vuelo sin confirmar `[PENDIENTE: confirmar si se rechaza o se reemplaza el anterior]` |
+| `404` | `USER_NOT_FOUND` | El `sub` del token no corresponde a un usuario del tenant |
+| `409` | `AUTH_PHONE_CHANGE_PENDING` | Ya hay un cambio en vuelo sin confirmar. El `detail` indica cuántos segundos faltan para que el pendiente venza |
 | `429` | `RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
 
 ### Reglas
 
 - El OTP DEBE enviarse al `PhoneNumber` **vigente**. NUNCA al número nuevo — mandarlo al nuevo destruye la garantía: cualquiera con la contraseña se autoconfirmaría el cambio.
-- El `PhoneNumber` NO DEBE modificarse hasta que el OTP sea confirmado. Mientras tanto el número nuevo vive aparte (pendiente), no en `ApplicationUser`.
+- **Regla del país del tenant (decisión del titular, T061)**: el número nuevo DEBE corresponder a un móvil del país del tenant (`tenant_settings.country_code`, ISO 3166-1 alpha-2, def. `CO`). Las reglas viven en `CountryPhoneRules` (Domain): sólo se valida **formato** (prefijo del país + longitud + prefijo móvil), no la existencia del número. El rechazo ocurre EN EL REQUEST, antes de gastar un SMS. Un tenant sin `country_code` o un país sin regla cargada degrada a exigir únicamente E.164.
+- El `PhoneNumber` NO DEBE modificarse hasta que el OTP sea confirmado. Mientras tanto el número nuevo vive aparte (pendiente), no en `ApplicationUser`: se persiste en la fila del OTP (`device_otps.new_phone_number`), de modo que la vida del pendiente = la del código (10 min) y no queda estado huérfano.
+- Los OTP de cambio viven en el alcance interno `internal:phone-change` (no se amarran a un dispositivo): el usuario puede pedir el cambio desde cualquiera, y los OTP de login y de cambio nunca se pisan.
+- **Un solo cambio en vuelo — `409` (decisión del titular, T061)**: si ya hay un cambio pendiente, un nuevo pedido responde `409 AUTH_PHONE_CHANGE_PENDING` sin emitir otro código ni gastar un SMS. El pendiente original sigue vigente hasta que venza (10 min) o se confirme. El `detail` informa los segundos restantes para que el front pueda mostrar "esperá a que venza el código anterior". El rechazo no relaja la tasa de emisión (NFR-005).
 - Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint (`403 AUTH_PHONE_NOT_ENROLLED`).
+- **Confirmar revoca TODO — fail-closed (decisión del titular, T061)**: al confirmar el OTP se revocan TODAS las sesiones del usuario (refresh tokens) y TODOS sus dispositivos confiables, y se queman los OTPs restantes. La revocación ocurre ANTES de escribir el número y dentro de la misma transacción del consume: si algo falla a mitad, no se aplica el cambio. El titular se desloguea en todos lados y su próximo login exige OTP al número **nuevo**.
+- **Aviso al número viejo (decisión T061)**: aplicado el cambio se envía un SMS best-effort al número anterior ("Tu número de Stockma fue cambiado..."). Si el envío falla, se loguea y el cambio NO se revierte — ya estaba confirmado con OTP.
 - Aplicado el cambio, `PhoneNumberConfirmed` DEBE quedar en `true` y el cambio DEBE quedar auditado con el usuario que lo ejecutó.
 - Rate limiting igual que el resto de `auth` (NFR-005).
-- `[PENDIENTE: definir si el cambio confirmado revoca los TrustedDevice y/o notifica al número viejo]`
 
 ### Escenarios (Dado/Cuando/Entonces)
 
@@ -701,6 +708,26 @@ Content-Type: application/json
 - **DADO** un usuario autenticado sin `PhoneNumber` cargado
 - **CUANDO** `PUT /api/auth/phone-number`
 - **ENTONCES** responde `403 AUTH_PHONE_NOT_ENROLLED` y el número queda sin cambios
+
+**Cambio en vuelo**
+- **DADO** un cambio pendiente sin confirmar
+- **CUANDO** el usuario pide OTRO cambio con un número distinto
+- **ENTONCES** responde `409 AUTH_PHONE_CHANGE_PENDING`, no se emite código nuevo y el pendiente original sigue vivo
+
+**Confirmar revoca todo**
+- **DADO** un usuario con sesiones abiertas y dispositivos confiables que confirma su cambio de número
+- **CUANDO** se aplica el nuevo número
+- **ENTONCES** todas sus sesiones y sus dispositivos confiables quedan revocados, y los OTPs restantes del usuario quedan quemados
+
+**Aviso al número viejo**
+- **DADO** un cambio confirmado con OTP
+- **CUANDO** se aplica el nuevo número
+- **ENTONCES** se envía un SMS de aviso al número VIEJO; si el envío falla, el cambio se mantiene y el fallo queda en el log
+
+**Mismo número**
+- **DADO** un usuario con `PhoneNumber` cargado
+- **CUANDO** pide cambiarlo a su propio número actual
+- **ENTONCES** responde `400 VALIDATION_FAILED` sin emitir OTP
 
 ---
 

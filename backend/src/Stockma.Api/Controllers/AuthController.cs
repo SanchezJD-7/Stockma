@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -67,6 +68,41 @@ public sealed class AuthController(ISender sender) : ControllerBase
         ClearRefreshCookie();
 
         return NoContent();
+    }
+
+    [HttpPut("phone-number")]
+    [Authorize]
+    public async Task<ActionResult<RequestPhoneNumberChangeResult>> RequestPhoneNumberChange(
+        RequestPhoneNumberChangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new RequestPhoneNumberChangeCommand(GetUserIdFromClaims(), request.NewPhoneNumber),
+            cancellationToken);
+
+        return Accepted(result);
+    }
+
+    [HttpPost("phone-number/confirm")]
+    [Authorize]
+    public async Task<ActionResult<ConfirmPhoneNumberChangeResult>> ConfirmPhoneNumberChange(
+        ConfirmPhoneNumberChangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ConfirmPhoneNumberChangeCommand(GetUserIdFromClaims(), request.Otp),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    public sealed record RequestPhoneNumberChangeRequest(string NewPhoneNumber);
+    public sealed record ConfirmPhoneNumberChangeRequest(string Otp);
+
+    private Guid GetUserIdFromClaims()
+    {
+        var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        return Guid.TryParse(sub, out var userId) ? userId : throw new UnauthorizedAccessException("El token no trae un sub válido.");
     }
 
     private void SetRefreshCookie(string token) =>

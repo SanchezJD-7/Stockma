@@ -14,6 +14,8 @@ public sealed class DeviceOtpService : IDeviceOtpService
 {
     public static readonly TimeSpan Lifetime = DeviceOtp.MaxLifetime;
 
+    public const string PhoneChangeScope = "internal:phone-change";
+
     private const string LockScope = "device_otps";
 
     private readonly StockmaDbContext context;
@@ -50,22 +52,19 @@ public sealed class DeviceOtpService : IDeviceOtpService
     {
         var normalizedDeviceId = DeviceIdentifier.Normalize(deviceId);
 
-        var delivery = await context.RunLockedAsync(
+        var outcome = await context.RunLockedAsync(
             LockScope,
             userId,
-            () => IssueLockedAsync(userId, normalizedDeviceId, cancellationToken),
+            () => IssueLockedAsync(userId, normalizedDeviceId, newPhoneNumber: null, cancellationToken),
             cancellationToken);
 
-        if (delivery is null)
-        {
-            return;
-        }
+        if (outcome.Delivery is null) return;
 
         try
         {
             await smsSender.SendAsync(
-                delivery.Value.PhoneNumber,
-                $"Tu código de acceso a Stockma es {delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+                outcome.Delivery.Value.PhoneNumber,
+                $"Tu código de acceso a Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
                 cancellationToken);
         }
         catch (SmsDeliveryException exception)
@@ -76,6 +75,43 @@ public sealed class DeviceOtpService : IDeviceOtpService
                 userId,
                 exception.Message);
         }
+    }
+
+    public async Task<PhoneChangeIssueResult> IssuePhoneNumberChangeAsync(Guid userId, string newPhoneNumber, CancellationToken cancellationToken = default)
+    {
+        var outcome = await context.RunLockedAsync(
+            LockScope,
+            userId,
+            () => IssueLockedAsync(userId, PhoneChangeScope, newPhoneNumber, cancellationToken),
+            cancellationToken);
+
+        if (outcome.Status == IssueStatus.PendingExists)
+        {
+            return new PhoneChangeIssueResult(PhoneChangeIssueStatus.PendingExists, outcome.PendingExpiresInSeconds);
+        }
+
+        if (outcome.Delivery is null)
+        {
+            return new PhoneChangeIssueResult(PhoneChangeIssueStatus.RateLimited);
+        }
+
+        try
+        {
+            await smsSender.SendAsync(
+                outcome.Delivery.Value.PhoneNumber,
+                $"Tu código para confirmar el cambio de número en Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+                cancellationToken);
+        }
+        catch (SmsDeliveryException exception)
+        {
+            logger.LogError(
+                exception,
+                "Falló el envío del SMS de OTP de cambio de número para el usuario {UserId}: {Reason}",
+                userId,
+                exception.Message);
+        }
+
+        return new PhoneChangeIssueResult(PhoneChangeIssueStatus.Issued);
     }
 
     public async Task InvalidateAllForUserAsync(
@@ -111,29 +147,33 @@ public sealed class DeviceOtpService : IDeviceOtpService
         string deviceId,
         string code,
         Func<Task<T>> onConsumed,
-        CancellationToken cancellationToken = default)
-    {
-        var normalizedDeviceId = DeviceIdentifier.Normalize(deviceId);
+        CancellationToken cancellationToken = default) =>
+        await ConsumeCoreAsync(userId, deviceId, code, _ => onConsumed(), requirePhoneNumberChange: false, cancellationToken);
 
-        var (consumed, result) = await context.RunLockedAsync(
-            LockScope,
+    public async Task<T> ConsumePhoneNumberChangeAsync<T>(
+        Guid userId,
+        string code,
+        Func<string, Task<T>> onConsumed,
+        CancellationToken cancellationToken = default) =>
+        await ConsumeCoreAsync(
             userId,
-            async () => await ConsumeLockedAsync(userId, normalizedDeviceId, code, cancellationToken)
-                ? (true, await onConsumed())
-                : (false, default(T)!),
+            PhoneChangeScope,
+            code,
+            otp => onConsumed(otp.NewPhoneNumber!),
+            requirePhoneNumberChange: true,
             cancellationToken);
 
-        if (!consumed)
-        {
-            throw new OtpNotUsableException();
-        }
+    private enum IssueStatus { Issued, RateLimited, PendingExists }
 
-        return result;
-    }
+    private sealed record IssueOutcome(
+        IssueStatus Status,
+        (string PhoneNumber, string Code)? Delivery,
+        int PendingExpiresInSeconds = 0);
 
-    private async Task<(string PhoneNumber, string Code)?> IssueLockedAsync(
+    private async Task<IssueOutcome> IssueLockedAsync(
         Guid userId,
         string deviceId,
+        string? newPhoneNumber,
         CancellationToken cancellationToken)
     {
         var user = await context.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken)
@@ -145,6 +185,22 @@ public sealed class DeviceOtpService : IDeviceOtpService
         }
 
         var now = timeProvider.GetUtcNow();
+
+        if (deviceId == PhoneChangeScope)
+        {
+            var pending = await LiveOtps(userId, PhoneChangeScope, now)
+                .OrderByDescending(otp => otp.IssuedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (pending is not null)
+            {
+                return new IssueOutcome(
+                    IssueStatus.PendingExists,
+                    Delivery: null,
+                    Math.Max(0, (int)(pending.ExpiresAt - now).TotalSeconds));
+            }
+        }
+
         var windowStart = now.AddMinutes(-options.IssueWindowMinutes);
 
         var issuedInWindow = await context.DeviceOtps.CountAsync(
@@ -159,7 +215,7 @@ public sealed class DeviceOtpService : IDeviceOtpService
                 options.MaxIssuesPerWindow,
                 options.IssueWindowMinutes);
 
-            return null;
+            return new IssueOutcome(IssueStatus.RateLimited, Delivery: null);
         }
 
         var previous = await LiveOtps(userId, deviceId, now).ToListAsync(cancellationToken);
@@ -177,58 +233,83 @@ public sealed class DeviceOtpService : IDeviceOtpService
             deviceId,
             hasher.HashPassword(user, code),
             now,
-            Lifetime));
+            Lifetime,
+            newPhoneNumber));
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return (user.PhoneNumber, code);
+        return new IssueOutcome(IssueStatus.Issued, (user.PhoneNumber, code));
     }
 
-    private async Task<bool> ConsumeLockedAsync(
+    private async Task<T> ConsumeCoreAsync<T>(
         Guid userId,
         string deviceId,
         string code,
+        Func<DeviceOtp, Task<T>> onConsumed,
+        bool requirePhoneNumberChange,
         CancellationToken cancellationToken)
     {
-        var now = timeProvider.GetUtcNow();
+        var normalizedDeviceId = DeviceIdentifier.Normalize(deviceId);
 
-        var otp = await LiveOtps(userId, deviceId, now)
-            .OrderByDescending(candidate => candidate.IssuedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var (consumed, result) = await context.RunLockedAsync(
+            LockScope,
+            userId,
+            async () =>
+            {
+                var now = timeProvider.GetUtcNow();
 
-        var user = otp is null
-            ? null
-            : await context.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                var otp = await LiveOtps(userId, normalizedDeviceId, now)
+                    .Where(candidate => !requirePhoneNumberChange || candidate.NewPhoneNumber != null)
+                    .OrderByDescending(candidate => candidate.IssuedAt)
+                    .FirstOrDefaultAsync(cancellationToken);
 
-        if (otp is null || user is null)
+                var user = otp is null
+                    ? null
+                    : await context.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+                if (otp is null || user is null)
+                {
+                    logger.LogWarning(
+                        "Intento de OTP rechazado para el usuario {UserId}: no hay un código vigente.",
+                        userId);
+
+                    return (false, default(T)!);
+                }
+
+                if (hasher.VerifyHashedPassword(user, otp.CodeHash, code) == PasswordVerificationResult.Failed)
+                {
+                    otp.RegisterFailedAttempt(now, options.MaxAttempts);
+
+                    var recorded = await TrySaveAsync(cancellationToken);
+
+                    logger.LogWarning(
+                        "Intento de OTP rechazado para el usuario {UserId}: código incorrecto. Intentos fallidos {FailedAttempts} de {MaxAttempts}; quemado: {Burned}; registrado: {Recorded}.",
+                        userId,
+                        otp.FailedAttempts,
+                        options.MaxAttempts,
+                        otp.InvalidatedAt is not null,
+                        recorded);
+
+                    return (false, default(T)!);
+                }
+
+                otp.Consume(now);
+
+                if (!await TrySaveAsync(cancellationToken))
+                {
+                    return (false, default(T)!);
+                }
+
+                return (true, await onConsumed(otp));
+            },
+            cancellationToken);
+
+        if (!consumed)
         {
-            logger.LogWarning(
-                "Intento de OTP rechazado para el usuario {UserId}: no hay un código vigente.",
-                userId);
-
-            return false;
+            throw new OtpNotUsableException();
         }
 
-        if (hasher.VerifyHashedPassword(user, otp.CodeHash, code) == PasswordVerificationResult.Failed)
-        {
-            otp.RegisterFailedAttempt(now, options.MaxAttempts);
-
-            var recorded = await TrySaveAsync(cancellationToken);
-
-            logger.LogWarning(
-                "Intento de OTP rechazado para el usuario {UserId}: código incorrecto. Intentos fallidos {FailedAttempts} de {MaxAttempts}; quemado: {Burned}; registrado: {Recorded}.",
-                userId,
-                otp.FailedAttempts,
-                options.MaxAttempts,
-                otp.InvalidatedAt is not null,
-                recorded);
-
-            return false;
-        }
-
-        otp.Consume(now);
-
-        return await TrySaveAsync(cancellationToken);
+        return result;
     }
 
     private IQueryable<DeviceOtp> LiveOtps(Guid userId, string deviceId, DateTimeOffset now) =>

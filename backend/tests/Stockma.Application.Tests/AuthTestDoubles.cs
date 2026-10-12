@@ -46,17 +46,30 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default)
     {
         PhoneNumberSet = (userId, phoneNumber);
+        CurrentPhoneNumber = phoneNumber;
         return Task.CompletedTask;
     }
 
-    public bool RoleUserExists { get; set; } = true;
+    public string? CurrentPhoneNumber { get; set; }
+
+    public Task<string?> GetUserPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (!UserExists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        return Task.FromResult(CurrentPhoneNumber);
+    }
+
+    public bool UserExists { get; set; } = true;
     public string CurrentRole { get; set; } = TenantRoles.Member;
     public int OtherTenantAdmins { get; set; }
     public (Guid UserId, string Role)? RoleSet { get; private set; }
 
     public Task<string> GetRoleAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        if (!RoleUserExists)
+        if (!UserExists)
         {
             throw new UserNotFoundException(userId);
         }
@@ -253,6 +266,59 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
         Committed.Add((userId, deviceId, code));
         return result;
     }
+
+    public List<(Guid UserId, string NewPhoneNumber)> PhoneChangeIssued { get; } = [];
+    public List<(Guid UserId, string Code)> PhoneChangeConsumed { get; } = [];
+    public string? ConsumePhoneNumberChangeReturns { get; set; }
+    public PhoneChangeIssueStatus IssueStatus { get; set; } = PhoneChangeIssueStatus.Issued;
+
+    public Task<PhoneChangeIssueResult> IssuePhoneNumberChangeAsync(Guid userId, string newPhoneNumber, CancellationToken cancellationToken = default)
+    {
+        if (IssueThrows is not null)
+        {
+            throw IssueThrows;
+        }
+
+        if (IssueStatus == PhoneChangeIssueStatus.Issued)
+        {
+            PhoneChangeIssued.Add((userId, newPhoneNumber));
+        }
+
+        return Task.FromResult(new PhoneChangeIssueResult(IssueStatus, PendingExpiresInSeconds: 540));
+    }
+
+    public async Task<T> ConsumePhoneNumberChangeAsync<T>(
+        Guid userId,
+        string code,
+        Func<string, Task<T>> onConsumed,
+        CancellationToken cancellationToken = default)
+    {
+        if (ConsumeThrows is not null)
+        {
+            throw ConsumeThrows;
+        }
+
+        PhoneChangeConsumed.Add((userId, code));
+
+        return await onConsumed(ConsumePhoneNumberChangeReturns ?? "+573000000000");
+    }
+}
+
+public sealed class FakeSmsSender : ISmsSender
+{
+    public List<(string PhoneNumber, string Message)> Sent { get; } = [];
+    public Exception? Throws { get; set; }
+
+    public Task SendAsync(string phoneNumber, string message, CancellationToken cancellationToken = default)
+    {
+        if (Throws is not null)
+        {
+            throw Throws;
+        }
+
+        Sent.Add((phoneNumber, message));
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class FakeJwtTokenService : IJwtTokenService
@@ -312,6 +378,7 @@ public sealed class FakeTenantContext(Guid tenantId) : ITenantContext
 public sealed class FakeTenantSettingsProvider(ITenantContext tenantContext) : ITenantSettingsProvider
 {
     public bool RequireSecondFactor { get; set; } = TenantSettings.DefaultRequireSecondFactor;
+    public string? CountryCode { get; set; } = TenantSettings.DefaultCountryCode;
     public int Reads { get; private set; }
     public Guid? TenantIdWhenRead { get; private set; }
     public ExpiryThresholds Thresholds { get; set; } = ExpiryThresholds.Default();
@@ -329,4 +396,7 @@ public sealed class FakeTenantSettingsProvider(ITenantContext tenantContext) : I
         TenantIdWhenRead = tenantContext.TenantId;
         return Task.FromResult(RequireSecondFactor);
     }
+
+    public Task<string?> GetCountryCodeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(CountryCode);
 }

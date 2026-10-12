@@ -14,7 +14,7 @@ public class DeviceOtp : ITenantEntity, IAggregateRoot
         CodeHash = string.Empty;
     }
 
-    public DeviceOtp(Guid tenantId, Guid userId, string deviceId, string codeHash, DateTimeOffset issuedAt, TimeSpan lifetime)
+    public DeviceOtp(Guid tenantId, Guid userId, string deviceId, string codeHash, DateTimeOffset issuedAt, TimeSpan lifetime, string? newPhoneNumber = null)
     {
         if (tenantId == Guid.Empty)
         {
@@ -52,6 +52,11 @@ public class DeviceOtp : ITenantEntity, IAggregateRoot
                 $"La vigencia del código no puede superar {MaxLifetime.TotalMinutes:0} minutos (NFR-004).");
         }
 
+        if (newPhoneNumber is not null)
+        {
+            NewPhoneNumber = PhoneNumber.Parse(newPhoneNumber);
+        }
+
         Id = Guid.CreateVersion7();
         TenantId = tenantId;
         UserId = userId;
@@ -66,6 +71,7 @@ public class DeviceOtp : ITenantEntity, IAggregateRoot
     public Guid UserId { get; private set; }
     public string DeviceId { get; private set; }
     public string CodeHash { get; private set; }
+    public string? NewPhoneNumber { get; private set; }
     public DateTimeOffset IssuedAt { get; private set; }
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? ConsumedAt { get; private set; }

@@ -18,6 +18,7 @@ public sealed class DeviceOtpConfiguration : IEntityTypeConfiguration<DeviceOtp>
         builder.Property(o => o.UserId).HasColumnName("user_id");
         builder.Property(o => o.DeviceId).HasColumnName("device_id").HasMaxLength(128).IsRequired();
         builder.Property(o => o.CodeHash).HasColumnName("code_hash").HasMaxLength(256).IsRequired();
+        builder.Property(o => o.NewPhoneNumber).HasColumnName("new_phone_number").HasMaxLength(32).IsRequired(false);
         builder.Property(o => o.IssuedAt).HasColumnName("issued_at");
         builder.Property(o => o.ExpiresAt).HasColumnName("expires_at");
         builder.Property(o => o.ConsumedAt).HasColumnName("consumed_at");

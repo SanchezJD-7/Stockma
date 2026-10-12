@@ -81,7 +81,7 @@ public class SetUserRoleCommandTests
     [Fact]
     public async Task SetRole_ForAnUnknownUser_ReturnsNotFoundWithoutSideEffects()
     {
-        accounts.RoleUserExists = false;
+        accounts.UserExists = false;
 
         Func<Task> act = () => CreateHandler().Handle(new SetUserRoleCommand(UserId, TenantRoles.TenantAdmin), default);
 

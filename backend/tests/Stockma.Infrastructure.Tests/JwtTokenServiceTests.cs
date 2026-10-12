@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 
 using FluentAssertions;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Stockma.Application.Identity;
 using Stockma.Infrastructure.Identity;

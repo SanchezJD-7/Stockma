@@ -188,6 +188,15 @@ public sealed class UserAccounts(
         }
     }
 
+    public async Task<string?> GetUserPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString()) ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId) throw new UserNotFoundException(userId);
+
+        return user.PhoneNumber;
+    }
+
     private async Task<Guid> CreateWithRoleAsync(NewUser newUser)
     {
         var user = new ApplicationUser(newUser.TenantId, newUser.Email)

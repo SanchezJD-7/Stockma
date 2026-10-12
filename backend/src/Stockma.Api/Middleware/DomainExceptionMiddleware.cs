@@ -35,7 +35,7 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
     {
         InvalidCredentialsException or OtpNotUsableException or RefreshTokenNotUsableException => StatusCodes.Status401Unauthorized,
         PhoneNotEnrolledException => StatusCodes.Status403Forbidden,
-        EmailAlreadyRegisteredException => StatusCodes.Status409Conflict,
+        EmailAlreadyRegisteredException or PhoneChangePendingException => StatusCodes.Status409Conflict,
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,
         ConcurrencyConflictException => StatusCodes.Status409Conflict,
         SkuDuplicateException or BarcodeDuplicateException => StatusCodes.Status409Conflict,

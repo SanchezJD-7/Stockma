@@ -24,6 +24,8 @@ public interface IUserAccounts
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);
+
+    Task<string?> GetUserPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record LoginIdentity(Guid UserId, Guid TenantId, IReadOnlyList<string> Roles);

@@ -135,4 +135,46 @@ public class TenantSettingsTests
         settings.SetRequireSecondFactor(true);
         settings.RequireSecondFactor.Should().BeTrue();
     }
+
+    [Fact]
+    public void CreateDefault_UsesTheDefaultCountryCode()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.CountryCode.Should().Be("CO", "mercado actual de arranque: Colombia");
+    }
+
+    [Fact]
+    public void SetCountryCode_NormalizesToUppercase()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.SetCountryCode("mx");
+
+        settings.CountryCode.Should().Be("MX");
+    }
+
+    [Theory]
+    [InlineData("COL")]
+    [InlineData("C")]
+    [InlineData("1O")]
+    public void SetCountryCode_RejectsAnythingThatIsNotATwoLetterCode(string countryCode)
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        var act = () => settings.SetCountryCode(countryCode);
+
+        act.Should().Throw<ArgumentException>(
+            "CountryCode es ISO 3166-1 alpha-2: dos letras y nada más");
+    }
+
+    [Fact]
+    public void SetCountryCode_AcceptsNullToDisableTheRule()
+    {
+        var settings = TenantSettings.CreateDefault(TenantId);
+
+        settings.SetCountryCode(null);
+
+        settings.CountryCode.Should().BeNull("sin país el sistema degrada a validar sólo E.164");
+    }
 }

@@ -20,6 +20,8 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
 
     private const string DeviceId = "device-mostrador";
     private const string PhoneNumber = "+573001234567";
+    private const string NewPhoneNumber = "+573009876543";
+    private const string AnotherPhoneNumber = "+573005555555";
 
     private sealed class CapturingSmsSender : ISmsSender
     {
@@ -690,5 +692,94 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
             .Contain(userId.ToString(), "el error tiene que permitir cruzar con el usuario")
             .And.NotContain("483920", "el log no guarda el código")
             .And.NotContain(PhoneNumber, "el log no guarda el celular");
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_SendsTheCodeToTheCurrentNumberNotTheNewOne()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        sender.Sent.Should().ContainSingle();
+        sender.Sent[0].PhoneNumber.Should().Be(PhoneNumber, "T061: el OTP viaja al número vigente, nunca al nuevo");
+        sender.Sent[0].Message.Should().Contain("483920").And.Contain("cambio");
+
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.DeviceId.Should().Be(DeviceOtpService.PhoneChangeScope, "los OTP de cambio viven en su propio alcance");
+        stored.NewPhoneNumber.Should().Be(NewPhoneNumber);
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_WhileOneIsPending_ReportsTheConflictAndEmitsNothing()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        var first = await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+        var second = await service.IssuePhoneNumberChangeAsync(userId, AnotherPhoneNumber);
+
+        first.Status.Should().Be(PhoneChangeIssueStatus.Issued);
+        second.Status.Should().Be(PhoneChangeIssueStatus.PendingExists);
+        second.PendingExpiresInSeconds.Should().BeInRange(1, 600, "el 409 informa cuánto falta para que venza el pendiente");
+
+        sender.Sent.Should().ContainSingle("el conflicto no gasta un SMS adicional");
+
+        var all = await context.DeviceOtps
+            .Where(otp => otp.UserId == userId)
+            .ToListAsync();
+
+        all.Should().ContainSingle("no se emite un segundo código");
+        all[0].InvalidatedAt.Should().BeNull("el pendiente original queda intacto");
+        all[0].NewPhoneNumber.Should().Be(NewPhoneNumber);
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_ForAUserWithoutPhoneNumber_IsRejected()
+    {
+        var (context, userId) = await ArrangeAsync(phoneNumber: null);
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+
+        var act = () => service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        await act.Should().ThrowAsync<PhoneNotEnrolledException>();
+        (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ConsumePhoneNumberChange_WithTheRightCode_HandsThePendingNumberToTheCallback()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        string? applied = null;
+        await service.ConsumePhoneNumberChangeAsync(
+            userId,
+            "483920",
+            newPhone =>
+            {
+                applied = newPhone;
+                return Task.FromResult(true);
+            });
+
+        applied.Should().Be(NewPhoneNumber, "el callback recibe el número pendiente para aplicarlo");
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.ConsumedAt.Should().Be(Now, "el OTP usado se marca consumido, no se borra");
+    }
+
+    [Fact]
+    public async Task ConsumePhoneNumberChange_DoesNotAcceptALoginOtp()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssueAsync(userId, DeviceId);
+
+        var act = () => service.ConsumePhoneNumberChangeAsync(userId, "483920", newPhone => Task.FromResult(true));
+
+        await act.Should().ThrowAsync<OtpNotUsableException>("un OTP de login no confirma un cambio de número");
     }
 }
