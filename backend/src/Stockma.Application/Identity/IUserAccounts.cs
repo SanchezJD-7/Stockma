@@ -23,6 +23,8 @@ public interface IUserAccounts
 
     Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default);
 
+    Task SetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default);
+
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);

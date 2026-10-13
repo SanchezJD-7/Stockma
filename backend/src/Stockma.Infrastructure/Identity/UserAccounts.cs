@@ -13,6 +13,7 @@ public sealed class UserAccounts(
     StockmaDbContext context,
     ITenantContext tenantContext,
     UserManager<ApplicationUser> userManager,
+    IPasswordValidator<ApplicationUser> passwordValidator,
     ILookupNormalizer lookupNormalizer,
     IPasswordHasher<ApplicationUser> passwordHasher,
     TimeProvider timeProvider,
@@ -214,6 +215,33 @@ public sealed class UserAccounts(
             throw new ValidationFailedException(
                 "No se pudo guardar el estado de la cuenta: "
                 + string.Join(", ", updated.Errors.Select(error => error.Code)));
+        }
+    }
+
+    public async Task SetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString()) ?? throw new UserNotFoundException(userId);
+
+        if (user.TenantId != context.CurrentTenantId) throw new UserNotFoundException(userId);
+
+        if (string.IsNullOrWhiteSpace(newPassword)) throw new ValidationFailedException("La contraseña no puede quedar vacía.");
+
+        var policy = await passwordValidator.ValidateAsync(userManager, user, newPassword);
+
+        if (!policy.Succeeded)
+        {
+            throw new ValidationFailedException(
+                "La nueva contraseña no cumple las reglas de la política: "
+                + string.Join(", ", policy.Errors.Select(error => error.Description)));
+        }
+
+        user.PasswordHash = userManager.PasswordHasher.HashPassword(user, newPassword);
+
+        var updated = await userManager.UpdateAsync(user);
+
+        if (!updated.Succeeded)
+        {
+            throw new ValidationFailedException("No se pudo guardar la contraseña: " + string.Join(", ", updated.Errors.Select(error => error.Code)));
         }
     }
 

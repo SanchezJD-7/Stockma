@@ -16,6 +16,8 @@ public sealed class DeviceOtpService : IDeviceOtpService
 
     public const string PhoneChangeScope = "internal:phone-change";
 
+    public const string PasswordResetScope = "internal:password-reset";
+
     private const string LockScope = "device_otps";
 
     private readonly StockmaDbContext context;
@@ -114,6 +116,40 @@ public sealed class DeviceOtpService : IDeviceOtpService
         return new PhoneChangeIssueResult(PhoneChangeIssueStatus.Issued);
     }
 
+    public async Task IssuePasswordResetAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var outcome = await context.RunLockedAsync(
+            LockScope,
+            userId,
+            () => IssueLockedAsync(userId, PasswordResetScope, newPhoneNumber: null, cancellationToken),
+            cancellationToken);
+
+        if (outcome.Delivery is null) return;
+
+        try
+        {
+            await smsSender.SendAsync(
+                outcome.Delivery.Value.PhoneNumber,
+                $"Tu código para restablecer tu contraseña en Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+                cancellationToken);
+        }
+        catch (SmsDeliveryException exception)
+        {
+            logger.LogError(
+                exception,
+                "Falló el envío del SMS de restablecimiento de contraseña para el usuario {UserId}: {Reason}",
+                userId,
+                exception.Message);
+        }
+    }
+
+    public Task<T> ConsumePasswordResetAsync<T>(
+        Guid userId,
+        string code,
+        Func<Task<T>> onConsumed,
+        CancellationToken cancellationToken = default) =>
+        ConsumeCoreAsync(userId, PasswordResetScope, code, _ => onConsumed(), requirePhoneNumberChange: false, cancellationToken);
+
     public async Task InvalidateAllForUserAsync(
         Guid userId,
         DateTimeOffset invalidatedAt,
@@ -163,7 +199,7 @@ public sealed class DeviceOtpService : IDeviceOtpService
             requirePhoneNumberChange: true,
             cancellationToken);
 
-    private enum IssueStatus { Issued, RateLimited, PendingExists }
+    private enum IssueStatus { Issued, RateLimited, PendingExists, CooldownActive }
 
     private sealed record IssueOutcome(
         IssueStatus Status,
@@ -198,6 +234,21 @@ public sealed class DeviceOtpService : IDeviceOtpService
                     IssueStatus.PendingExists,
                     Delivery: null,
                     Math.Max(0, (int)(pending.ExpiresAt - now).TotalSeconds));
+            }
+        }
+
+        if (options.ReissueCooldownMinutes > 0 && deviceId != PhoneChangeScope && deviceId != PasswordResetScope)
+        {
+            var cooldownFloor = now.AddMinutes(-options.ReissueCooldownMinutes);
+            var recentlyIssued = await LiveOtps(userId, deviceId, now).AnyAsync(otp => otp.IssuedAt > cooldownFloor, cancellationToken);
+
+            if (recentlyIssued)
+            {
+                logger.LogInformation(
+                    "Re-emisión de OTP omitida para el usuario {UserId}: el dispositivo recibió un código hace menos de {ReissueCooldownMinutes} minutos.",
+                    userId, options.ReissueCooldownMinutes);
+
+                return new IssueOutcome(IssueStatus.CooldownActive, Delivery: null);
             }
         }
 

@@ -2,7 +2,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AuthService } from '../../../../services/auth-service'
 import {
   ActionRow,
@@ -21,16 +21,42 @@ interface DeviceOtpFormProps {
   deviceId: string
   onAuthenticated: (accessToken: string, expiresIn: number) => void
   onBack: () => void
+  resendAvailableAt?: number
 }
 
-export function DeviceOtpForm({ email, deviceId, onAuthenticated, onBack }: DeviceOtpFormProps) {
+function formatClock(totalMs: number): string {
+  const seconds = Math.ceil(totalMs / 1000)
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+export function DeviceOtpForm({
+  email,
+  deviceId,
+  onAuthenticated,
+  onBack,
+  resendAvailableAt,
+}: DeviceOtpFormProps) {
   const authService = new AuthService()
   const [otp, setOtp] = useState('')
   const { error, showError, clearError } = useFlashError()
   const [submitting, setSubmitting] = useState(false)
+  const inFlight = useRef(false)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (resendAvailableAt === undefined) return
+
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [resendAvailableAt])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+
+    if (inFlight.current) return
+
+    inFlight.current = true
     clearError()
     setSubmitting(true)
 
@@ -45,9 +71,12 @@ export function DeviceOtpForm({ email, deviceId, onAuthenticated, onBack }: Devi
     } catch (err) {
       showError(authErrorMessage(err))
     } finally {
+      inFlight.current = false
       setSubmitting(false)
     }
   }
+
+  const resendInMs = resendAvailableAt === undefined ? 0 : resendAvailableAt - nowMs
 
   return (
     <form onSubmit={handleSubmit}>
@@ -64,6 +93,13 @@ export function DeviceOtpForm({ email, deviceId, onAuthenticated, onBack }: Devi
           fullWidth
         />
         {error && <Alert severity='error'>{error}</Alert>}
+        {resendAvailableAt !== undefined && (
+          <Hint>
+            {resendInMs > 0
+              ? `¿No llegó el código? En ${formatClock(resendInMs)} puedes volver a iniciar sesión para pedir otro.`
+              : '¿No llegó el código? Vuelve a iniciar sesión para pedir otro.'}
+          </Hint>
+        )}
         <ActionRow>
           <BackButton type='button' onClick={onBack} disabled={submitting}>
             <ArrowBackIcon fontSize='small' />

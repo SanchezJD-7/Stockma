@@ -255,8 +255,16 @@ public class TenantMiddlewareTests
         TenantMiddleware.UnauthenticatedPaths
             .Should()
             .BeEquivalentTo(
-                ["/api/auth/login", "/api/auth/confirm-device", "/api/auth/refresh", "/api/auth/logout"],
+                [
+                    "/api/auth/login",
+                    "/api/auth/confirm-device",
+                    "/api/auth/refresh",
+                    "/api/auth/logout",
+                    "/api/auth/forgot-password",
+                    "/api/auth/reset-password",
+                ],
                 "T055a: agregar una ruta aca amplia la superficie sin autenticar. "
-                + "Este test obliga a que sea un acto consciente");
+                + "T069 agrega forgot/reset-password: el email resuelve el tenant, no hay header. "
+                + "Ambos responden uniforme (202/401) y corren bajo el rate limit de Auth");
     }
 }

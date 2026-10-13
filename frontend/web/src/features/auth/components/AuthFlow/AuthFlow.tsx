@@ -11,11 +11,14 @@ import { LoginPage } from '../LoginPage/LoginPage'
 type Screen =
   { name: 'login'; email?: string } | { name: 'otp'; email: string } | { name: 'session' }
 
+const RESEND_COOLDOWN_MS = 2 * 60_000
+
 export function AuthFlow() {
   const deviceId = useMemo(() => getOrCreateDeviceId(), [])
   const session = useAuthStore((state) => state.session)
   const setSession = useAuthStore((state) => state.setSession)
   const [screen, setScreen] = useState<Screen>(session ? { name: 'session' } : { name: 'login' })
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null)
 
   useSessionRenewer()
 
@@ -43,13 +46,17 @@ export function AuthFlow() {
           deviceId={deviceId}
           onAuthenticated={handleAuthenticated}
           onBack={() => setScreen({ name: 'login', email: screen.email })}
+          resendAvailableAt={otpSentAt === null ? undefined : otpSentAt + RESEND_COOLDOWN_MS}
         />
       ) : (
         <LoginPage
           initialEmail={screen.name === 'login' ? screen.email : undefined}
           deviceId={deviceId}
           onAuthenticated={handleAuthenticated}
-          onRequiresConfirmation={(email) => setScreen({ name: 'otp', email })}
+          onRequiresConfirmation={(email) => {
+            setOtpSentAt(Date.now())
+            setScreen({ name: 'otp', email })
+          }}
         />
       )}
     </AuthLayout>

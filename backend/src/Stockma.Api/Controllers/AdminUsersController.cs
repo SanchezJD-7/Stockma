@@ -67,4 +67,19 @@ public sealed class AdminUsersController(ISender sender, ILogger<AdminUsersContr
         logger.LogInformation("{AdminId} rehabilitó al usuario {TargetUserId}.", adminId, userId);
         return Ok(result);
     }
+
+    [HttpPost("admin/users/{userId:guid}/reset-password")]
+    [Authorize(Policy = AuthorizationPolicies.TenantAdmin)]
+    public async Task<ActionResult<ResetUserPasswordResult>> ResetUserPassword(
+        Guid userId,
+        [FromBody] ResetUserPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetUserIdFromClaims();
+        var result = await sender.Send(new ResetUserPasswordCommand(userId, request.NewPassword), cancellationToken);
+        logger.LogInformation("{AdminId} restableció la contraseña del usuario {TargetUserId}.", adminId, userId);
+        return Ok(result);
+    }
+
+    public sealed record ResetUserPasswordRequest(string NewPassword);
 }

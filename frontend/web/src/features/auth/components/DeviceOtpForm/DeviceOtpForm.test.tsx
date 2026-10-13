@@ -1,13 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DeviceOtpForm } from './DeviceOtpForm'
 import { mockPending, restoreHttp } from '../../../../shared/http.testkit'
 
 afterEach(() => {
   restoreHttp()
+  vi.useRealTimers()
 })
 
-function renderForm() {
+function renderForm(resendAvailableAt?: number) {
   const onAuthenticated = vi.fn()
   const onBack = vi.fn()
 
@@ -17,6 +18,7 @@ function renderForm() {
       deviceId={'d'.repeat(16)}
       onAuthenticated={onAuthenticated}
       onBack={onBack}
+      resendAvailableAt={resendAvailableAt}
     />,
   )
 
@@ -39,5 +41,33 @@ describe('DeviceOtpForm', () => {
 
     fireEvent.click(back)
     expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('cuenta hacia atrás cuánto falta para poder pedir otro código', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
+
+    renderForm(Date.now() + 90_000)
+
+    screen.getByText(/en 1:30 podés volver a iniciar sesión para pedir otro/i)
+
+    act(() => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    screen.getByText(/en 1:00 podés volver a iniciar sesión para pedir otro/i)
+  })
+
+  it('pasado el cooldown avisa que puede volver a iniciar sesión para pedir otro', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
+
+    renderForm(Date.now() + 60_000)
+
+    act(() => {
+      vi.advanceTimersByTime(61_000)
+    })
+
+    screen.getByText(/volvé a iniciar sesión para pedir otro/i)
   })
 })

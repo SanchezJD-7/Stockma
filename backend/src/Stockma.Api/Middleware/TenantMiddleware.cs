@@ -14,6 +14,8 @@ public sealed class TenantMiddleware(RequestDelegate next)
             "/api/auth/confirm-device",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
         };
 
     public async Task InvokeAsync(HttpContext httpContext, ITenantContext tenantContext)

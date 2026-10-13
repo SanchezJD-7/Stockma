@@ -72,6 +72,7 @@ public class UserAccountsTests(PostgresFixture postgres) : IClassFixture<Postgre
             context,
             provider.GetRequiredService<ITenantContext>(),
             provider.GetRequiredService<UserManager<ApplicationUser>>(),
+            provider.GetRequiredService<IPasswordValidator<ApplicationUser>>(),
             provider.GetRequiredService<ILookupNormalizer>(),
             hasher ?? provider.GetRequiredService<IPasswordHasher<ApplicationUser>>(),
             new FixedTimeProvider(Now),
@@ -122,8 +123,6 @@ public class UserAccountsTests(PostgresFixture postgres) : IClassFixture<Postgre
             .Should()
             .BeEquivalentTo([TenantRoles.TenantAdmin], "el claim role del JWT sale de acá");
     }
-
-    // T055c — los tres caminos de falla devuelven null, y el handler no puede distinguirlos.
 
     [Fact]
     public async Task Verify_WithAnUnknownEmail_ReturnsNull()
@@ -543,5 +542,52 @@ public class UserAccountsTests(PostgresFixture postgres) : IClassFixture<Postgre
 
         (await login.VerifyCredentialsAsync(email, Password))
             .Should().NotBeNull("rehabilitar reabre el acceso; lo viejo no resucita porque se revocó en el disable");
+    }
+
+    [Fact]
+    public async Task SetPassword_WithAValidPassword_AcceptsTheNewOneAndRejectsTheOld()
+    {
+        var (accounts, _, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await accounts.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        await accounts.SetPasswordAsync(userId, "OtraClave#2026Larga");
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+        (await login.VerifyCredentialsAsync(email, "OtraClave#2026Larga"))
+            .Should().NotBeNull("T069: el cambio queda persistido con la política de Identity validada");
+        (await login.VerifyCredentialsAsync(email, Password))
+            .Should().BeNull("la contraseña vieja muere con el reset");
+    }
+
+    [Fact]
+    public async Task SetPassword_WithAWeakPassword_ThrowsValidationFailedAndKeepsTheOldOne()
+    {
+        var (accounts, _, _) = await BuildAsync(activeTenant: TenantA);
+        var email = UniqueEmail();
+        var userId = await accounts.CreateAsync(new NewUser(TenantA, email, Password, "+573001234567", TenantRoles.Member));
+
+        var act = () => accounts.SetPasswordAsync(userId, "123");
+
+        await act.Should().ThrowAsync<ValidationFailedException>(
+            "la política de contraseñas (largo 12) aplica igual en el reset que en el alta");
+
+        var (login, _, _) = await BuildAsync(activeTenant: null);
+        (await login.VerifyCredentialsAsync(email, Password))
+            .Should().NotBeNull("si la política rechaza, la contraseña anterior sigue intacta");
+    }
+
+    [Fact]
+    public async Task SetPassword_ForAUserOfAnotherTenant_ThrowsNotFound()
+    {
+        var (foreignSetup, _, _) = await BuildAsync(activeTenant: TenantB);
+        var foreignUserId = await foreignSetup.CreateAsync(
+            new NewUser(TenantB, UniqueEmail(), Password, "+573001234567", TenantRoles.Member));
+
+        var (accounts, _, _) = await BuildAsync(activeTenant: TenantA);
+
+        var act = () => accounts.SetPasswordAsync(foreignUserId, "OtraClave#2026Larga");
+
+        await act.Should().ThrowAsync<UserNotFoundException>("T069: el fallback admin no toca cuentas de otro tenant");
     }
 }

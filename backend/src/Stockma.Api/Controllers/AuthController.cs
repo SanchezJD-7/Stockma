@@ -96,8 +96,26 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await sender.Send(new RequestPasswordResetCommand(request.Email), cancellationToken);
+        return Accepted();
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await sender.Send(new ResetPasswordCommand(request.Email, request.Code, request.NewPassword), cancellationToken);
+        return NoContent();
+    }
+
     public sealed record RequestPhoneNumberChangeRequest(string NewPhoneNumber);
     public sealed record ConfirmPhoneNumberChangeRequest(string Otp);
+    public sealed record ForgotPasswordRequest(string Email);
+    public sealed record ResetPasswordRequest(string Email, string Code, string NewPassword);
 
     private Guid GetUserIdFromClaims()
     {

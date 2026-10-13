@@ -237,6 +237,8 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 
 > **Tope de emisión (T075)**: pasado `Otp:MaxIssuesPerWindow` en la ventana, la respuesta sigue siendo `200` `requiresDeviceConfirmation: true` — idéntica a la de un envío real — pero no se manda SMS. Un `429` o un error distinto revelaría que el email existe.
 
+> **Cooldown de re-emisión (idempotencia)**: si el **mismo dispositivo** recibió un código hace menos de `Otp:ReissueCooldownMinutes` (def. `2`), el login no emite otro ni invalida el vigente — responde el mismo `200` `requiresDeviceConfirmation: true`, sin SMS. Un doble click produce el mismo efecto que un click: 1 código, 1 SMS. El chequeo corre **bajo el mismo candado** que la emisión, junto al tope por ventana (antes de descontarlo). Sólo aplica al scope de dispositivo de login: cambio de número (T061, `409` pendiente) y restablecimiento (T069) tienen su propia regla.
+
 ### Escenarios (Dado/Cuando/Entonces)
 
 **Dispositivo confiable**
@@ -258,6 +260,16 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 - **DADO** un tenant con `require_second_factor = false` y credenciales válidas
 - **CUANDO** `POST /api/auth/login` desde un dispositivo desconocido
 - **ENTONCES** retorna `accessToken` y `refreshToken` sin `requiresDeviceConfirmation`, sin emitir SMS y sin tocar los dispositivos confiables
+
+**Doble click en el login (idempotencia)**
+- **DADO** credenciales válidas desde un dispositivo desconocido, y un código ya emitido hace menos de 2 minutos
+- **CUANDO** `POST /api/auth/login` otra vez con el mismo `deviceId`
+- **ENTONCES** responde byte a byte igual que la primera vez, sin emitir otro SMS y sin invalidar el código vigente
+
+**Reintento pasado el cooldown**
+- **DADO** credenciales válidas desde un dispositivo desconocido, y un código emitido hace 2 minutos o más
+- **CUANDO** `POST /api/auth/login` otra vez con el mismo `deviceId`
+- **ENTONCES** emite un código nuevo por SMS e invalida el anterior (sólo el último vale)
 
 ---
 
@@ -1097,3 +1109,122 @@ X-Tenant-ID: {guid}
 - `404` sólo cuando el `userId` no existe en el tenant. Un usuario que ya no tiene dispositivos sí existe: eso responde `204`.
 - Revocar todos DEBE revocar las familias de refresh token de **cada** dispositivo del usuario: `revoke-all` lo deja sin ninguna sesión viva por dispositivo confiado. Las sesiones abiertas desde un dispositivo **no** confiado las mata T068 (deshabilitar la cuenta).
 - Idempotente: revocar dos veces no falla.
+
+---
+
+## `POST /api/auth/forgot-password` y `POST /api/auth/reset-password` + fallback admin — T069
+
+Recuperación de contraseña cuando el usuario perdió el acceso a ella. El canal de verificación es el **mismo del 2FA: el SMS al número enrolado** — no hay link por email ni pregunta de seguridad. Dos pasos anónimos + un fallback admin para quien perdió el celular Y la contraseña.
+
+### Paso 1 — `POST /api/auth/forgot-password` (AllowAnonymous, sin `X-Tenant-ID`)
+
+El email resuelve el tenant; no hay header. Rate limit por IP: la política `Auth` de clase.
+
+#### Request
+
+```json
+{ "email": "duena@droga.co" }
+```
+
+#### Respuesta `202 Accepted` — siempre
+
+Cuerpo vacío. Idéntica exista o no el email, esté o no deshabilitado, tenga o no teléfono. No se emite código si la cuenta no existe, está bloqueada (spray T090 / deshabilitada T068) o no tiene `PhoneNumber`.
+
+### Paso 2 — `POST /api/auth/reset-password` (AllowAnonymous, sin `X-Tenant-ID`)
+
+#### Request
+
+```json
+{ "email": "duena@droga.co", "code": "483920", "newPassword": "Nueva-Larga-2026" }
+```
+
+#### Respuesta `204 No Content`
+
+#### Errores
+
+| Status | errorCode | Cuándo |
+|---|---|---|
+| `401` | `AUTH_OTP_REJECTED` | email inexistente/deshabilitado, código errado, vencido o ya usado — misma respuesta en todos los casos |
+| `400` | `VALIDATION_FAILED` | la nueva contraseña no cumple la política (T003: largo 12) |
+
+#### Reglas
+
+- **Uniformidad**: el paso 1 responde `202` vacío SIEMPRE; el paso 2 responde `401 AUTH_OTP_REJECTED` idéntico para email inexistente y para código errado (mismo motivo que T055c: enumerar correos).
+- El código se envía por **SMS al `PhoneNumber` enrolado**, en el alcance propio `internal:password-reset` (aislado de login y de cambio de número), expira en 10 minutos y es de **un solo uso**.
+- El consume corre dentro de la transacción del lock: **contraseña débil ⇒ `400` y el código NO se quema** (rollback); el usuario reintenta con el mismo código.
+- Un reset exitoso **cambia la contraseña**, **revoca todas las familias de refresh** (T065) y **quema los OTPs vivos** del usuario.
+- El reset **NO salta el 2FA**: tras el reset, un dispositivo desconocido sigue pidiendo OTP.
+- El reset **NO toca los dispositivos confiables**: el ancla OTP (el número) no cambió, y sin la contraseña nueva un dispositivo no entra. *(Decisión a veto en review.)*
+- **No rehabilita**: una cuenta deshabilitada (T068) tampoco inicia el flujo (mismo `202` uniforme, cero filas en `device_otps`).
+- El lockout por spraying (T090) también bloquea iniciar el flujo por `LockoutEnd` — aceptado; el dueño espera a que venza.
+
+### Fallback admin — `POST /api/admin/users/{userId}/reset-password` (TenantAdmin)
+
+Para el que perdió el celular Y la contraseña. Cambia la contraseña directamente (sin OTP), corta todas las familias de refresh y quema los OTPs vivos. NO toca `LockoutEnd` (un reset no rehabilita) ni los dispositivos confiables.
+
+#### Request
+
+```json
+{ "newPassword": "Nueva-Larga-2026" }
+```
+
+#### Respuesta `200 OK`
+
+```json
+{ "userId": "..." }
+```
+
+#### Errores
+
+| Status | errorCode | Cuándo |
+|---|---|---|
+| `403` | — | caller Member (política `TenantAdmin`) |
+| `404` | `USER_NOT_FOUND` | el `userId` no existe en el tenant del caller |
+| `400` | `VALIDATION_FAILED` | la nueva contraseña no cumple la política |
+
+#### Reglas del fallback
+
+- Fail-closed al estilo T061/T068: **primero se corta el acceso** (familias + OTPs) y **después** se escribe la contraseña. Una contraseña débil responde `400` con las sesiones **ya cortadas**; la contraseña anterior queda intacta. *(Decisión a veto en review.)*
+- Riesgo residual: el SMS al viejo número puede caer en manos de un tercero — mitigable con rate limit + aviso al número viejo (postergado, flaggeado).
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Respuesta uniforme**
+- **DADO** una cuenta existente y un email inexistente
+- **CUANDO** ambos piden `forgot-password`
+- **ENTONCES** responden `202` byte a byte igual; sólo al existente se le emite código
+
+**Código de un solo uso**
+- **DADO** un reset completado
+- **CUANDO** se repite con el mismo código
+- **ENTONCES** responde `401 AUTH_OTP_REJECTED`
+
+**El reset mata las sesiones vivas**
+- **DADO** un usuario con una sesión abierta
+- **CUANDO** completa el reset
+- **ENTONCES** su refresh token viejo responde `401`
+
+**El 2FA sigue vivo**
+- **DADO** un usuario que completó el reset
+- **CUANDO** entra con la contraseña nueva desde un dispositivo desconocido
+- **ENTONCES** `200` con `requiresDeviceConfirmation: true` — la contraseña sola no alcanza
+
+**Contraseña débil no quema el código**
+- **DADO** un código vigente
+- **CUANDO** se intenta resetear con una contraseña que no pasa la política
+- **ENTONCES** responde `400 VALIDATION_FAILED` y el MISMO código sirve para el reintento
+
+**El deshabilitado no inicia el flujo**
+- **DADO** una cuenta deshabilitada (T068)
+- **CUANDO** pide `forgot-password`
+- **ENTONCES** responde `202` uniforme y no se inserta fila en `device_otps`
+
+**Fallback admin**
+- **DADO** un miembro con sesión viva
+- **CUANDO** un TenantAdmin le resetea la contraseña
+- **ENTONCES** responde `200`, las familias de refresh quedan revocadas y la contraseña vieja no entra
+
+**Aislamiento de tenant en el fallback**
+- **DADO** un admin del tenant A
+- **CUANDO** resetea a un usuario del tenant B
+- **ENTONCES** responde `404 USER_NOT_FOUND`

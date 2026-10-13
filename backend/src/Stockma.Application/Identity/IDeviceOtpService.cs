@@ -23,4 +23,8 @@ public interface IDeviceOtpService
     Task<PhoneChangeIssueResult> IssuePhoneNumberChangeAsync(Guid userId, string newPhoneNumber, CancellationToken cancellationToken = default);
 
     Task<T> ConsumePhoneNumberChangeAsync<T>(Guid userId, string code, Func<string, Task<T>> onConsumed, CancellationToken cancellationToken = default);
+
+    Task IssuePasswordResetAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<T> ConsumePasswordResetAsync<T>(Guid userId, string code, Func<Task<T>> onConsumed, CancellationToken cancellationToken = default);
 }

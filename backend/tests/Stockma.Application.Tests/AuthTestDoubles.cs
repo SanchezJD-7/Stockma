@@ -96,6 +96,20 @@ public sealed class FakeUserAccounts : IUserAccounts
         return Task.CompletedTask;
     }
 
+    public (Guid UserId, string NewPassword)? PasswordSet { get; private set; }
+    public Exception? SetPasswordThrows { get; set; }
+
+    public Task SetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
+    {
+        if (SetPasswordThrows is not null)
+        {
+            throw SetPasswordThrows;
+        }
+
+        PasswordSet = (userId, newPassword);
+        return Task.CompletedTask;
+    }
+
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(EmailTaken);
 
@@ -311,6 +325,37 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
 
         return await onConsumed(ConsumePhoneNumberChangeReturns ?? "+573000000000");
     }
+
+    public List<Guid> PasswordResetIssued { get; } = [];
+    public List<(Guid UserId, string Code)> PasswordResetConsumed { get; } = [];
+    public Action? OnIssuePasswordReset { get; set; }
+
+    public Task IssuePasswordResetAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (IssueThrows is not null)
+        {
+            throw IssueThrows;
+        }
+
+        PasswordResetIssued.Add(userId);
+        OnIssuePasswordReset?.Invoke();
+        return Task.CompletedTask;
+    }
+
+    public async Task<T> ConsumePasswordResetAsync<T>(
+        Guid userId,
+        string code,
+        Func<Task<T>> onConsumed,
+        CancellationToken cancellationToken = default)
+    {
+        if (ConsumeThrows is not null)
+        {
+            throw ConsumeThrows;
+        }
+
+        PasswordResetConsumed.Add((userId, code));
+        return await onConsumed();
+    }
 }
 
 public sealed class FakeSmsSender : ISmsSender
@@ -377,10 +422,13 @@ public sealed class FakeTenantContext(Guid tenantId) : ITenantContext
     public Guid TenantId { get; private set; } = tenantId;
     public bool IsResolved => TenantId != Guid.Empty;
     public List<Guid> SetCalls { get; } = [];
+    public Action? OnSet { get; set; }
+
     public void Set(Guid value)
     {
         SetCalls.Add(value);
         TenantId = value;
+        OnSet?.Invoke();
     }
 }
 
