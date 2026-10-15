@@ -33,9 +33,9 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
 
     private static int MapStatus(DomainException exception) => exception switch
     {
-        InvalidCredentialsException or OtpNotUsableException or RefreshTokenNotUsableException => StatusCodes.Status401Unauthorized,
+        InvalidCredentialsException or AccountDisabledException or OtpNotUsableException or RefreshTokenNotUsableException => StatusCodes.Status401Unauthorized,
         PhoneNotEnrolledException => StatusCodes.Status403Forbidden,
-        EmailAlreadyRegisteredException => StatusCodes.Status409Conflict,
+        EmailAlreadyRegisteredException or PhoneChangePendingException => StatusCodes.Status409Conflict,
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,
         ConcurrencyConflictException => StatusCodes.Status409Conflict,
         SkuDuplicateException or BarcodeDuplicateException => StatusCodes.Status409Conflict,

@@ -31,7 +31,7 @@ Cada decisión trae las alternativas que se evaluaron y se descartaron. Si una t
 
 ## Los tres principios que sostienen todo
 
-Casi todas las decisiones de abajo son aplicaciones de uno de estos tres. Si entendés estos, el resto se deduce.
+Casi todas las decisiones de abajo son aplicaciones de uno de estos tres. Si entiendes estos, el resto se deduce.
 
 | Principio | Qué significa |
 |---|---|
@@ -106,7 +106,7 @@ Esta es la **única** excepción al aislamiento entre tenants en todo el sistema
 
 > El filtro global **NO DEBE** volverse permisivo cuando el `TenantContext` está vacío.
 
-Es tentador: hacés que el filtro "no aplique si no hay contexto" y el login funciona sin excepciones especiales. Y desactivás el aislamiento **en silencio** en toda ruta donde el contexto no se haya poblado por un bug, un job en background o un endpoint nuevo.
+Es tentador: haces que el filtro "no aplique si no hay contexto" y el login funciona sin excepciones especiales. Y desactivas el aislamiento **en silencio** en toda ruta donde el contexto no se haya poblado por un bug, un job en background o un endpoint nuevo.
 
 La excepción va en el punto de uso. Nunca como default del filtro.
 
@@ -286,7 +286,7 @@ activo = RevokedAt IS NULL AND ExpiresAt > now()
 
 ### Por qué dos campos y no uno
 
-`RevokedAt` significa **"una persona lo dio de baja"**. Es auditoría. Si le escribís ahí el vencimiento automático, perdés la diferencia entre *lo revocaron* y *se venció solo* — que es justamente la información por la que existe el registro.
+`RevokedAt` significa **"una persona lo dio de baja"**. Es auditoría. Si le escribes ahí el vencimiento automático, pierdes la diferencia entre *lo revocaron* y *se venció solo* — que es justamente la información por la que existe el registro.
 
 ### Alcance: qué hace y qué no
 

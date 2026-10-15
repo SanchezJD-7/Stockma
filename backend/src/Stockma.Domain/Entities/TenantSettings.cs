@@ -12,6 +12,7 @@ public class TenantSettings : ITenantEntity
     public const int DefaultTrustedDeviceLifetimeDays = 15;
     public const int AccessTokenLifetimeMinutes = 15;
     public const bool DefaultRequireSecondFactor = true;
+    public const string DefaultCountryCode = "CO";
 
     private TenantSettings()
     {
@@ -90,9 +91,29 @@ public class TenantSettings : ITenantEntity
     public int SessionIdleTimeoutMinutes { get; private set; } = DefaultSessionIdleTimeoutMinutes;
     public int TrustedDeviceLifetimeDays { get; private set; } = DefaultTrustedDeviceLifetimeDays;
     public bool RequireSecondFactor { get; private set; } = DefaultRequireSecondFactor;
+    public string? CountryCode { get; private set; } = DefaultCountryCode;
     public void UpdateBranding(TenantBranding? branding) => Branding = branding;
     public void SetRequireSecondFactor(bool requireSecondFactor) =>
         RequireSecondFactor = requireSecondFactor;
+
+    public void SetCountryCode(string? countryCode)
+    {
+        if (countryCode is not null)
+        {
+            var normalized = countryCode.Trim().ToUpperInvariant();
+
+            if (normalized.Length != 2 || !normalized.All(char.IsAsciiLetterUpper))
+            {
+                throw new ArgumentException(
+                    "CountryCode debe ser el código ISO 3166-1 alpha-2 de 2 letras (ej. CO, MX, AR).",
+                    nameof(countryCode));
+            }
+
+            countryCode = normalized;
+        }
+
+        CountryCode = countryCode;
+    }
     public static TenantSettings CreateDefault(Guid tenantId) =>
         new(
             tenantId,

@@ -3,6 +3,7 @@ using Stockma.Application.Identity;
 using Stockma.Application.Identity.Queries;
 using Stockma.Application.Tenants;
 using Stockma.Domain.Entities;
+using Stockma.Domain.Exceptions;
 using Stockma.Domain.ValueObjects;
 
 namespace Stockma.Application.Tests;
@@ -23,7 +24,8 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task<LoginIdentity?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByEmailResult);
 
-    public LoginIdentity? ByIdResult { get; set; }
+    public LoginIdentity? ByIdResult { get; set; } =
+        new(Guid.Empty, Guid.Empty, Array.Empty<string>());
 
     public Task<LoginIdentity?> FindByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(ByIdResult);
@@ -45,6 +47,66 @@ public sealed class FakeUserAccounts : IUserAccounts
     public Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default)
     {
         PhoneNumberSet = (userId, phoneNumber);
+        CurrentPhoneNumber = phoneNumber;
+        return Task.CompletedTask;
+    }
+
+    public string? CurrentPhoneNumber { get; set; }
+
+    public Task<string?> GetUserPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (!UserExists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        return Task.FromResult(CurrentPhoneNumber);
+    }
+
+    public bool UserExists { get; set; } = true;
+    public string CurrentRole { get; set; } = TenantRoles.Member;
+    public int OtherTenantAdmins { get; set; }
+    public (Guid UserId, string Role)? RoleSet { get; private set; }
+
+    public Task<string> GetRoleAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (!UserExists)
+        {
+            throw new UserNotFoundException(userId);
+        }
+
+        return Task.FromResult(CurrentRole);
+    }
+
+    public Task<int> CountOtherTenantAdminsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(OtherTenantAdmins);
+
+    public Task SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        RoleSet = (userId, role);
+        CurrentRole = role;
+        return Task.CompletedTask;
+    }
+
+    public (Guid UserId, bool Enabled)? AccountEnabledSet { get; private set; }
+
+    public Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        AccountEnabledSet = (userId, enabled);
+        return Task.CompletedTask;
+    }
+
+    public (Guid UserId, string NewPassword)? PasswordSet { get; private set; }
+    public Exception? SetPasswordThrows { get; set; }
+
+    public Task SetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
+    {
+        if (SetPasswordThrows is not null)
+        {
+            throw SetPasswordThrows;
+        }
+
+        PasswordSet = (userId, newPassword);
         return Task.CompletedTask;
     }
 
@@ -227,6 +289,90 @@ public sealed class FakeDeviceOtpService : IDeviceOtpService
         Committed.Add((userId, deviceId, code));
         return result;
     }
+
+    public List<(Guid UserId, string NewPhoneNumber)> PhoneChangeIssued { get; } = [];
+    public List<(Guid UserId, string Code)> PhoneChangeConsumed { get; } = [];
+    public string? ConsumePhoneNumberChangeReturns { get; set; }
+    public PhoneChangeIssueStatus IssueStatus { get; set; } = PhoneChangeIssueStatus.Issued;
+
+    public Task<PhoneChangeIssueResult> IssuePhoneNumberChangeAsync(Guid userId, string newPhoneNumber, CancellationToken cancellationToken = default)
+    {
+        if (IssueThrows is not null)
+        {
+            throw IssueThrows;
+        }
+
+        if (IssueStatus == PhoneChangeIssueStatus.Issued)
+        {
+            PhoneChangeIssued.Add((userId, newPhoneNumber));
+        }
+
+        return Task.FromResult(new PhoneChangeIssueResult(IssueStatus, PendingExpiresInSeconds: 540));
+    }
+
+    public async Task<T> ConsumePhoneNumberChangeAsync<T>(
+        Guid userId,
+        string code,
+        Func<string, Task<T>> onConsumed,
+        CancellationToken cancellationToken = default)
+    {
+        if (ConsumeThrows is not null)
+        {
+            throw ConsumeThrows;
+        }
+
+        PhoneChangeConsumed.Add((userId, code));
+
+        return await onConsumed(ConsumePhoneNumberChangeReturns ?? "+573000000000");
+    }
+
+    public List<Guid> PasswordResetIssued { get; } = [];
+    public List<(Guid UserId, string Code)> PasswordResetConsumed { get; } = [];
+    public Action? OnIssuePasswordReset { get; set; }
+
+    public Task IssuePasswordResetAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (IssueThrows is not null)
+        {
+            throw IssueThrows;
+        }
+
+        PasswordResetIssued.Add(userId);
+        OnIssuePasswordReset?.Invoke();
+        return Task.CompletedTask;
+    }
+
+    public async Task<T> ConsumePasswordResetAsync<T>(
+        Guid userId,
+        string code,
+        Func<Task<T>> onConsumed,
+        CancellationToken cancellationToken = default)
+    {
+        if (ConsumeThrows is not null)
+        {
+            throw ConsumeThrows;
+        }
+
+        PasswordResetConsumed.Add((userId, code));
+        return await onConsumed();
+    }
+}
+
+public sealed class FakeSmsSender : ISmsSender
+{
+    public List<(string PhoneNumber, string Message)> Sent { get; } = [];
+    public Exception? Throws { get; set; }
+
+    public Task SendAsync(string phoneNumber, string message, CancellationToken cancellationToken = default)
+    {
+        if (Throws is not null)
+        {
+            throw Throws;
+        }
+
+        Sent.Add((phoneNumber, message));
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class FakeJwtTokenService : IJwtTokenService
@@ -276,16 +422,20 @@ public sealed class FakeTenantContext(Guid tenantId) : ITenantContext
     public Guid TenantId { get; private set; } = tenantId;
     public bool IsResolved => TenantId != Guid.Empty;
     public List<Guid> SetCalls { get; } = [];
+    public Action? OnSet { get; set; }
+
     public void Set(Guid value)
     {
         SetCalls.Add(value);
         TenantId = value;
+        OnSet?.Invoke();
     }
 }
 
 public sealed class FakeTenantSettingsProvider(ITenantContext tenantContext) : ITenantSettingsProvider
 {
     public bool RequireSecondFactor { get; set; } = TenantSettings.DefaultRequireSecondFactor;
+    public string? CountryCode { get; set; } = TenantSettings.DefaultCountryCode;
     public int Reads { get; private set; }
     public Guid? TenantIdWhenRead { get; private set; }
     public ExpiryThresholds Thresholds { get; set; } = ExpiryThresholds.Default();
@@ -303,4 +453,7 @@ public sealed class FakeTenantSettingsProvider(ITenantContext tenantContext) : I
         TenantIdWhenRead = tenantContext.TenantId;
         return Task.FromResult(RequireSecondFactor);
     }
+
+    public Task<string?> GetCountryCodeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(CountryCode);
 }

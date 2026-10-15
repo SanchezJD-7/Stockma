@@ -20,6 +20,8 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
 
     private const string DeviceId = "device-mostrador";
     private const string PhoneNumber = "+573001234567";
+    private const string NewPhoneNumber = "+573009876543";
+    private const string AnotherPhoneNumber = "+573005555555";
 
     private sealed class CapturingSmsSender : ISmsSender
     {
@@ -501,8 +503,56 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
         var (context, userId) = await ArrangeAsync();
         await CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("111111"))
             .IssueAsync(userId, DeviceId);
-        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("222222"));
+        var service = CreateService(
+            context,
+            new CapturingSmsSender(),
+            new FixedOtpGenerator("222222"),
+            now: Now.AddMinutes(2));
         await service.IssueAsync(userId, DeviceId);
+
+        var stale = () => service.ConsumeAsync(userId, DeviceId, "111111");
+
+        await stale.Should().ThrowAsync<OtpNotUsableException>("ADR-016: sólo el último código emitido vale");
+
+        var fresh = () => service.ConsumeAsync(userId, DeviceId, "222222");
+
+        await fresh.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Issue_WithinTheReissueCooldown_KeepsTheSentCodeAliveAndSendsNoSecondSms()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        await CreateService(context, sender, new FixedOtpGenerator("111111")).IssueAsync(userId, DeviceId);
+        var service = CreateService(context, sender, new FixedOtpGenerator("222222"));
+
+        await service.IssueAsync(userId, DeviceId);
+
+        sender.Sent.Should().HaveCount(1, "un doble click en el login no debe mandar dos SMS");
+        (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId))
+            .Should().Be(1, "ni siquiera se crea una fila: el pedido en cooldown no toca la base");
+
+        var act = () => service.ConsumeAsync(userId, DeviceId, "111111");
+
+        await act.Should().NotThrowAsync("el código que ya le llegó al usuario sigue siendo el vigente");
+    }
+
+    [Fact]
+    public async Task Issue_JustAfterTheReissueCooldown_EmitsANewCodeAndInvalidatesThePrevious()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        await CreateService(context, sender, new FixedOtpGenerator("111111")).IssueAsync(userId, DeviceId);
+        var service = CreateService(
+            context,
+            sender,
+            new FixedOtpGenerator("222222"),
+            now: Now.AddMinutes(2));
+
+        await service.IssueAsync(userId, DeviceId);
+
+        sender.Sent.Should().HaveCount(2, "pasados los 2 minutos se puede pedir otro código");
 
         var stale = () => service.ConsumeAsync(userId, DeviceId, "111111");
 
@@ -553,10 +603,12 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
         var (context, userId) = await ArrangeAsync();
         var sender = new CapturingSmsSender();
         var options = new OtpOptions { MaxIssuesPerWindow = 2, IssueWindowMinutes = 15 };
-        var service = CreateService(context, sender, new FixedOtpGenerator("483920"), options);
 
-        await service.IssueAsync(userId, DeviceId);
-        await service.IssueAsync(userId, DeviceId);
+        await CreateService(context, sender, new FixedOtpGenerator("483920"), options, now: Now.AddMinutes(-6))
+            .IssueAsync(userId, DeviceId);
+        await CreateService(context, sender, new FixedOtpGenerator("483920"), options, now: Now.AddMinutes(-4))
+            .IssueAsync(userId, DeviceId);
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"), options);
 
         var third = () => service.IssueAsync(userId, DeviceId);
 
@@ -570,9 +622,15 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
     {
         var (context, userId) = await ArrangeAsync();
         var options = new OtpOptions { MaxIssuesPerWindow = 1 };
-        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"), options);
+        await CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"), options)
+            .IssueAsync(userId, DeviceId);
+        var service = CreateService(
+            context,
+            new CapturingSmsSender(),
+            new FixedOtpGenerator("483920"),
+            options,
+            now: Now.AddMinutes(2));
 
-        await service.IssueAsync(userId, DeviceId);
         await service.IssueAsync(userId, DeviceId);
 
         var act = () => service.ConsumeAsync(userId, DeviceId, "483920");
@@ -611,7 +669,10 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
 
         await Task.WhenAll(requests);
 
-        sender.Sent.Should().HaveCount(2, "ADR-016: el tope se cuenta bajo el mismo lock que la emisión");
+        sender.Sent.Should().HaveCount(
+            1,
+            "con el cooldown de re-emisión, de 6 pedidos paralelos sólo el primero manda SMS; "
+            + "el tope por ventana es la segunda red, ambas medidas bajo el mismo lock");
         (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId && otp.InvalidatedAt == null))
             .Should()
             .Be(1, "a lo sumo un código vivo por dispositivo");
@@ -690,5 +751,228 @@ public class DeviceOtpServiceTests(PostgresFixture postgres) : IClassFixture<Pos
             .Contain(userId.ToString(), "el error tiene que permitir cruzar con el usuario")
             .And.NotContain("483920", "el log no guarda el código")
             .And.NotContain(PhoneNumber, "el log no guarda el celular");
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_SendsTheCodeToTheCurrentNumberNotTheNewOne()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        sender.Sent.Should().ContainSingle();
+        sender.Sent[0].PhoneNumber.Should().Be(PhoneNumber, "T061: el OTP viaja al número vigente, nunca al nuevo");
+        sender.Sent[0].Message.Should().Contain("483920").And.Contain("cambio");
+
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.DeviceId.Should().Be(DeviceOtpService.PhoneChangeScope, "los OTP de cambio viven en su propio alcance");
+        stored.NewPhoneNumber.Should().Be(NewPhoneNumber);
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_WhileOneIsPending_ReportsTheConflictAndEmitsNothing()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        var first = await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+        var second = await service.IssuePhoneNumberChangeAsync(userId, AnotherPhoneNumber);
+
+        first.Status.Should().Be(PhoneChangeIssueStatus.Issued);
+        second.Status.Should().Be(PhoneChangeIssueStatus.PendingExists);
+        second.PendingExpiresInSeconds.Should().BeInRange(1, 600, "el 409 informa cuánto falta para que venza el pendiente");
+
+        sender.Sent.Should().ContainSingle("el conflicto no gasta un SMS adicional");
+
+        var all = await context.DeviceOtps
+            .Where(otp => otp.UserId == userId)
+            .ToListAsync();
+
+        all.Should().ContainSingle("no se emite un segundo código");
+        all[0].InvalidatedAt.Should().BeNull("el pendiente original queda intacto");
+        all[0].NewPhoneNumber.Should().Be(NewPhoneNumber);
+    }
+
+    [Fact]
+    public async Task IssuePhoneNumberChange_ForAUserWithoutPhoneNumber_IsRejected()
+    {
+        var (context, userId) = await ArrangeAsync(phoneNumber: null);
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+
+        var act = () => service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        await act.Should().ThrowAsync<PhoneNotEnrolledException>();
+        (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ConsumePhoneNumberChange_WithTheRightCode_HandsThePendingNumberToTheCallback()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePhoneNumberChangeAsync(userId, NewPhoneNumber);
+
+        string? applied = null;
+        await service.ConsumePhoneNumberChangeAsync(
+            userId,
+            "483920",
+            newPhone =>
+            {
+                applied = newPhone;
+                return Task.FromResult(true);
+            });
+
+        applied.Should().Be(NewPhoneNumber, "el callback recibe el número pendiente para aplicarlo");
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.ConsumedAt.Should().Be(Now, "el OTP usado se marca consumido, no se borra");
+    }
+
+    [Fact]
+    public async Task ConsumePhoneNumberChange_DoesNotAcceptALoginOtp()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssueAsync(userId, DeviceId);
+
+        var act = () => service.ConsumePhoneNumberChangeAsync(userId, "483920", newPhone => Task.FromResult(true));
+
+        await act.Should().ThrowAsync<OtpNotUsableException>("un OTP de login no confirma un cambio de número");
+    }
+
+    [Fact]
+    public async Task IssuePasswordReset_SendsTheCodeToTheEnrolledPhoneInItsOwnScope()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        await service.IssuePasswordResetAsync(userId);
+
+        sender.Sent.Should().ContainSingle();
+        sender.Sent[0].PhoneNumber.Should().Be(PhoneNumber, "T069: el código va por SMS al número enrolado, nunca por email");
+        sender.Sent[0].Message.Should().Contain("483920").And.Contain("restablecer");
+
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.DeviceId.Should().Be(DeviceOtpService.PasswordResetScope, "los OTP de reset viven en su propio alcance");
+        stored.CodeHash.Should().NotContain("483920", "NFR-004: el código se persiste hasheado");
+        stored.ExpiresAt.Should().Be(Now.AddMinutes(10), "expiración corta");
+    }
+
+    [Fact]
+    public async Task IssuePasswordReset_ForAUserWithoutPhoneNumber_IsRejected()
+    {
+        var (context, userId) = await ArrangeAsync(phoneNumber: null);
+        var sender = new CapturingSmsSender();
+        var service = CreateService(context, sender, new FixedOtpGenerator("483920"));
+
+        var act = () => service.IssuePasswordResetAsync(userId);
+
+        await act.Should().ThrowAsync<PhoneNotEnrolledException>();
+        sender.Sent.Should().BeEmpty();
+        (await context.DeviceOtps.CountAsync(otp => otp.UserId == userId)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task IssuePasswordReset_Reissuing_InvalidatesThePreviousResetCode()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePasswordResetAsync(userId);
+
+        await service.IssuePasswordResetAsync(userId);
+
+        var all = await context.DeviceOtps
+            .Where(otp => otp.UserId == userId)
+            .ToListAsync();
+
+        all.Should().HaveCount(2, "pedir el código de nuevo emite otro y invalida el anterior");
+        all.Count(otp => otp.InvalidatedAt is null).Should().Be(1, "sólo el último código queda vigente");
+    }
+
+    [Fact]
+    public async Task ConsumePasswordReset_WithTheRightCode_RunsTheCallbackAndMarksItUsed()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePasswordResetAsync(userId);
+
+        var applied = false;
+        await service.ConsumePasswordResetAsync(
+            userId,
+            "483920",
+            () =>
+            {
+                applied = true;
+                return Task.FromResult(true);
+            });
+
+        applied.Should().BeTrue();
+        var stored = await context.DeviceOtps.SingleAsync(otp => otp.UserId == userId);
+        stored.ConsumedAt.Should().Be(Now, "el OTP usado se marca consumido, no se borra");
+    }
+
+    [Fact]
+    public async Task ConsumePasswordReset_TheSameCodeTwice_IsRejected()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePasswordResetAsync(userId);
+        await service.ConsumePasswordResetAsync(userId, "483920", () => Task.FromResult(true));
+
+        var act = () => service.ConsumePasswordResetAsync(userId, "483920", () => Task.FromResult(true));
+
+        await act.Should().ThrowAsync<OtpNotUsableException>("T069: token de reset de un solo uso");
+    }
+
+    [Fact]
+    public async Task ConsumePasswordReset_WhenTheFollowUpFails_KeepsTheCodeUsable()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePasswordResetAsync(userId);
+
+        var act = () => service.ConsumePasswordResetAsync<bool>(
+            userId,
+            "483920",
+            () => throw new ValidationFailedException("La nueva contraseña no cumple las reglas."));
+
+        await act.Should().ThrowAsync<ValidationFailedException>(
+            "una contraseña débil no debería quemar el código: el rollback de la transacción lo conserva");
+
+        await using var fresh = NewContext();
+        (await fresh.DeviceOtps.SingleAsync(otp => otp.UserId == userId)).ConsumedAt
+            .Should()
+            .BeNull("sin commit no hay consumo: el usuario puede reintentar con el mismo código");
+
+        var retry = () => CreateService(fresh, new CapturingSmsSender(), new FixedOtpGenerator("483920"))
+            .ConsumePasswordResetAsync(userId, "483920", () => Task.FromResult(true));
+        await retry.Should().NotThrowAsync("el código sobrevive para el reintento con una contraseña válida");
+    }
+
+    [Fact]
+    public async Task ConsumePasswordReset_DoesNotAcceptALoginOtp()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssueAsync(userId, DeviceId);
+
+        var act = () => service.ConsumePasswordResetAsync(userId, "483920", () => Task.FromResult(true));
+
+        await act.Should().ThrowAsync<OtpNotUsableException>("un OTP de login no restablece la contraseña");
+    }
+
+    [Fact]
+    public async Task Consume_ForDeviceLogin_DoesNotAcceptAPasswordResetOtp()
+    {
+        var (context, userId) = await ArrangeAsync();
+        var service = CreateService(context, new CapturingSmsSender(), new FixedOtpGenerator("483920"));
+        await service.IssuePasswordResetAsync(userId);
+
+        var act = () => service.ConsumeAsync(userId, DeviceId, "483920");
+
+        await act.Should().ThrowAsync<OtpNotUsableException>("el código de reset no confirma un dispositivo");
     }
 }

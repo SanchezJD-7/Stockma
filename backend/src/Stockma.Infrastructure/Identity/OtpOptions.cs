@@ -6,4 +6,5 @@ public sealed class OtpOptions
     public int MaxAttempts { get; set; } = 5;
     public int MaxIssuesPerWindow { get; set; } = 5;
     public int IssueWindowMinutes { get; set; } = 15;
+    public int ReissueCooldownMinutes { get; set; } = 2;
 }

@@ -15,9 +15,21 @@ public interface IUserAccounts
 
     Task SetPhoneNumberAsync(Guid userId, string phoneNumber, CancellationToken cancellationToken = default);
 
+    Task<string> GetRoleAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<int> CountOtherTenantAdminsAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task SetRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default);
+
+    Task SetAccountEnabledAsync(Guid userId, bool enabled, CancellationToken cancellationToken = default);
+
+    Task SetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default);
+
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 
     Task<bool> TenantHasAnyUserAsync(CancellationToken cancellationToken = default);
+
+    Task<string?> GetUserPhoneNumberAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed record LoginIdentity(Guid UserId, Guid TenantId, IReadOnlyList<string> Roles);

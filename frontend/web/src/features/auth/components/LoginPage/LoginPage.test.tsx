@@ -29,4 +29,27 @@ describe('LoginPage', () => {
     fireEvent.click(button)
     expect(requests).toHaveLength(1)
   })
+
+  it('un doble submit en el mismo instante lanza una sola request', () => {
+    const requests = mockPending()
+
+    render(
+      <LoginPage
+        deviceId={'d'.repeat(16)}
+        onAuthenticated={vi.fn()}
+        onRequiresConfirmation={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@a.com' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'secreta' } })
+
+    const form = screen.getByRole('button', { name: 'Ingresar' }).closest('form')
+    if (!form) throw new Error('el botón debe vivir dentro del formulario')
+
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+
+    expect(requests).toHaveLength(1)
+  })
 })

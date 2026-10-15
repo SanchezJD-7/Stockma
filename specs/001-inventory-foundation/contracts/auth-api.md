@@ -232,10 +232,12 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 | Status | `errorCode` | Cuándo |
 |---|---|---|
 | `400` | `VALIDATION_FAILED` | Falta `email`, `password` o `deviceId`, o el `deviceId` tiene menos de 16 caracteres. Se decide antes de mirar credenciales: es el mismo `400` para cualquier email (T078) |
-| `401` | `AUTH_INVALID_CREDENTIALS` | Email inexistente **o** contraseña incorrecta. La respuesta DEBE ser idéntica en los tres casos —email que no existe, contraseña equivocada, usuario de otro tenant— porque distinguirlos habilita enumerar qué correos usan Stockma (FR-006). También en **tiempo**: todo camino de falla (email inexistente, usuario sin contraseña, usuario bloqueado) corre una verificación PBKDF2 contra un hash señuelo (T074, ADR-016) |
+| `401` | `AUTH_INVALID_CREDENTIALS` | Email inexistente **o** contraseña incorrecta. La respuesta DEBE ser idéntica en los tres casos —email que no existe, contraseña equivocada, usuario de otro tenant— porque distinguirlos habilita enumerar qué correos usan Stockma (FR-006). También en **tiempo**: todo camino de falla (email inexistente, usuario sin contraseña, usuario bloqueado) corre una verificación PBKDF2 contra un hash señuelo (T074, ADR-016). Tras `Lockout:MaxFailedAccessAttempts` (5) contraseñas erradas —contadas **por cuenta**, no por IP (T068)— la cuenta se bloquea con `LockoutEnd` y la respuesta sigue siendo este mismo `401`: dentro del bloqueo ni la contraseña correcta entra, y el bloqueo no se distingue de un error cualquiera |
 | `429` | `AUTH_RATE_LIMITED` | Más de 5 intentos por IP por minuto (NFR-005). Cuerpo `problem+json` |
 
 > **Tope de emisión (T075)**: pasado `Otp:MaxIssuesPerWindow` en la ventana, la respuesta sigue siendo `200` `requiresDeviceConfirmation: true` — idéntica a la de un envío real — pero no se manda SMS. Un `429` o un error distinto revelaría que el email existe.
+
+> **Cooldown de re-emisión (idempotencia)**: si el **mismo dispositivo** recibió un código hace menos de `Otp:ReissueCooldownMinutes` (def. `2`), el login no emite otro ni invalida el vigente — responde el mismo `200` `requiresDeviceConfirmation: true`, sin SMS. Un doble click produce el mismo efecto que un click: 1 código, 1 SMS. El chequeo corre **bajo el mismo candado** que la emisión, junto al tope por ventana (antes de descontarlo). Sólo aplica al scope de dispositivo de login: cambio de número (T061, `409` pendiente) y restablecimiento (T069) tienen su propia regla.
 
 ### Escenarios (Dado/Cuando/Entonces)
 
@@ -258,6 +260,16 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 - **DADO** un tenant con `require_second_factor = false` y credenciales válidas
 - **CUANDO** `POST /api/auth/login` desde un dispositivo desconocido
 - **ENTONCES** retorna `accessToken` y `refreshToken` sin `requiresDeviceConfirmation`, sin emitir SMS y sin tocar los dispositivos confiables
+
+**Doble click en el login (idempotencia)**
+- **DADO** credenciales válidas desde un dispositivo desconocido, y un código ya emitido hace menos de 2 minutos
+- **CUANDO** `POST /api/auth/login` otra vez con el mismo `deviceId`
+- **ENTONCES** responde byte a byte igual que la primera vez, sin emitir otro SMS y sin invalidar el código vigente
+
+**Reintento pasado el cooldown**
+- **DADO** credenciales válidas desde un dispositivo desconocido, y un código emitido hace 2 minutos o más
+- **CUANDO** `POST /api/auth/login` otra vez con el mismo `deviceId`
+- **ENTONCES** emite un código nuevo por SMS e invalida el anterior (sólo el último vale)
 
 ---
 
@@ -527,15 +539,177 @@ Content-Type: application/json
 
 ---
 
+## `PUT /api/admin/users/{userId}/role` — FR-005 (T094)
+
+Promueve (`Member` → `TenantAdmin`) o degrada (`TenantAdmin` → `Member`) a un usuario existente. **Sólo un admin del tenant.** Hoy `register` asigna rol sólo al crear: este endpoint es el único camino para cambiarlo después (rescate de admin, baja, reorganización).
+
+**Command**: `SetUserRoleCommand`
+
+### Request
+
+```http
+PUT /api/admin/users/9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31/role
+X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
+Authorization: Bearer {jwt-de-admin}
+Content-Type: application/json
+```
+
+```json
+{
+  "role": "TenantAdmin"
+}
+```
+
+### Respuesta `200 OK`
+
+```json
+{
+  "userId": "9a1e4c2f-77b3-4a0e-b1d8-5c2f6e9a0d31",
+  "role": "TenantAdmin"
+}
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `400` | `TENANT_HEADER_MISSING` / `TENANT_HEADER_INVALID` | Header inválido |
+| `400` | `VALIDATION_FAILED` | `role` no es `TenantAdmin` ni `Member` |
+| `400` | `VALIDATION_FAILED` | Degradar al **último** `TenantAdmin` vivo del tenant |
+| `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
+| `403` | `AUTH_FORBIDDEN` | El llamante no es admin del tenant |
+| `404` | `USER_NOT_FOUND` | El `userId` no existe **en ese tenant** |
+
+### Reglas
+
+- Un usuario tiene UN rol (`TenantAdmin` o `Member`); `SetRoleAsync` garantiza el invariante: quita los roles viejos antes de asignar el nuevo.
+- **El tenant nunca se queda sin admin**: degradar sólo pasa si queda OTRO `TenantAdmin` vivo (misma regla de T062). La validación corre ANTES de cualquier efecto — si se rechaza, no se tocó nada.
+- **Degradar es fail-closed** (misma lógica que T050): primero se revocan todas las sesiones del usuario (familias de refresh) y sus dispositivos confiables, recién después se escribe el rol. Si algo falla a mitad de camino, la persona queda MENOS privilegiada, nunca más. El rol vive dentro del JWT: el token ya emitido conserva `role: TenantAdmin` hasta su `exp` (≤15 min, ADR-019), consecuencia aceptada — por eso además se mata la sesión, para que el re-login emita claims frescos con `Member`.
+- **Promover no expulsa a nadie**: los roles se releen de la DB en cada rotación (`RefreshCommand` → `session.Roles`), así que el rol nuevo surte efecto en el próximo refresh o login (≤15 min con el token vivo).
+- Idempotente: pedir el rol que ya tiene responde `200` sin efectos secundarios.
+- El cambio DEBE quedar auditado (`AuditSaveChangesInterceptor`) con el admin que lo ejecutó.
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Promover a admin**
+- **DADO** un admin del tenant, un `Member` con sesión activa
+- **CUANDO** `PUT /api/admin/users/{userId}/role` con `"role": "TenantAdmin"`
+- **ENTONCES** responde `200`, persiste el rol nuevo y la sesión del usuario sigue viva (el rol llega con el próximo refresh)
+
+**Degradar al último admin**
+- **DADO** un tenant con UN solo `TenantAdmin` (él es admin y llamante)
+- **CUANDO** se intenta degradarlo a sí mismo
+- **ENTONCES** responde `400 VALIDATION_FAILED` y el rol queda sin cambios
+
+**Degradar un admin con respaldo**
+- **DADO** un tenant con dos `TenantAdmin`; el objetivo tiene sesión y dispositivo confiable
+- **CUANDO** el otro admin lo degrada a `Member`
+- **ENTONCES** responde `200`, el rol pasa a `Member` y sus sesiones quedan revocadas
+
+**Un Member intenta tocar roles**
+- **DADO** un usuario `Member` autenticado
+- **CUANDO** invoca el endpoint
+- **ENTONCES** responde `403`
+
+---
+
+## `POST /api/admin/users/{userId}/disable` y `/enable` — T068
+
+Offboarding real. T067 revoca dispositivos, pero **no alcanza para el empleado que se va**: conserva contraseña y celular, así que vuelve a entrar con OTP como si nada. Lo único que corta el acceso de verdad es deshabilitar la cuenta. Usa `LockoutEnabled`/`LockoutEnd` de ASP.NET Identity — no un flag nuevo, para no duplicar estado.
+
+**Command**: `SetUserEnabledCommand` (T068)
+
+```http
+POST /api/admin/users/{userId}/disable
+POST /api/admin/users/{userId}/enable
+X-Tenant-ID: 6f2c1b3a-8e41-4f2d-9c7a-1d5e8b0a3f77
+Authorization: Bearer {jwt-del-tenantadmin}
+```
+
+Sin body.
+
+### Respuesta `200 OK`
+
+```json
+{ "userId": "9f0f2a64-…", "enabled": false }
+```
+
+### Errores
+
+| Status | `errorCode` | Cuándo |
+|---|---|---|
+| `400` | `VALIDATION_FAILED` | Se intenta **deshabilitar al último `TenantAdmin`** del tenant: quedaría sin quien administre |
+| `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
+| `403` | `AUTH_FORBIDDEN` | El llamante no es `TenantAdmin` |
+| `404` | `USER_NOT_FOUND` | El `userId` no existe en este tenant (cuentas aisladas, FR-002) |
+| `429` | `RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
+
+### Reglas
+
+- **Deshabilitar es un solo acto, fail-closed** (misma regla que T061), en este orden:
+  1. revocar **todos** sus `TrustedDevice`;
+  2. revocar **todas** sus familias de refresh;
+  3. escribir `LockoutEnabled = true`, `LockoutEnd = infinito` y `AccessFailedCount = 0`.
+
+  Si algo falla a mitad de camino, el peor caso es un usuario con las sesiones cortadas y la cuenta **todavía operativa** — nunca al revés. Un offboarding a medias no es un offboarding.
+- **Login y refresh mueren en el acto**: `VerifyCredentialsAsync` y `FindByIdAsync` devuelven `null` con `LockoutEnd` futuro, así que el login responde el `401` uniforme (byte a byte igual a una contraseña errada) y el refresh revoca la familia borrando la cookie. Ni siquiera desde un dispositivo confiable ya sembrado entra.
+- **El deshabilitado no opera sobre su propia cuenta**: no puede pedir cambio de número (`401 AUTH_ACCOUNT_DISABLED` en T061, chequeado después del lookup del número y antes de gastar el OTP) ni recuperación de contraseña (T069 usa `FindByEmailAsync`, que devuelve `null`), ni confirmar un OTP vigente en `confirm-device` (ya cubierto desde T080).
+- **Último admin**: un `TenantAdmin` no puede deshabilitarse a sí mismo si es el único del tenant (mismo conteo por rol que T094). Un `Member` puede deshabilitarse sin reglas — sólo un admin llega a este endpoint.
+- **Rehabilitar no resucita nada**: `enable` sólo setea `LockoutEnd = null` y limpia `AccessFailedCount`. Las sesiones y dispositivos viejos quedaron muertos en el disable; el usuario vuelve a entrar por el flujo completo de 2FA. Rehabilitar **no** revoca nada (lo viejo ya está muerto — nada que revocar).
+- **Idempotente**: deshabilitar una cuenta ya deshabilitada, o rehabilitar una activa, responde `200` sin efectos secundarios.
+- **Runbook de celular robado** (decidido 2026-10-09): deshabilitar → verificación por llamada → T050 con el número nuevo → rehabilitar. T050 opera sobre cuentas deshabilitadas **a propósito** (usa `SetPhoneNumberAsync`, sin lookups con lockout).
+
+### Password spraying (cierre del hallazgo de la 2.ª revisión de 3b)
+
+- Los fallos de contraseña se cuentan **por cuenta** (`AccessFailedCount`): el rate limit por IP sólo esquivable con un atacante distribuido que pruebe una contraseña contra miles de emails a la vez.
+- Al llegar a `Lockout:MaxFailedAccessAttempts` (5) se setea `LockoutEnd = ahora + 5 min`. **Mientras el bloqueo esté activo no se cuentan intentos**: contarlo lo extendería y un atacante dejaría afuera al dueño para siempre (es lo que hace el `PreSignInCheck` de Identity).
+- Un login exitoso pone el contador en cero: los fallos viejos no acumulan.
+- La respuesta es siempre el mismo `401 AUTH_INVALID_CREDENTIALS`; el bloqueo no se delata en el cuerpo ni en el código.
+- El hash señuelo sigue corriendo en **todos** los caminos de falla: una sola verificación PBKDF2 por camino (T074 intacto). Un email inexistente no tiene fila que contar — es imposible — y un usuario bloqueado tampoco se cuenta, por el DoS de arriba. Eso deja **un único** delta de tiempo residual: la escritura del conteo cuando la cuenta existe y tiene contraseña errada, inherente a la decisión de contar.
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Deshabilitar corta todo en un acto**
+- **DADO** un usuario con sesión viva y dispositivo confiable sembrado
+- **CUANDO** un `TenantAdmin` invoca `POST …/disable`
+- **ENTONCES** responde `200`; sus familias de refresh y sus dispositivos quedan revocados, y su login responde `401 AUTH_INVALID_CREDENTIALS` — ni siquiera desde el dispositivo trusted
+
+**Último admin**
+- **DADO** un tenant con un único `TenantAdmin`
+- **CUANDO** se deshabilita a sí mismo
+- **ENTONCES** responde `400 VALIDATION_FAILED` y la cuenta queda intacta (sigue pudiendo entrar)
+
+**Rehabilitar no resucita**
+- **DADO** un usuario deshabilitado con sesiones y dispositivos revocados
+- **CUANDO** se invoca `POST …/enable` y el usuario reintenta el login con su contraseña correcta
+- **ENTONCES** el login responde `200` con `requiresDeviceConfirmation: true` (el 2FA arranca de cero) y en la DB **no** queda ninguna sesión vieja viva
+
+**Un Member intenta deshabilitar**
+- **DADO** un usuario `Member` autenticado
+- **CUANDO** invoca el endpoint
+- **ENTONCES** responde `403`
+
+**El deshabilitado no toca su propio número**
+- **DADO** un usuario deshabilitado con un JWT emitido antes del disable
+- **CUANDO** invoca `PUT /api/auth/phone-number` o su confirm
+- **ENTONCES** responde `401 AUTH_ACCOUNT_DISABLED` sin procesar nada
+
+**Cinco contraseñas erradas (T068 — password spraying)**
+- **DADO** un usuario con contraseña conocida y 4 intentos fallidos
+- **CUANDO** falla el 5.º intento y después prueba la contraseña correcta
+- **ENTONCES** ambos responden el mismo `401`, byte a byte idéntico: el bloqueo no se delata
+
+---
+
 ## `PUT /api/auth/phone-number` — FR-008 (T061)
 
-`[PENDIENTE: propuesto, no está en las fuentes originales]`
+Diseñado y cerrado en T061 (2026-10-09). Decisiones del titular revisadas y aplicadas (2026-10-10): `409` sobre reemplazo silencioso, revocación total al confirmar, aviso al viejo, E.164, y validación de móvil del país del tenant.
 
 Único camino para que un usuario cambie **su propio** `PhoneNumber`. Exige estar autenticado **y** confirmar un OTP enviado al número **actual**.
 
 > **Alta ≠ cambio.** Enrolar el primer número con sólo la contraseña sería dejar que un factor se autoenrole: quien tuviera la contraseña decidiría a dónde llegan los OTP. Cambiar uno existente es seguro porque exige demostrar posesión del canal vigente — un atacante con la contraseña robada no tiene el celular viejo. Por eso el **alta** es `PUT /api/admin/users/{userId}/phone-number` (admin, T050) y el **cambio** es este endpoint.
 
-**Commands**: `RequestPhoneNumberChangeCommand` / `ConfirmPhoneNumberChangeCommand` `[PENDIENTE: propuesto]`
+**Commands**: `RequestPhoneNumberChangeCommand` / `ConfirmPhoneNumberChangeCommand` (T061)
 
 ### Paso 1 — Request del cambio
 
@@ -590,21 +764,29 @@ Content-Type: application/json
 
 | Status | `errorCode` | Cuándo |
 |---|---|---|
-| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no es un número móvil válido en formato E.164 `[PENDIENTE: formato/validación a confirmar]` |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no es E.164 válido (`PhoneNumber.Parse`: `^\+[1-9]\d{6,14}$`, sin espacios ni símbolos) |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` no corresponde a un móvil del país del tenant (`CountryPhoneRules`: hoy Colombia, `^\+573\d{9}$`) |
+| `400` | `VALIDATION_FAILED` | `newPhoneNumber` es el mismo que el actual: no hay nada que cambiar |
 | `401` | `AUTH_INVALID_CREDENTIALS` | JWT ausente o vencido |
-| `401` | `AUTH_OTP_REJECTED` | OTP errado o vencido en el paso 2 |
+| `401` | `AUTH_ACCOUNT_DISABLED` | La cuenta existe pero está **deshabilitada** (T068). El chequeo corre después del lookup del número y antes de gastar el OTP: ni el request ni el confirm se procesan, y un JWT emitido antes del disable no sirve |
+| `401` | `AUTH_OTP_REJECTED` | OTP errado o vencido en el paso 2, o no hay cambio pendiente |
 | `403` | `AUTH_PHONE_NOT_ENROLLED` | El usuario **no tiene** `PhoneNumber` cargado: ese caso es alta por admin (T050), no cambio |
-| `409` | `AUTH_PHONE_CHANGE_PENDING` | Ya hay un cambio en vuelo sin confirmar `[PENDIENTE: confirmar si se rechaza o se reemplaza el anterior]` |
+| `404` | `USER_NOT_FOUND` | El `sub` del token no corresponde a un usuario del tenant |
+| `409` | `AUTH_PHONE_CHANGE_PENDING` | Ya hay un cambio en vuelo sin confirmar. El `detail` indica cuántos segundos faltan para que el pendiente venza |
 | `429` | `RATE_LIMITED` | Excedido el límite de `auth` (NFR-005) |
 
 ### Reglas
 
 - El OTP DEBE enviarse al `PhoneNumber` **vigente**. NUNCA al número nuevo — mandarlo al nuevo destruye la garantía: cualquiera con la contraseña se autoconfirmaría el cambio.
-- El `PhoneNumber` NO DEBE modificarse hasta que el OTP sea confirmado. Mientras tanto el número nuevo vive aparte (pendiente), no en `ApplicationUser`.
+- **Regla del país del tenant (decisión del titular, T061)**: el número nuevo DEBE corresponder a un móvil del país del tenant (`tenant_settings.country_code`, ISO 3166-1 alpha-2, def. `CO`). Las reglas viven en `CountryPhoneRules` (Domain): sólo se valida **formato** (prefijo del país + longitud + prefijo móvil), no la existencia del número. El rechazo ocurre EN EL REQUEST, antes de gastar un SMS. Un tenant sin `country_code` o un país sin regla cargada degrada a exigir únicamente E.164.
+- El `PhoneNumber` NO DEBE modificarse hasta que el OTP sea confirmado. Mientras tanto el número nuevo vive aparte (pendiente), no en `ApplicationUser`: se persiste en la fila del OTP (`device_otps.new_phone_number`), de modo que la vida del pendiente = la del código (10 min) y no queda estado huérfano.
+- Los OTP de cambio viven en el alcance interno `internal:phone-change` (no se amarran a un dispositivo): el usuario puede pedir el cambio desde cualquiera, y los OTP de login y de cambio nunca se pisan.
+- **Un solo cambio en vuelo — `409` (decisión del titular, T061)**: si ya hay un cambio pendiente, un nuevo pedido responde `409 AUTH_PHONE_CHANGE_PENDING` sin emitir otro código ni gastar un SMS. El pendiente original sigue vigente hasta que venza (10 min) o se confirme. El `detail` informa los segundos restantes para que el front pueda mostrar "espera a que venza el código anterior". El rechazo no relaja la tasa de emisión (NFR-005).
 - Un usuario **sin** `PhoneNumber` cargado NO DEBE poder usar este endpoint (`403 AUTH_PHONE_NOT_ENROLLED`).
+- **Confirmar revoca TODO — fail-closed (decisión del titular, T061)**: al confirmar el OTP se revocan TODAS las sesiones del usuario (refresh tokens) y TODOS sus dispositivos confiables, y se queman los OTPs restantes. La revocación ocurre ANTES de escribir el número y dentro de la misma transacción del consume: si algo falla a mitad, no se aplica el cambio. El titular se desloguea en todos lados y su próximo login exige OTP al número **nuevo**.
+- **Aviso al número viejo (decisión T061)**: aplicado el cambio se envía un SMS best-effort al número anterior ("Tu número de Stockma fue cambiado..."). Si el envío falla, se loguea y el cambio NO se revierte — ya estaba confirmado con OTP.
 - Aplicado el cambio, `PhoneNumberConfirmed` DEBE quedar en `true` y el cambio DEBE quedar auditado con el usuario que lo ejecutó.
 - Rate limiting igual que el resto de `auth` (NFR-005).
-- `[PENDIENTE: definir si el cambio confirmado revoca los TrustedDevice y/o notifica al número viejo]`
 
 ### Escenarios (Dado/Cuando/Entonces)
 
@@ -627,6 +809,26 @@ Content-Type: application/json
 - **DADO** un usuario autenticado sin `PhoneNumber` cargado
 - **CUANDO** `PUT /api/auth/phone-number`
 - **ENTONCES** responde `403 AUTH_PHONE_NOT_ENROLLED` y el número queda sin cambios
+
+**Cambio en vuelo**
+- **DADO** un cambio pendiente sin confirmar
+- **CUANDO** el usuario pide OTRO cambio con un número distinto
+- **ENTONCES** responde `409 AUTH_PHONE_CHANGE_PENDING`, no se emite código nuevo y el pendiente original sigue vivo
+
+**Confirmar revoca todo**
+- **DADO** un usuario con sesiones abiertas y dispositivos confiables que confirma su cambio de número
+- **CUANDO** se aplica el nuevo número
+- **ENTONCES** todas sus sesiones y sus dispositivos confiables quedan revocados, y los OTPs restantes del usuario quedan quemados
+
+**Aviso al número viejo**
+- **DADO** un cambio confirmado con OTP
+- **CUANDO** se aplica el nuevo número
+- **ENTONCES** se envía un SMS de aviso al número VIEJO; si el envío falla, el cambio se mantiene y el fallo queda en el log
+
+**Mismo número**
+- **DADO** un usuario con `PhoneNumber` cargado
+- **CUANDO** pide cambiarlo a su propio número actual
+- **ENTONCES** responde `400 VALIDATION_FAILED` sin emitir OTP
 
 ---
 
@@ -907,3 +1109,122 @@ X-Tenant-ID: {guid}
 - `404` sólo cuando el `userId` no existe en el tenant. Un usuario que ya no tiene dispositivos sí existe: eso responde `204`.
 - Revocar todos DEBE revocar las familias de refresh token de **cada** dispositivo del usuario: `revoke-all` lo deja sin ninguna sesión viva por dispositivo confiado. Las sesiones abiertas desde un dispositivo **no** confiado las mata T068 (deshabilitar la cuenta).
 - Idempotente: revocar dos veces no falla.
+
+---
+
+## `POST /api/auth/forgot-password` y `POST /api/auth/reset-password` + fallback admin — T069
+
+Recuperación de contraseña cuando el usuario perdió el acceso a ella. El canal de verificación es el **mismo del 2FA: el SMS al número enrolado** — no hay link por email ni pregunta de seguridad. Dos pasos anónimos + un fallback admin para quien perdió el celular Y la contraseña.
+
+### Paso 1 — `POST /api/auth/forgot-password` (AllowAnonymous, sin `X-Tenant-ID`)
+
+El email resuelve el tenant; no hay header. Rate limit por IP: la política `Auth` de clase.
+
+#### Request
+
+```json
+{ "email": "duena@droga.co" }
+```
+
+#### Respuesta `202 Accepted` — siempre
+
+Cuerpo vacío. Idéntica exista o no el email, esté o no deshabilitado, tenga o no teléfono. No se emite código si la cuenta no existe, está bloqueada (spray T090 / deshabilitada T068) o no tiene `PhoneNumber`.
+
+### Paso 2 — `POST /api/auth/reset-password` (AllowAnonymous, sin `X-Tenant-ID`)
+
+#### Request
+
+```json
+{ "email": "duena@droga.co", "code": "483920", "newPassword": "Nueva-Larga-2026" }
+```
+
+#### Respuesta `204 No Content`
+
+#### Errores
+
+| Status | errorCode | Cuándo |
+|---|---|---|
+| `401` | `AUTH_OTP_REJECTED` | email inexistente/deshabilitado, código errado, vencido o ya usado — misma respuesta en todos los casos |
+| `400` | `VALIDATION_FAILED` | la nueva contraseña no cumple la política (T003: largo 12) |
+
+#### Reglas
+
+- **Uniformidad**: el paso 1 responde `202` vacío SIEMPRE; el paso 2 responde `401 AUTH_OTP_REJECTED` idéntico para email inexistente y para código errado (mismo motivo que T055c: enumerar correos).
+- El código se envía por **SMS al `PhoneNumber` enrolado**, en el alcance propio `internal:password-reset` (aislado de login y de cambio de número), expira en 10 minutos y es de **un solo uso**.
+- El consume corre dentro de la transacción del lock: **contraseña débil ⇒ `400` y el código NO se quema** (rollback); el usuario reintenta con el mismo código.
+- Un reset exitoso **cambia la contraseña**, **revoca todas las familias de refresh** (T065) y **quema los OTPs vivos** del usuario.
+- El reset **NO salta el 2FA**: tras el reset, un dispositivo desconocido sigue pidiendo OTP.
+- El reset **NO toca los dispositivos confiables**: el ancla OTP (el número) no cambió, y sin la contraseña nueva un dispositivo no entra. *(Decisión a veto en review.)*
+- **No rehabilita**: una cuenta deshabilitada (T068) tampoco inicia el flujo (mismo `202` uniforme, cero filas en `device_otps`).
+- El lockout por spraying (T090) también bloquea iniciar el flujo por `LockoutEnd` — aceptado; el dueño espera a que venza.
+
+### Fallback admin — `POST /api/admin/users/{userId}/reset-password` (TenantAdmin)
+
+Para el que perdió el celular Y la contraseña. Cambia la contraseña directamente (sin OTP), corta todas las familias de refresh y quema los OTPs vivos. NO toca `LockoutEnd` (un reset no rehabilita) ni los dispositivos confiables.
+
+#### Request
+
+```json
+{ "newPassword": "Nueva-Larga-2026" }
+```
+
+#### Respuesta `200 OK`
+
+```json
+{ "userId": "..." }
+```
+
+#### Errores
+
+| Status | errorCode | Cuándo |
+|---|---|---|
+| `403` | — | caller Member (política `TenantAdmin`) |
+| `404` | `USER_NOT_FOUND` | el `userId` no existe en el tenant del caller |
+| `400` | `VALIDATION_FAILED` | la nueva contraseña no cumple la política |
+
+#### Reglas del fallback
+
+- Fail-closed al estilo T061/T068: **primero se corta el acceso** (familias + OTPs) y **después** se escribe la contraseña. Una contraseña débil responde `400` con las sesiones **ya cortadas**; la contraseña anterior queda intacta. *(Decisión a veto en review.)*
+- Riesgo residual: el SMS al viejo número puede caer en manos de un tercero — mitigable con rate limit + aviso al número viejo (postergado, flaggeado).
+
+### Escenarios (Dado/Cuando/Entonces)
+
+**Respuesta uniforme**
+- **DADO** una cuenta existente y un email inexistente
+- **CUANDO** ambos piden `forgot-password`
+- **ENTONCES** responden `202` byte a byte igual; sólo al existente se le emite código
+
+**Código de un solo uso**
+- **DADO** un reset completado
+- **CUANDO** se repite con el mismo código
+- **ENTONCES** responde `401 AUTH_OTP_REJECTED`
+
+**El reset mata las sesiones vivas**
+- **DADO** un usuario con una sesión abierta
+- **CUANDO** completa el reset
+- **ENTONCES** su refresh token viejo responde `401`
+
+**El 2FA sigue vivo**
+- **DADO** un usuario que completó el reset
+- **CUANDO** entra con la contraseña nueva desde un dispositivo desconocido
+- **ENTONCES** `200` con `requiresDeviceConfirmation: true` — la contraseña sola no alcanza
+
+**Contraseña débil no quema el código**
+- **DADO** un código vigente
+- **CUANDO** se intenta resetear con una contraseña que no pasa la política
+- **ENTONCES** responde `400 VALIDATION_FAILED` y el MISMO código sirve para el reintento
+
+**El deshabilitado no inicia el flujo**
+- **DADO** una cuenta deshabilitada (T068)
+- **CUANDO** pide `forgot-password`
+- **ENTONCES** responde `202` uniforme y no se inserta fila en `device_otps`
+
+**Fallback admin**
+- **DADO** un miembro con sesión viva
+- **CUANDO** un TenantAdmin le resetea la contraseña
+- **ENTONCES** responde `200`, las familias de refresh quedan revocadas y la contraseña vieja no entra
+
+**Aislamiento de tenant en el fallback**
+- **DADO** un admin del tenant A
+- **CUANDO** resetea a un usuario del tenant B
+- **ENTONCES** responde `404 USER_NOT_FOUND`

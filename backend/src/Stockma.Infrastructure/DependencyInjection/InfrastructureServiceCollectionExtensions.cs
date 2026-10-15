@@ -50,6 +50,8 @@ public static class InfrastructureServiceCollectionExtensions
                 options.User.RequireUniqueEmail = true;
                 options.Password.RequiredLength = 12;
                 options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             })
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<StockmaDbContext>();

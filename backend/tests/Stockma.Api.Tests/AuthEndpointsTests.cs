@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Stockma.Application.Common;
 using Stockma.Application.Identity;
+using Stockma.Domain.ValueObjects;
 using Stockma.Infrastructure.Persistence;
 
 namespace Stockma.Api.Tests;
@@ -86,6 +87,25 @@ public class AuthEndpointsTests(StockmaApiFactory factory) : IClassFixture<Stock
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         return email;
+    }
+
+    private async Task<int> LiveDeviceOtpCountAsync(Guid tenantId, string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContext>().Set(tenantId);
+
+        var context = scope.ServiceProvider.GetRequiredService<StockmaDbContext>();
+        var normalizedEmail = email.ToUpperInvariant();
+        var userId = await context.Users
+            .Where(user => user.NormalizedEmail == normalizedEmail)
+            .Select(user => user.Id)
+            .SingleAsync();
+
+        return await context.DeviceOtps.CountAsync(
+            otp => otp.UserId == userId
+                && otp.DeviceId == DeviceIdentifier.Normalize(DeviceId)
+                && otp.ConsumedAt == null
+                && otp.InvalidatedAt == null);
     }
 
     [Fact]
@@ -234,6 +254,29 @@ public class AuthEndpointsTests(StockmaApiFactory factory) : IClassFixture<Stock
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
         body.GetProperty("requiresDeviceConfirmation").GetBoolean().Should().BeTrue();
         body.GetProperty("accessToken").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Login_TwiceInARow_AnswersTheSameAndEmitsOnlyOneOtp()
+    {
+        var tenantId = await SeedTenantAsync();
+        var email = await RegisterUserAsync(tenantId, $"doble-{Guid.NewGuid():N}@droga.co");
+        var client = factory.CreateClient();
+        var payload = new { email, password = "Contrasena-Larga-1", deviceId = DeviceId };
+
+        var first = await client.PostAsJsonAsync("/api/auth/login", payload);
+        var second = await client.PostAsJsonAsync("/api/auth/login", payload);
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await first.Content.ReadAsStringAsync())
+            .Should()
+            .Be(
+                await second.Content.ReadAsStringAsync(),
+                "idempotencia: el segundo pedido responde byte a byte igual que el primero");
+
+        (await LiveDeviceOtpCountAsync(tenantId, email))
+            .Should().Be(1, "idempotencia: un doble click no pisa el código vigente ni emite otro");
     }
 
     [Fact]

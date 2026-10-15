@@ -31,7 +31,7 @@ null
 
 No es `404`. La ausencia de branding es un estado válido, no un recurso que
 falta: el frontend le pasa ese `null` directo a `applyTenantBranding`, que ya
-significa "usá los valores por defecto de `tokens.css`".
+significa "usa los valores por defecto de `tokens.css`".
 
 **`400 Bad Request`** — falta el header `X-Tenant-ID`.
 

@@ -19,8 +19,8 @@ TanStack Query para datos del servidor y Zustand para estado de UI.
 | `npm run format:check` | Verifica formato con Prettier                            |
 
 El proxy apunta al puerto del perfil `http` de la API
-(`backend/src/Stockma.Api/Properties/launchSettings.json`). Si lo cambiás allá,
-cambialo acá.
+(`backend/src/Stockma.Api/Properties/launchSettings.json`). Si lo cambias allá,
+cámbialo aquí.
 
 ## Estructura
 
@@ -78,12 +78,16 @@ Todo texto que ve el usuario —pantallas, errores, y los `detail` de la API— 
 **español latinoamericano neutro, tuteando**. Nada de voseo ni de modismos
 regionales: Stockma se vende en toda LATAM.
 
-| Sí                    | No                    |
-| --------------------- | --------------------- |
-| Espera un minuto      | Esperá un minuto      |
-| Intenta de nuevo      | Probá de nuevo        |
-| Ingrésalo para seguir | Ingresalo para seguir |
-| ¿No tienes cuenta?    | ¿No tenés cuenta?     |
+| Sí                    | No                                           |
+| --------------------- | -------------------------------------------- |
+| Espera un minuto      | imperativos de voseo (terminados en -á o -í) |
+| Intenta de nuevo      | modismos regionales                          |
+| Ingrésalo para seguir | Ingresalo para seguir                        |
+| ¿No tienes cuenta?    | voseo en cualquier otra forma verbal         |
+
+La regla no depende de la memoria: `node scripts/check-neutral-es.mjs` la verifica en el
+pre-commit (`.githooks/pre-commit`) y en CI (job `copy-neutral` de `.github/workflows/ci.yml`).
+Si aparece voseo, no hay commit ni merge.
 
 ### Branding por tenant
 

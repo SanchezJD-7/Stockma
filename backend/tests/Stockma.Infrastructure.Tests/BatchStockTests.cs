@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Stockma.Application.Batches;
 using Stockma.Application.Batches.Commands;
 using Stockma.Application.Products.Commands;
 using Stockma.Domain.Enums;

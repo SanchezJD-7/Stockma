@@ -1,6 +1,6 @@
 import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { AuthService } from '../../../../services/auth-service'
 import { FormBody, FormTitle, SubmitButton } from '../../styles/auth-form.styles'
 import { useFlashError } from '../../hooks/useFlashError'
@@ -24,9 +24,14 @@ export function LoginPage({
   const [password, setPassword] = useState('')
   const { error, showError, clearError } = useFlashError()
   const [submitting, setSubmitting] = useState(false)
+  const inFlight = useRef(false)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+
+    if (inFlight.current) return
+
+    inFlight.current = true
     clearError()
     setSubmitting(true)
 
@@ -42,6 +47,7 @@ export function LoginPage({
     } catch (err) {
       showError(authErrorMessage(err))
     } finally {
+      inFlight.current = false
       setSubmitting(false)
     }
   }
