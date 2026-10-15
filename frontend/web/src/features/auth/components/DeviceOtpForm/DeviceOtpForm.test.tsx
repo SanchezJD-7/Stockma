@@ -49,13 +49,13 @@ describe('DeviceOtpForm', () => {
 
     renderForm(Date.now() + 90_000)
 
-    screen.getByText(/en 1:30 podés volver a iniciar sesión para pedir otro/i)
+    screen.getByText(/en 1:30 puedes volver a iniciar sesión para pedir otro/i)
 
     act(() => {
       vi.advanceTimersByTime(30_000)
     })
 
-    screen.getByText(/en 1:00 podés volver a iniciar sesión para pedir otro/i)
+    screen.getByText(/en 1:00 puedes volver a iniciar sesión para pedir otro/i)
   })
 
   it('pasado el cooldown avisa que puede volver a iniciar sesión para pedir otro', () => {
@@ -68,6 +68,6 @@ describe('DeviceOtpForm', () => {
       vi.advanceTimersByTime(61_000)
     })
 
-    screen.getByText(/volvé a iniciar sesión para pedir otro/i)
+    screen.getByText(/vuelve a iniciar sesión para pedir otro/i)
   })
 })

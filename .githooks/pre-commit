@@ -2,11 +2,22 @@
 #
 # Formatea con Prettier los archivos staged de frontend/web antes de commitear.
 # Evita que `npm run format:check` del CI sea el primero en avisar.
+# Verifica además la regla de jerga latinoamericana neutra (scripts/check-neutral-es.mjs).
 #
 # Instalación (una sola vez por clon):
 #   git config core.hooksPath .githooks
 
 set -e
+
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/check-neutral-es.mjs; then
+    echo ""
+    echo "  pre-commit: voseo detectado. Español neutro latinoamericano, sin excepciones."
+    exit 1
+  fi
+else
+  echo "pre-commit: node no disponible; la verificación de voseo la hará CI (copy-neutral)."
+fi
 
 WEB_DIR="frontend/web"
 
@@ -35,7 +46,7 @@ if [ -n "$partial" ]; then
   if ! (cd "$WEB_DIR" && npx --no-install prettier --check $rel); then
     echo ""
     echo "  Formato inválido. Corré:  cd $WEB_DIR && npm run format"
-    echo "  (no lo arreglé solo porque tenés cambios a medio stagear)"
+    echo "  (no lo arreglé solo porque tienes cambios a medio stagear)"
     exit 1
   fi
   exit 0

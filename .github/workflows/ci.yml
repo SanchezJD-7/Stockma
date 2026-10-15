@@ -58,3 +58,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  copy-neutral:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Jerga latinoamericana neutra (sin voseo)
+        run: node scripts/check-neutral-es.mjs

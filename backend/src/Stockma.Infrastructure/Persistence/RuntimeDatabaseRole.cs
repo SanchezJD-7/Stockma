@@ -62,5 +62,5 @@ public static class RuntimeDatabaseRole
 
     private static InvalidOperationException Refuse(string role, string reason) =>
         new($"La API no arranca: el rol de runtime '{role}' {reason}, y la RLS no lo aislaría. "
-            + "Conectate con app_user (ConnectionStrings:Postgres) y dejá el rol propietario sólo para migrar. Ver ADR-017.");
+            + "Conéctate con app_user (ConnectionStrings:Postgres) y deja el rol propietario sólo para migrar. Ver ADR-017.");
 }
