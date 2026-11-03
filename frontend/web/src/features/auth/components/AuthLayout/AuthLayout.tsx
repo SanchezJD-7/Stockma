@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import logoUrl from '../../../../assets/stockma-stacked.svg'
+import logoUrl from '../../../../assets/Stockma_logo.png'
 import { Backdrop, Brand, Card, Logo } from './AuthLayout.styles'
 
 interface AuthLayoutProps {

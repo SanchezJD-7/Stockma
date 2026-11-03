@@ -45,6 +45,12 @@ export const Brand = styled.header`
 `
 
 export const Logo = styled.img`
-  width: 180px;
+  display: block;
+  width: 200px;
+  max-width: 90%;
   height: auto;
+  object-fit: contain;
+  background: transparent;
+  user-select: none;
+  -webkit-user-drag: none;
 `
