@@ -13,7 +13,7 @@ describe('AuthLayout', () => {
     const logo = screen.getByRole('img', { name: 'Stockma' })
     const content = screen.getByText('formulario')
 
-    expect(logo.getAttribute('src')).toMatch(/stockma-stacked\.svg/)
+    expect(logo.getAttribute('src')).toMatch(/Stockma_logo\.png/)
     expect(logo.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
