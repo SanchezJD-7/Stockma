@@ -1,0 +1,167 @@
+.mock {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg-surface);
+  box-shadow: 0 24px 60px rgba(8, 20, 38, 0.14);
+  overflow: hidden;
+}
+
+.intro {
+  padding: 18px 22px 10px;
+  font-size: 13px;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 22px 12px;
+}
+
+.headingTitle {
+  margin: 0;
+  padding: 0;
+  font-size: 22px;
+}
+
+.lotCount {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(51, 112, 130, 0.12);
+  color: var(--brand-teal);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  background: rgba(51, 112, 130, 0.12);
+  color: var(--brand-teal);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--brand-teal);
+  outline-offset: 2px;
+}
+
+.panels ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 18px;
+}
+
+.panels li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'details indicator'
+    'stock stock';
+  align-items: center;
+  gap: 4px 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panels li:last-child {
+  border-bottom: 0;
+}
+
+.rowDetails {
+  grid-area: details;
+  min-width: 0;
+}
+
+.rowDetails strong {
+  display: block;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowDetails span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.quantity,
+.expiryChip {
+  grid-area: indicator;
+}
+
+.quantity {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.expiryChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(46, 125, 50, 0.12);
+  color: var(--status-green);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expiryChip[data-status='warn'] {
+  background: rgba(180, 83, 9, 0.12);
+  color: var(--status-yellow);
+}
+
+.expiryChip[data-status='danger'] {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--status-red);
+}
+
+.stockTrack {
+  grid-area: stock;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.stockTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-teal);
+}
+
+.stockTrack[data-fill='high'] span {
+  width: 78%;
+}
+
+.stockTrack[data-fill='medium'] span {
+  width: 52%;
+}
+
+.stockTrack[data-fill='low'] span {
+  width: 26%;
+}
