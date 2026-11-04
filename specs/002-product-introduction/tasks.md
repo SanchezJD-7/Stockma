@@ -32,55 +32,52 @@ Chain strategy: stacked-to-main
 
 ## Phase 1: Tema y assets
 
-- [ ] 1.1 `styles/tokens.css`: tokens `[data-theme='dark']` + radius 10px.
-- [ ] 1.2 `frontend/web/index.html`: anti-FOUC `stockma-theme` + links Work Sans.
-- [ ] 1.3 `main.tsx`: listener `stockma-theme-change` recrea tema MUI; validar `mui-bridge.ts`.
-- [ ] 1.4 `assets/`: PNGs `Stockma_*.png`; dimensionar por artwork visible (~49%), no por canvas.
+- [x] 1.1 `styles/tokens.css`: tokens `[data-theme='dark']` + radius 10px.
+- [x] 1.2 `frontend/web/index.html`: anti-FOUC `stockma-theme` + links Work Sans.
+- [x] 1.3 `main.tsx`: listener `stockma-theme-change` recrea tema MUI; validar `mui-bridge.ts`.
+- [x] 1.4 `assets/`: PNGs `Stockma_*.png`; dimensionar por artwork visible (~49%), no por canvas.
 
 ## Phase 2: Rutas
 
-- [ ] 2.1 `App.tsx`: pathname: `/login`→`AuthFlow`, resto→`LandingPage` (T058, sin Router).
+- [x] 2.1 `App.tsx`: pathname: `/login`→`AuthFlow`, resto→`LandingPage` (T058, sin Router).
 
 ## Phase 3: Estructura
 
-- [ ] 3.1 `features/landing/`: `types.ts` con `interface Plan` (design); `index.ts` exporta `LandingPage`.
-- [ ] 3.2 `features/landing/components/LandingPage/LandingPage.tsx`: 11 secciones de spec; `WaitlistSection` último hijo de `<main>`.
-- [ ] 3.3 `features/landing/components/Header/Header.tsx`: anclas de secciones, toggle de tema, menú móvil.
+- [x] 3.1 `features/landing/`: `types.ts` con `interface Plan` (design); `index.ts` exporta `LandingPage`.
+- [x] 3.2 `features/landing/components/LandingPage/LandingPage.tsx`: 11 secciones de spec; `WaitlistSection` último hijo de `<main>`.
+- [x] 3.3 `features/landing/components/Header/Header.tsx`: anclas de secciones, toggle de tema, menú móvil.
 
 ## Phase 4: Secciones
 
-- [ ] 4.1 `components/Hero/Hero.tsx`: H1 itálica; primario abre modal, secundario → `#como-funciona`.
-- [ ] 4.2 `components/Hero/HeroMockTable.tsx`: pestañas Productos/Lotes/Por vencer; chips 21/9 warn, 3 danger.
-- [ ] 4.3 `components/WhoItsFor/WhoItsFor.tsx`: `#para-quien-es`: Droguerías, Minimercados, Distribuidoras.
-- [ ] 4.4 `components/HowItWorks/HowItWorks.tsx`: `#como-funciona`: 3 pasos, copy exacto.
-- [ ] 4.5 `components/Features/Features.tsx`: `#producto`: grid 3x2; tag "Próximamente" solo en reportes.
-- [ ] 4.6 `components/Comparison/Comparison.tsx`: `#comparativa`: columnas Sin/Con Stockma, bullets de spec.
-- [ ] 4.7 `components/Faq/Faq.tsx`: `#preguntas`: acordeón, copy del prototipo.
+- [x] 4.1 `components/Hero/Hero.tsx`: H1 itálica; CTA primario habilitado sin acción, secundario → `#how-it-works`.
+- [x] 4.2 `components/Hero/HeroMockTable.tsx`: pestañas Productos/Lotes/Por vencer; chips 21/9 warn, 3 danger.
+- [x] 4.3 `components/WhoItsFor/WhoItsFor.tsx`: `#audience`: Droguerías, Minimercados, Distribuidoras.
+- [x] 4.4 `components/HowItWorks/HowItWorks.tsx`: `#how-it-works`: 3 pasos, copy exacto.
+- [x] 4.5 `components/Features/Features.tsx`: `#features`: grid 3x2; tag "Próximamente" solo en reportes.
+- [x] 4.6 `components/Comparison/Comparison.tsx`: `#comparison`: columnas Sin/Con Stockma, bullets de spec.
+- [x] 4.7 `components/Faq/Faq.tsx`: `#faq`: acordeón, copy del prototipo.
 
 ## Phase 5: Planes y footer
 
-- [ ] 5.1 `components/Pricing/Pricing.tsx`: `#planes`: 4 planes altura uniforme (`grid-auto-rows:1fr`, botón `margin-top:auto`); selección con `aria-pressed`.
-- [ ] 5.2 `components/Pricing/PricingButton.tsx`: botones `href="#lista-espera"`+`data-open-waitlist` abren modal; primarios con `--primary`/`--on-primary`/`--primary-active`, nunca `--accent` (2.33:1).
-- [ ] 5.3 `components/DemoSection/DemoSection.tsx`: `#agendar`: badge "Próximamente", botón deshabilitado, CTA a lista de espera.
-- [ ] 5.4 `components/Footer/Footer.tsx`: 3 filas: `Stockma_vertical_trim.png` (118px), iconos SVG inline WhatsApp/Instagram (`currentColor`), soporte (ancla WhatsApp), copyright; hairline `var(--border)`.
+- [x] 5.1 `components/Pricing/Pricing.tsx`: `#pricing`: 4 planes altura uniforme (`grid-auto-rows:1fr`, botón `margin-top:auto`); selección con `aria-pressed`.
+- [x] 5.2 `components/Pricing/Pricing.tsx`: botones activos sin acción; primarios con `--primary`/`--on-primary`/`--primary-active`, nunca `--accent` (2.33:1).
+- [x] 5.3 `components/DemoSection/DemoSection.tsx`: `#demo`: badge "Próximamente", botón "Agendar demo" deshabilitado y CTA de lista de espera activo sin acción.
+- [x] 5.4 `components/Footer/Footer.tsx`: 3 filas: `Stockma_vertical_trim.png` (118px), iconos SVG inline WhatsApp/Instagram (`currentColor`), soporte (ancla WhatsApp), copyright; hairline `var(--border)`.
 
-## Phase 6: Lista de espera
+## Phase 6: Barra de lista de espera
 
-- [ ] 6.1 `components/WaitlistModal/WaitlistModal.tsx`: nombre, bandera Colombia con `+57` fijo, correo; submit `preventDefault`.
-- [ ] 6.2 `components/WaitlistModal/WaitlistModal.tsx`: `is-submitted`: oculta campos/botón, conserva título; "¡Listo, {nombre}!" capitalizado; sin JS "¡Listo!".
-- [ ] 6.3 `components/WaitlistModal/SuccessBadge.tsx`: badge animado (ripple + check `stroke-dashoffset`, `--brand-teal`), `prefers-reduced-motion`; cierra con X, fuera, Esc.
-- [ ] 6.4 `components/WaitlistSection/WaitlistSection.tsx`: `#lista-espera` sticky `bottom:0` full-bleed, último hijo de `<main>`; `.wrap` usa `padding-block`, no shorthand `padding`; ≤900px apilada, botón full-width.
-- [ ] 6.5 `features/landing/landing.css`: ≤600px: h1 30px, h2 25px, cuerpo 14px; botones ancho completo.
+- [x] 6.1 `components/WaitlistSection/WaitlistSection.tsx`: `#waitlist` sticky `bottom:0` full-bleed, último hijo de `<main>`; `.wrap` usa `padding-block`, no shorthand `padding`; CTA activo sin acción; ≤900px apilada, botón full-width.
+- [x] 6.2 `features/landing/landing.css`: ≤600px: h1 30px, h2 25px, cuerpo 14px; botones ancho completo.
 
 ## Phase 7: Tests
 
-- [ ] 7.1 `App.test.tsx`: `/` renderiza LandingPage, `/login` AuthFlow (RTL).
-- [ ] 7.2 `Header.test.tsx`: toggle: `data-theme`, `localStorage`, evento `stockma-theme-change`.
-- [ ] 7.3 `HeroMockTable.test.tsx`: pestaña conmuta panel visible.
-- [ ] 7.4 `WaitlistModal.test.tsx`: abre; Esc/X/backdrop cierran; submit muestra `is-submitted`+nombre.
-- [ ] 7.5 `LandingPage.test.tsx`: 11 secciones con sus ids.
+- [x] 7.1 `App.test.tsx`: `/` renderiza LandingPage, `/login` AuthFlow (RTL).
+- [x] 7.2 `Header.test.tsx`: toggle: `data-theme`, `localStorage`, evento `stockma-theme-change`.
+- [x] 7.3 `HeroMockTable.test.tsx`: pestaña conmuta panel visible.
+- [x] 7.4 `LandingPage.test.tsx`: los CTA de lista de espera están habilitados, no navegan y no abren modal.
+- [x] 7.5 `LandingPage.test.tsx`: 11 secciones con sus ids en inglés y en orden.
 
 ## Phase 8: Gate
 
-- [ ] 8.1 `node scripts/check-neutral-es.mjs` → ok (sin voseo).
+- [x] 8.1 `node scripts/check-neutral-es.mjs` → ok (sin voseo).
 - [ ] 8.2 `Stockma_landing.html`: paridad claro/oscuro, ≤900px, ≤600px.

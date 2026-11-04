@@ -14,21 +14,22 @@ Crear una pantalla de introducción (landing) en `/` para Stockma, con navegaci�
 ## Alcance
 - Landing pública en `/`.
 - Navegación superior con logo, links a secciones (Producto, Cómo funciona, Planes, Agendar demo), menú móvil y cambio de tema. Sin CTA de login.
-- Hero con CTA primario "Únete a la lista de espera" (abre la modal), CTA secundario "Ver cómo funciona" y mock visual interactivo de tabla de inventario con pestañas.
-- Sección "Para quién es Stockma" (`#para-quien-es`, segmentos objetivo: Droguerías, Minimercados, Distribuidoras).
+- Hero con CTA primario "Únete a la lista de espera" (visible, habilitado y sin acción en esta spec), CTA secundario "Ver cómo funciona" y mock visual interactivo de tabla de inventario con pestañas.
+- Sección "Para quién es Stockma" (`#audience`, segmentos objetivo: Droguerías, Minimercados, Distribuidoras).
 - Sección "Cómo funciona" (3 pasos).
 - Sección "Funcionalidades principales" (6 tarjetas en grid 3x2; la de reportes lleva el tag "Próximamente").
-- Barra de lista de espera (`#lista-espera`) pegada al pie de la pantalla, de ancho completo, con CTA que abre la modal.
+- Barra de lista de espera (`#waitlist`) pegada al pie de la pantalla y de ancho completo, con CTA visible, habilitado y sin acción en esta spec.
 - Sección "De la hoja y el lápiz a un software que hace ese trabajo por ti" (comparativa).
-- Sección "Elige tu plan" (4 planes con altura uniforme; los 4 botones abren la modal de lista de espera).
-- Sección "Agenda tu demo" (badge "Próximamente", botón "Agendar demo" deshabilitado y CTA a la lista de espera).
+- Sección "Elige tu plan" (4 planes con altura uniforme; los 4 botones están visibles, habilitados y sin acción en esta spec).
+- Sección "Agenda tu demo" (badge "Próximamente", botón "Agendar demo" deshabilitado y CTA de lista de espera visible, habilitado y sin acción).
 - Sección "Preguntas frecuentes" (acordeón).
 - Footer en tres filas: logo + iconos de WhatsApp e Instagram (`space-between`), línea de soporte con el enlace "Escribenos al WhatsApp" y copyright ("© 2026 Stockma" / "Hecho en Colombia", también `space-between`). Sin navegación interna.
-- Modal de lista de espera (maqueta, sin backend): nombre, teléfono con prefijo +57 y correo.
+- Los CTA de lista de espera se muestran activos, pero no abren modal, navegan ni envían datos en este cambio.
 - Modo oscuro con `data-theme`, `localStorage` `stockma-theme`, anti-FOUC y actualización del tema MUI.
 - Sin React Router (usar switch por `window.location.pathname` en `App.tsx`: `/login` -> `AuthFlow`, resto -> `LandingPage`). Diferido a T058.
 
 ## Fuera de alcance
+- Modal de lista de espera y guardado de datos en backend; se abordarán juntos en una futura spec. El prototipo HTML conserva la modal como referencia visual, sin que eso forme parte de la implementación de 002.
 - Modal/CTA de login en la landing y autenticación desde la landing (no existe en el prototipo actual; posible change futuro).
 - Chat de demo con redirección a Cal.com (no existe en el prototipo actual; posible change futuro).
 - Agenda propia / backend de demo (no existe en el prototipo actual; posible change futuro).
@@ -39,21 +40,21 @@ Crear una pantalla de introducción (landing) en `/` para Stockma, con navegaci�
 ## Estructura de la landing
 1. Header (logo, nav, tema, menú móvil)
 2. Hero (H1, subtítulo, 2 CTAs, mock visual de tabla)
-3. Para quién es Stockma (`#para-quien-es`)
-4. Cómo funciona (3 pasos, `#como-funciona`)
-5. Funcionalidades principales (6 tarjetas, `#producto`)
-6. Comparativa manual vs Stockma (`#comparativa`)
-7. Planes (`#planes`)
-8. Preguntas frecuentes (`#preguntas`)
-9. Agenda tu demo (`#agendar`)
-10. Barra de lista de espera pegada al pie (`#lista-espera`, último hijo de `<main>`)
+3. Para quién es Stockma (`#audience`)
+4. Cómo funciona (3 pasos, `#how-it-works`)
+5. Funcionalidades principales (6 tarjetas, `#features`)
+6. Comparativa manual vs Stockma (`#comparison`)
+7. Planes (`#pricing`)
+8. Preguntas frecuentes (`#faq`)
+9. Agenda tu demo (`#demo`)
+10. Barra de lista de espera pegada al pie (`#waitlist`, último hijo de `<main>`)
 11. Footer
 
 ## Hero
 - **H1:** "Automatiza tu inventario y *deja las planillas atrás*" (la segunda parte va en itálica)
 - **Subtítulo:** "Stockma es la plataforma de inventarios ideal para tu negocio: cada lote con su vencimiento, cada producto con su código, y el trabajo repetitivo en manos del sistema, no en las tuyas."
-- **CTA primario:** botón "Únete a la lista de espera" -> abre la modal de lista de espera.
-- **CTA secundario:** enlace "Ver cómo funciona" -> `#como-funciona`.
+- **CTA primario:** botón "Únete a la lista de espera", visible y habilitado, sin acción asociada en esta spec.
+- **CTA secundario:** enlace "Ver cómo funciona" -> `#how-it-works`.
 - **Mock visual de tabla** (columna derecha, decorativo pero interactivo): leyenda "Modelo de referencia. Así se ve tu inventario: cada producto con sus lotes, cantidades y fecha de vencimiento."; encabezado "Inventario · Tu negocio" + pill "3 lotes por vencer"; pestañas conmutables ("Productos", "Lotes", "Por vencer"), cada una con 3 filas de ejemplo. En "Por vencer" los chips de días son "21 días", "9 días" (warn) y "3 días" (danger).
 
 ## Cómo funciona
@@ -94,18 +95,18 @@ Crear una pantalla de introducción (landing) en `/` para Stockma, con navegaci�
   - **Negocio** — $ 149.000 / mes — "Para negocios con más movimiento y más gente." — bullets: todo lo del Profesional / usuarios sin límite / acompañamiento en la carga inicial — botón "Hablar con ventas" (secundario).
   - **A tu medida** — Bajo cotización (borde punteado) — "Si tu operación pide algo que no está en los planes, lo armamos contigo." — bullets: las funciones que necesites / módulos hechos para tu negocio / acompañamiento dedicado — botón "Cotizar mi plan" (secundario).
 
-Los 4 botones tienen `href="#lista-espera"` + `data-open-waitlist` y **abren la modal de lista de espera** (no navegan a `#agendar`). Las tarjetas de plan además son seleccionables (click/Enter/Espacio marca `is-selected` y `aria-pressed`).
+Los 4 botones se muestran habilitados y sin acción asociada en esta spec: no abren una modal ni navegan a otra sección. Las tarjetas de plan además son seleccionables (click/Enter/Espacio marca `is-selected` y `aria-pressed`).
 
 ## Agenda tu demo
-Apartado en la página (`#agendar`), tarjeta con fondo acentuado, bordes 10px.
+Apartado en la página (`#demo`), tarjeta con fondo acentuado, bordes 10px.
 - **Badge:** "Próximamente"
 - **Título:** "Agenda tu demo"
 - **Descripción:** "Estamos terminando de construir Stockma y todavía no podemos mostrarte el producto funcionando. Cuando esté listo vas a poder agendar 30 minutos por videollamada: vemos tu inventario real, cargamos un par de productos y revisamos el plan que mejor se ajusta a tu negocio."
 - **Botón 1:** "Agendar demo" -> **deshabilitado** (`disabled`, sin acción)
-- **Botón 2:** "Mientras tanto, únete a la lista de espera" -> abre la modal de lista de espera
+- **Botón 2:** "Mientras tanto, únete a la lista de espera" -> visible y habilitado, sin acción asociada en esta spec.
 
-## Lista de espera (maqueta)
-Barra `#lista-espera` + modal `#waitlist-modal`.
+## Lista de espera (barra)
+La modal y el envío de datos quedan fuera del alcance de esta spec. La modal del prototipo permanece en `Stockma_landing.html` como referencia para una futura spec.
 
 **Barra (CTA)**
 - Pegada al pie de la pantalla (`position: sticky; bottom: 0`), de ancho completo y con el mismo tratamiento visual del header (fondo translúcido, blur y borde superior). El contenido va dentro de `.wrap` para alinearse con el resto de la página.
@@ -113,13 +114,6 @@ Barra `#lista-espera` + modal `#waitlist-modal`.
 - ≤900px: se apila (texto centrado) y el botón ocupa todo el ancho.
 - **Título:** "Únete a la lista de espera"
 - **Texto:** "Rellena el formulario y recibe en primicia información de nuestro lanzamiento"
-
-**Modal**
-- **Encabezado:** "Únete a la lista de espera" + "Déjanos tus datos y te notificaremos por correo electrónico la fecha oficial de nuestro lanzamiento"
-- **Campos:** nombre completo, teléfono móvil (bandera de Colombia y `+57` fijo dentro del mismo cuadro, sin selector de país por ahora) y correo electrónico.
-- **Botón:** "Unirme a la lista de espera" -> sin backend: `preventDefault` + estado `is-submitted` muestra el mensaje de éxito.
-- En el estado de éxito (`is-submitted`) se ocultan los campos y el botón, pero el **título del encabezado se mantiene** (solo se oculta el subtítulo). El contenido se apila centrado en este orden: el saludo **"¡Listo, {nombre}!"** personalizado con el primer nombre del formulario (capitalizado por JS; sin JS queda "¡Listo!"), un **badge circular animado** (círculo con `--accent-tint`, dos ondas *ripple* saliendo y el check dibujándose con `stroke-dashoffset` dentro de un *pop*, todo en el teal de los botones `--brand-teal`) y el texto "Estás en la lista de espera. Te avisaremos por WhatsApp y correo cuando nuestro software esté disponible." Todo respeta `prefers-reduced-motion`.
-- Cierra con X, fuera o Esc.
 
 ## Diseño
 - **Tipografía:** Work Sans (única)
@@ -154,12 +148,10 @@ Barra `#lista-espera` + modal `#waitlist-modal`.
 - [ ] Landing accesible en `/` con todas las secciones
 - [ ] Nav funcional y responsive (incluye menú móvil)
 - [ ] Modo claro/oscuro funcional
-- [ ] Hero: CTA primario abre la modal de lista de espera, CTA secundario lleva a `#como-funciona` y las pestañas del mock cambian de panel
+- [ ] Hero: CTA primario permanece habilitado sin acción, CTA secundario lleva a `#how-it-works` y las pestañas del mock cambian de panel
 - [ ] Tarjetas de planes misma altura
-- [ ] Los 4 botones de planes abren la modal de lista de espera
-- [ ] Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA que abre la lista de espera
-- [ ] Modal de lista de espera abre/cierra y muestra el estado de éxito
-- [ ] Teléfono de la lista de espera: bandera de Colombia + `+57` en un solo cuadro
+- [ ] Los 4 botones de planes permanecen habilitados sin acción en esta spec
+- [ ] Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA de lista de espera habilitado sin acción
 - [ ] Barra de lista de espera pegada al pie y de ancho completo; apilada y a todo el ancho en móvil
 - [ ] Footer alineado al mismo eje que el resto de la página (24px de padding lateral)
 - [ ] Sin voseo (pasa gate)

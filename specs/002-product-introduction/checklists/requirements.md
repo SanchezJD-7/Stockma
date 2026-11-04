@@ -16,7 +16,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       **Verificación**: `/` muestra la landing; `/login` muestra el flujo de autenticación actual; una ruta desconocida (p. ej. `/foo`) muestra la landing. Cubierto por test RTL en `App.test.tsx`.
 
 - [ ] **RUTA-02 — Landing con las 11 secciones en orden**
-      La landing DEBE renderizar, en este orden: Header, Hero, Para quién es (`#para-quien-es`), Cómo funciona (`#como-funciona`), Funcionalidades (`#producto`), Comparativa (`#comparativa`), Planes (`#planes`), Preguntas frecuentes (`#preguntas`), Agenda tu demo (`#agendar`), Barra de lista de espera (`#lista-espera`, último hijo de `<main>`), Footer.
+      La landing DEBE renderizar, en este orden: Header, Hero, Para quién es (`#audience`), Cómo funciona (`#how-it-works`), Funcionalidades (`#features`), Comparativa (`#comparison`), Planes (`#pricing`), Preguntas frecuentes (`#faq`), Agenda tu demo (`#demo`), Barra de lista de espera (`#waitlist`, último hijo de `<main>`), Footer.
       *Spec*: §Estructura de la landing · *Tareas*: 3.3 [SIN TAREA para WaitlistSection y WhoItsFor]
       **Verificación**: cada `id` existe exactamente una vez en el DOM y el orden visual coincide con el spec.
 
@@ -28,7 +28,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       **Verificación**: logo, links y toggle presentes; grep en el header: sin botón "Iniciar sesión" ni enlace de autenticación.
 
 - [ ] **HEADER-02 — Links de navegación**
-      Los links DEBEN apuntar, en este orden, a: Producto (`#producto`), Cómo funciona (`#como-funciona`), Planes (`#planes`) y Agendar demo (`#agendar`).
+      Los links DEBEN apuntar, en este orden, a: Producto (`#features`), Cómo funciona (`#how-it-works`), Planes (`#pricing`) y Agendar demo (`#demo`).
       *Spec*: §Alcance, punto 2 · *Tareas*: 3.4
       **Verificación**: cada link navega a su ancla por scroll; los textos y targets coinciden con el prototipo.
 
@@ -40,7 +40,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 - [ ] **HEADER-04 — Tratamiento visual translúcido**
       El header DEBE usar fondo translúcido (`color-mix`), `backdrop-filter` (blur) y borde interior; la barra de lista de espera replica este tratamiento.
       *Spec*: §Lista de espera (Barra) · *Tareas*: 3.4
-      **Verificación**: al hacer scroll, el contenido se ve difuminado bajo el header; header y barra `#lista-espera` comparten la misma receta visual.
+      **Verificación**: al hacer scroll, el contenido se ve difuminado bajo el header; header y barra `#waitlist` comparten la misma receta visual.
 
 ## Hero
 
@@ -54,15 +54,15 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       *Spec*: §Hero · *Tareas*: 3.5
       **Verificación**: el texto del subtítulo coincide literalmente con el spec (copy del prototipo).
 
-- [ ] **HERO-03 — CTA primario**
-      El CTA primario "Únete a la lista de espera" DEBE abrir la modal de lista de espera.
+- [ ] **HERO-03 — CTA primario sin acción en esta spec**
+      El CTA primario "Únete a la lista de espera" DEBE permanecer visible y habilitado, sin acción asociada en este cambio.
       *Spec*: §Hero, §Alcance · *Tareas*: 3.5, 4.6
-      **Verificación**: el clic despliega `#waitlist-modal` sin navegar de página.
+      **Verificación**: el botón no está deshabilitado; el clic no abre un diálogo ni cambia ruta o hash.
 
 - [ ] **HERO-04 — CTA secundario**
-      El CTA secundario "Ver cómo funciona" DEBE ser un enlace a `#como-funciona`.
+      El CTA secundario "Ver cómo funciona" DEBE ser un enlace a `#how-it-works`.
       *Spec*: §Hero · *Tareas*: 3.5, 4.6
-      **Verificación**: el enlace tiene `href="#como-funciona"` y el clic hace scroll a la sección.
+      **Verificación**: el enlace tiene `href="#how-it-works"` y el clic hace scroll a la sección.
 
 - [ ] **HERO-05 — Mock visual de tabla interactivo**
       La columna derecha del hero DEBE mostrar el mock decorativo pero interactivo: leyenda "Modelo de referencia. Así se ve tu inventario: cada producto con sus lotes, cantidades y fecha de vencimiento."; encabezado "Inventario · Tu negocio" con el pill "3 lotes por vencer"; un `tablist` conmutable con las pestañas "Productos" (activa por defecto), "Lotes" y "Por vencer", cada una con 3 filas de ejemplo. En "Por vencer", los chips de días son "21 días" (normal), "9 días" (warn) y "3 días" (danger).
@@ -72,14 +72,14 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 ## Para quién es Stockma
 
 - [ ] **QUIEN-01 — Sección de segmentos objetivo**
-      La sección `#para-quien-es` DEBE presentar tres tarjetas de segmento: "Droguerías", "Minimercados" y "Distribuidoras", con su descripción.
+      La sección `#audience` DEBE presentar tres tarjetas de segmento: "Droguerías", "Minimercados" y "Distribuidoras", con su descripción.
       *Spec*: §Alcance, punto 3 · *Diseño*: componente `WhoItsFor` · *Tareas*: [SIN TAREA]
-      **Verificación**: la sección existe con `id="para-quien-es"` y renderiza las tres tarjetas con título y texto según el prototipo.
+      **Verificación**: la sección existe con `id="audience"` y renderiza las tres tarjetas con título y texto según el prototipo.
 
 ## Cómo funciona
 
 - [ ] **COMO-01 — Título y subtítulo**
-      La sección `#como-funciona` DEBE usar el título "De cero a tu inventario cargado" y el subtítulo "Tres pasos y tu equipo ya está trabajando con datos reales."
+      La sección `#how-it-works` DEBE usar el título "De cero a tu inventario cargado" y el subtítulo "Tres pasos y tu equipo ya está trabajando con datos reales."
       *Spec*: §Cómo funciona · *Tareas*: 3.6
       **Verificación**: `h2` y subtítulo coinciden literalmente con el spec.
 
@@ -91,7 +91,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 ## Funcionalidades principales
 
 - [ ] **FUNC-01 — Seis tarjetas en grid 3x2 con subtítulo**
-      La sección `#producto` DEBE mostrar el subtítulo "Tu stock centralizado, con menos trabajo manual y mayor control sobre cada uno de tus productos." y 6 tarjetas en cuadrícula de 3 columnas por 2 filas en escritorio.
+      La sección `#features` DEBE mostrar el subtítulo "Tu stock centralizado, con menos trabajo manual y mayor control sobre cada uno de tus productos." y 6 tarjetas en cuadrícula de 3 columnas por 2 filas en escritorio.
       *Spec*: §Funcionalidades principales · *Tareas*: 3.7
       **Verificación**: a ≥1024px la cuadrícula tiene 3 columnas; 6 tarjetas presentes; subtítulo coincide.
 
@@ -108,7 +108,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 ## Comparativa
 
 - [ ] **COMP-01 — Título y subtítulo**
-      La sección `#comparativa` DEBE usar el título "De la hoja y el lápiz a un software que hace ese trabajo por ti" y el subtítulo "Cansado de los procesos manuales, rutinarios, y agotadores que te quitan tiempo para realizar tus actividades extralaborales? Con Stockma puedes tener un software automatizado que te evita esos dolores de cabeza y hace todos los trabajos manuales por ti".
+      La sección `#comparison` DEBE usar el título "De la hoja y el lápiz a un software que hace ese trabajo por ti" y el subtítulo "Cansado de los procesos manuales, rutinarios, y agotadores que te quitan tiempo para realizar tus actividades extralaborales? Con Stockma puedes tener un software automatizado que te evita esos dolores de cabeza y hace todos los trabajos manuales por ti".
       *Spec*: §Comparativa · *Tareas*: 3.8
       **Verificación**: `h2` y subtítulo coinciden literalmente con el spec (copy del prototipo).
 
@@ -130,7 +130,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 ## Planes
 
 - [ ] **PLAN-01 — Título y subtítulo**
-      La sección `#planes` DEBE usar el título "Elige tu plan" y el subtítulo "Los primeros 8 días son gratis. Después eliges el plan que te sirva."
+      La sección `#pricing` DEBE usar el título "Elige tu plan" y el subtítulo "Los primeros 8 días son gratis. Después eliges el plan que te sirva."
       *Spec*: §Planes · *Tareas*: 3.9
       **Verificación**: `h2` y subtítulo coinciden literalmente con el spec.
 
@@ -149,10 +149,10 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       *Spec*: §Planes · *Tareas*: 3.9
       **Verificación**: la cuarta tarjeta tiene borde discontinuo y muestra "Bajo cotización" en lugar de precio numérico.
 
-- [ ] **PLAN-05 — Los 4 botones abren la modal de lista de espera**
-      Los 4 botones de los planes DEBEN tener `href="#lista-espera"` + `data-open-waitlist` y abrir la modal de lista de espera; NO deben navegar a `#agendar`.
-      *Spec*: §Planes (último párrafo), criterio de aceptación · *Tareas*: 3.9, 4.6
-      **Verificación**: cada botón tiene ambos atributos y el clic despliega `#waitlist-modal`; ninguno dirige a la sección de demo.
+- [ ] **PLAN-05 — CTA de planes sin acción en esta spec**
+      Los 4 botones de los planes DEBEN permanecer visibles y habilitados, sin abrir modal, navegar o enviar datos.
+      *Spec*: §Planes, §Fuera de alcance · *Tareas*: 3.9
+      **Verificación**: cada botón está habilitado; el clic no abre diálogo ni cambia ruta o hash.
 
 - [ ] **PLAN-06 — Tarjetas de plan seleccionables**
       Las tarjetas de plan DEBEN ser seleccionables: clic, Enter o Espacio marcan la tarjeta con la clase `is-selected` y actualizan `aria-pressed`.
@@ -162,14 +162,14 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 ## Preguntas frecuentes
 
 - [ ] **FAQ-01 — Acordeón de preguntas**
-      La sección `#preguntas` DEBE mostrar un acordeón con las preguntas del prototipo (fuente de verdad del copy), p. ej. "¿Cuánto cuesta?" con la respuesta "Hay planes según lo que necesites. Los primeros 8 días son gratis."
+      La sección `#faq` DEBE mostrar un acordeón con las preguntas del prototipo (fuente de verdad del copy), p. ej. "¿Cuánto cuesta?" con la respuesta "Hay planes según lo que necesites. Los primeros 8 días son gratis."
       *Spec*: §Alcance, punto 9 · *Tareas*: 3.11
-      **Verificación**: la sección existe con `id="preguntas"`; al abrir una pregunta se muestra su respuesta y al cerrarla se oculta; el copy coincide con el prototipo.
+      **Verificación**: la sección existe con `id="faq"`; al abrir una pregunta se muestra su respuesta y al cerrarla se oculta; el copy coincide con el prototipo.
 
 ## Agenda tu demo
 
-- [ ] **DEMO-01 — Apartado `#agendar` con tarjeta acentuada**
-      El apartado `#agendar` DEBE mostrar una tarjeta con fondo acentuado y bordes de 10px.
+- [ ] **DEMO-01 — Apartado `#demo` con tarjeta acentuada**
+      El apartado `#demo` DEBE mostrar una tarjeta con fondo acentuado y bordes de 10px.
       *Spec*: §Agenda tu demo · *Tareas*: 3.10
       **Verificación**: la tarjeta usa el fondo acentuado definido y `border-radius` de 10px.
 
@@ -188,17 +188,17 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       *Spec*: §Agenda tu demo, criterio de aceptación · *Tareas*: 3.10
       **Verificación**: el atributo `disabled` está presente; el clic no abre nada ni navega.
 
-- [ ] **DEMO-05 — CTA secundario a la lista de espera**
-      El botón 2 "Mientras tanto, únete a la lista de espera" DEBE abrir la modal de lista de espera.
-      *Spec*: §Agenda tu demo, criterio de aceptación · *Tareas*: 3.10, 4.6
-      **Verificación**: el clic despliega `#waitlist-modal`.
+- [ ] **DEMO-05 — CTA secundario sin acción en esta spec**
+      El botón 2 "Mientras tanto, únete a la lista de espera" DEBE permanecer visible y habilitado, sin acción asociada.
+      *Spec*: §Agenda tu demo, §Fuera de alcance · *Tareas*: 3.10
+      **Verificación**: el botón está habilitado; el clic no abre diálogo ni cambia ruta o hash.
 
 ## Lista de espera — barra sticky
 
 - [ ] **LISTA-01 — Barra sticky, último hijo de `<main>`**
-      La barra `#lista-espera` DEBE ser el último hijo de `<main>` con `position: sticky; bottom: 0`, de ancho completo (full-bleed), con el mismo tratamiento visual del header; su contenido va dentro de `.wrap`.
+      La barra `#waitlist` DEBE ser el último hijo de `<main>` con `position: sticky; bottom: 0`, de ancho completo (full-bleed), con el mismo tratamiento visual del header; su contenido va dentro de `.wrap`.
       *Spec*: §Lista de espera (Barra), §Estructura (paso 10) · *Diseño*: "Decisión: CTA de lista de espera como barra inferior sticky" · *Tareas*: [SIN TAREA]
-      **Verificación**: en el DOM, `#lista-espera` es el último hijo de `<main>`; la barra toca los bordes izquierdo y derecho del viewport; su copy está alineado al mismo eje `.wrap` que el resto de secciones.
+      **Verificación**: en el DOM, `#waitlist` es el último hijo de `<main>`; la barra toca los bordes izquierdo y derecho del viewport; su copy está alineado al mismo eje `.wrap` que el resto de secciones.
 
 - [ ] **LISTA-02 — Visibilidad desde la carga y liberación con el footer**
       La barra DEBE estar visible desde que carga la página y liberarse únicamente cuando el footer entra en pantalla, sin `fixed` ni `IntersectionObserver`.
@@ -210,52 +210,18 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       *Spec*: §Lista de espera (Barra) · *Tareas*: [SIN TAREA]
       **Verificación**: a 375px, texto y botón están en columnas apiladas, el botón mide el ancho del contenedor y no hay scroll horizontal.
 
-- [ ] **LISTA-04 — Copy de la barra**
       La barra DEBE mostrar el título "Únete a la lista de espera" y el texto "Rellena el formulario y recibe en primicia información de nuestro lanzamiento".
       *Spec*: §Lista de espera (Barra) · *Tareas*: [SIN TAREA]
       **Verificación**: ambos textos coinciden exactamente con el spec.
 
-## Lista de espera — modal
+- [ ] **LISTA-05 — CTA de la barra sin acción en esta spec**
+        El CTA "Quiero entrar" DEBE permanecer visible y habilitado, sin navegación, modal ni envío de datos.
+        *Spec*: §Lista de espera (Barra), §Fuera de alcance
+        **Verificación**: el botón no está deshabilitado y al hacer clic no cambia ruta/hash ni abre un diálogo.
 
-- [ ] **MODAL-01 — Apertura y cierre**
-      La modal `#waitlist-modal` DEBE abrirse desde todos los CTAs de lista de espera (hero, planes, demo, barra) y cerrarse con la X, clic fuera del diálogo y tecla Esc.
-      *Spec*: §Lista de espera (Modal), §Hero, §Planes, §Agenda tu demo · *Tareas*: [SIN TAREA] · *Diseño*: flujo de datos
-      **Verificación**: los cuatro CTAs despliegan la misma modal; los tres mecanismos de cierre funcionan; el diálogo tiene `role="dialog"` y `aria-modal="true"`.
+## Alcance diferido
 
-- [ ] **MODAL-02 — Campos del formulario**
-      El formulario DEBE tener nombre completo, teléfono móvil y correo electrónico; el teléfono DEBE mostrar la bandera de Colombia y el prefijo `+57` fijo dentro del mismo cuadro, sin selector de país.
-      *Spec*: §Lista de espera (Modal), criterio de aceptación · *Tareas*: [SIN TAREA]
-      **Verificación**: un solo cuadro con borde único contiene bandera SVG, "+57" no editable, divisor de 1px y el input; no hay desplegable de países.
-
-- [ ] **MODAL-03 — Envío sin backend**
-      Al enviar, el formulario DEBE hacer `preventDefault` y aplicar el estado `is-submitted` que muestra el mensaje de éxito, sin llamadas de red.
-      *Spec*: §Lista de espera (Modal), botón · *Tareas*: [SIN TAREA]
-      **Verificación**: el clic en "Unirme a la lista de espera" no recarga la página ni emite requests; el formulario adquiere la clase `is-submitted`.
-
-- [ ] **MODAL-04 — Estado de éxito: qué se oculta y qué se mantiene**
-      En estado `is-submitted` DEBEN ocultarse los campos y el botón, el título del encabezado SE MANTIENE y sólo se oculta el subtítulo; el contenido se apila centrado.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: tras enviar, el `h2` "Únete a la lista de espera" sigue visible, el subtítulo no, y no quedan inputs ni botón de envío.
-
-- [ ] **MODAL-05 — Saludo personalizado**
-      El estado de éxito DEBE mostrar "¡Listo, {nombre}!" con el primer nombre del formulario capitalizado por JS; sin JS, el texto por defecto es "¡Listo!".
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: enviar con nombre "ana maría gonzález" muestra "¡Listo, Ana!"; el HTML sin procesar contiene "¡Listo!".
-
-- [ ] **MODAL-06 — Badge circular animado**
-      El estado de éxito DEBE incluir un badge circular: círculo con `--accent-tint`, dos ondas *ripple* saliendo y un check dibujándose con `stroke-dashoffset` dentro de un *pop*, todo en el teal de botones `--brand-teal`.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: inspección de la animación: hay keyframes para las ondas y el trazo del check; el color resuelve a `--brand-teal`.
-
-- [ ] **MODAL-07 — Texto del mensaje de éxito**
-      El estado de éxito DEBE mostrar "Estás en la lista de espera. Te avisaremos por WhatsApp y correo cuando nuestro software esté disponible."
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: el texto coincide exactamente.
-
-- [ ] **MODAL-08 — Respeto de `prefers-reduced-motion`**
-      Con `prefers-reduced-motion: reduce`, las animaciones del estado de éxito DEBEN desactivarse o reducirse.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: con la preferencia activa en el sistema, el badge aparece sin ondas ni trazo animado; existe la media query `@media (prefers-reduced-motion: reduce)`.
+La modal, el formulario de datos y el guardado en backend pertenecen a una futura spec. El prototipo HTML conserva su implementación como referencia visual; no se exige reproducirla en 002.
 
 ## Footer
 
@@ -287,7 +253,7 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 - [ ] **FOOT-06 — Costura superior hairline**
       El footer DEBE separarse de su vecina (la barra clara de lista de espera, no la sección demo) con `border-top: 1px solid var(--border)`.
       *Spec*: §Diseño (Footer) · *Tareas*: 3.12
-      **Verificación**: el borde superior existe y usa el token `--border`; la sección inmediatamente anterior al footer en el flujo es la barra `#lista-espera`.
+      **Verificación**: el borde superior existe y usa el token `--border`; la sección inmediatamente anterior al footer en el flujo es la barra `#waitlist`.
 
 ## Modo oscuro
 
@@ -360,15 +326,14 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
 - [ ] **CA-01 — Landing accesible en `/` con todas las secciones** → RUTA-01, RUTA-02
 - [ ] **CA-02 — Nav funcional y responsive (incluye menú móvil)** → HEADER-02, HEADER-03
 - [ ] **CA-03 — Modo claro/oscuro funcional** → TEMA-01, TEMA-02, TEMA-03, TEMA-04
-- [ ] **CA-04 — Hero: CTA primario abre la modal de lista de espera, CTA secundario lleva a `#como-funciona` y las pestañas del mock cambian de panel** → HERO-03, HERO-04, HERO-05
+- [ ] **CA-04 — Hero: CTA primario sin acción, CTA secundario lleva a `#how-it-works` y las pestañas del mock cambian de panel** → HERO-03, HERO-04, HERO-05
 - [ ] **CA-05 — Tarjetas de planes misma altura** → PLAN-03
-- [ ] **CA-06 — Los 4 botones de planes abren la modal de lista de espera** → PLAN-05
-- [ ] **CA-07 — Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA que abre la lista de espera** → DEMO-02, DEMO-04, DEMO-05
-- [ ] **CA-08 — Modal de lista de espera abre/cierra y muestra el estado de éxito** → MODAL-01, MODAL-03, MODAL-04
-- [ ] **CA-09 — Teléfono de la lista de espera: bandera de Colombia + `+57` en un solo cuadro** → MODAL-02
-- [ ] **CA-10 — Barra de lista de espera pegada al pie y de ancho completo; apilada y a todo el ancho en móvil** → LISTA-01, LISTA-02, LISTA-03
-- [ ] **CA-11 — Footer alineado al mismo eje que el resto de la página (24px de padding lateral)** → FOOT-05
-- [ ] **CA-12 — Sin voseo (pasa gate)** → EST-06
-- [ ] **CA-13 — Sin promesas de funcionalidades no implementadas (los reportes van siempre marcados como "Próximamente")** → FUNC-03, EST-07
-- [ ] **CA-14 — Bordes coherentes 8-10px** → EST-02
-- [ ] **CA-15 — Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright** → FOOT-01, FOOT-02, FOOT-03, FOOT-04
+- [ ] **CA-06 — Los 4 botones de planes permanecen activos sin acción en esta spec** → PLAN-05
+- [ ] **CA-07 — Demo: badge "Próximamente", botón principal deshabilitado y CTA de lista de espera sin acción** → DEMO-02, DEMO-04, DEMO-05
+- [ ] **CA-08 — CTA de lista de espera habilitados sin modal, navegación ni envío** → HERO-03, PLAN-05, DEMO-05, LISTA-05
+- [ ] **CA-09 — Barra de lista de espera pegada al pie y de ancho completo; apilada en móvil** → LISTA-01, LISTA-02, LISTA-03
+- [ ] **CA-10 — Footer alineado al mismo eje que el resto de la página (24px de padding lateral)** → FOOT-05
+- [ ] **CA-11 — Sin voseo (pasa gate)** → EST-06
+- [ ] **CA-12 — Sin promesas de funcionalidades no implementadas (los reportes van siempre marcados como "Próximamente")** → FUNC-03, EST-07
+- [ ] **CA-13 — Bordes coherentes 8-10px** → EST-02
+- [ ] **CA-14 — Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright** → FOOT-01, FOOT-02, FOOT-03, FOOT-04
