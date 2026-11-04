@@ -9,6 +9,7 @@ import { createMuiBridge } from './mui-bridge'
 
 afterEach(() => {
   document.documentElement.removeAttribute('style')
+  document.documentElement.removeAttribute('data-theme')
 })
 
 describe('createMuiBridge', () => {
@@ -19,6 +20,17 @@ describe('createMuiBridge', () => {
     expect(theme.palette.primary.dark).toBe('#142843')
     expect(theme.palette.primary.light).toBe('#e8eaed')
     expect(theme.palette.primary.contrastText).toBe('#ffffff')
+  })
+
+  it('usa la superficie y los textos de los tokens del modo oscuro', () => {
+    document.documentElement.dataset.theme = 'dark'
+
+    const theme = createMuiBridge()
+
+    expect(theme.palette.primary.main).toBe('#3d78a8')
+    expect(theme.palette.background.default).toBe('#0b1320')
+    expect(theme.palette.background.paper).toBe('#121d2c')
+    expect(theme.palette.text.primary).toBe('#f2f5f9')
   })
 
   it('refleja el branding del tenant cuando se reconstruye', () => {
@@ -90,8 +102,8 @@ describe('createMuiBridge', () => {
       .map((tag) => tag.textContent ?? '')
       .join('')
 
-    expect(emitted).toMatch(/::after\{[^}]*border-bottom-color:#337082/)
-    expect(emitted).toMatch(/\.Mui-focused\{[^}]*color:#337082/)
+    expect(emitted).toMatch(/::after\{[^}]*border-bottom-color:var\(--brand-teal\)/)
+    expect(emitted).toMatch(/\.Mui-focused\{[^}]*color:var\(--brand-teal\)/)
   })
 
   it('dibuja las etiquetas de los campos con el tamaño de texto de Stockma', () => {
