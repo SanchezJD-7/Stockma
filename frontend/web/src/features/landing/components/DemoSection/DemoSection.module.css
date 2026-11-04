@@ -1,0 +1,82 @@
+.root {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--brand-navy);
+  color: var(--color-white);
+}
+
+.panel {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 64px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(19, 50, 74, 0.62);
+  text-align: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 18px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.badge::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-teal);
+  content: '';
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+button.cta,
+a.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: var(--brand-teal);
+  color: var(--color-white);
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.cta {
+  background: transparent;
+}
+
+button.cta[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 44px 20px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  button.cta,
+  a.cta {
+    width: 100%;
+  }
+}
