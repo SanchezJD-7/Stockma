@@ -8,7 +8,6 @@ export function Hero() {
     <section id='hero' className={styles.root}>
       <div className={styles.layout}>
         <div className={styles.copy}>
-          <p className={styles.eyebrow}>Stockma</p>
           <HeroTitle>
             Automatiza tu inventario y <em>deja las planillas atrás</em>
           </HeroTitle>

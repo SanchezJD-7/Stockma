@@ -1,6 +1,6 @@
 .root {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--brand-navy);
+  background: var(--color-deep);
   color: var(--color-white);
 }
 
@@ -9,8 +9,8 @@
   margin: 0 auto;
   padding: 64px 32px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  background: rgba(19, 50, 74, 0.62);
+  border-radius: var(--radius-card);
+  background: var(--color-deep-2);
   text-align: center;
 }
 
@@ -20,7 +20,7 @@
   gap: 7px;
   margin: 0 0 18px;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.8);
 }
@@ -28,7 +28,7 @@
 .badge::before {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   background: var(--brand-teal);
   content: '';
 }
@@ -48,7 +48,7 @@ a.cta {
   min-height: 52px;
   padding: 0 30px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--brand-teal);
   color: var(--color-white);
   font: inherit;
@@ -59,6 +59,10 @@ a.cta {
 
 a.cta {
   background: transparent;
+}
+
+button.cta:hover:not(:disabled) {
+  background: var(--brand-teal-active);
 }
 
 button.cta[disabled] {

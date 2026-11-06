@@ -118,7 +118,7 @@ La modal y el envío de datos quedan fuera del alcance de esta spec. La modal de
 ## Diseño
 - **Tipografía:** Work Sans (única)
 - **Bordes:** tokens globales 10px
-- **Botones primarios:** en el prototipo van con teal hardcodeado (`#337082`); al implementar en React usan tokens (`--primary` / `--on-primary` / `--primary-active`), nunca `--accent`, que en modo oscuro da 2.33:1 con texto blanco. Detalle en `design.md`.
+- **Botones primarios:** teal de marca `--brand-teal` (`#337082`), hover `--brand-teal-active` (`#2b5f6d`) y texto blanco, igual que el prototipo. Pasa WCAG AA (5.55:1) en claro y en oscuro. No se usa `--accent`, que en modo oscuro da 2.33:1 con texto blanco. Detalle en `design.md`.
 - **Modo oscuro:** `[data-theme='dark']`, persistido en `localStorage`, script anti-FOUC
 - **Sin chips/banners inclinados** sobre secciones
 - **Pantallas chicas (≤600px):** escala tipográfica reducida (h1 30px, h2 de sección 25px, cuerpo 14px) y botones de ancho completo con altura flexible.
@@ -145,16 +145,16 @@ La modal y el envío de datos quedan fuera del alcance de esta spec. La modal de
 - `scripts/check-neutral-es.mjs` (gate)
 
 ## Criterios de aceptación
-- [ ] Landing accesible en `/` con todas las secciones
-- [ ] Nav funcional y responsive (incluye menú móvil)
-- [ ] Modo claro/oscuro funcional
-- [ ] Hero: CTA primario permanece habilitado sin acción, CTA secundario lleva a `#how-it-works` y las pestañas del mock cambian de panel
-- [ ] Tarjetas de planes misma altura
-- [ ] Los 4 botones de planes permanecen habilitados sin acción en esta spec
-- [ ] Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA de lista de espera habilitado sin acción
-- [ ] Barra de lista de espera pegada al pie y de ancho completo; apilada y a todo el ancho en móvil
-- [ ] Footer alineado al mismo eje que el resto de la página (24px de padding lateral)
-- [ ] Sin voseo (pasa gate)
-- [ ] Sin promesas de funcionalidades no implementadas (los reportes van siempre marcados como "Próximamente")
-- [ ] Bordes coherentes 8-10px
-- [ ] Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright
+- [x] Landing accesible en `/` con todas las secciones
+- [x] Nav funcional y responsive (incluye menú móvil)
+- [x] Modo claro/oscuro funcional
+- [x] Hero: CTA primario permanece habilitado sin acción, CTA secundario lleva a `#how-it-works` y las pestañas del mock cambian de panel
+- [x] Tarjetas de planes misma altura
+- [x] Los 4 botones de planes permanecen habilitados sin acción en esta spec
+- [x] Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA de lista de espera habilitado sin acción
+- [x] Barra de lista de espera pegada al pie y de ancho completo; apilada y a todo el ancho en móvil
+- [x] Footer alineado al mismo eje que el resto de la página (24px de padding lateral)
+- [x] Sin voseo (pasa gate)
+- [x] Sin promesas de funcionalidades no implementadas (los reportes van siempre marcados como "Próximamente")
+- [x] Bordes coherentes 8-10px
+- [x] Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright

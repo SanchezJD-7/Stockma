@@ -20,6 +20,7 @@ describe('createMuiBridge', () => {
     expect(theme.palette.primary.dark).toBe('#142843')
     expect(theme.palette.primary.light).toBe('#e8eaed')
     expect(theme.palette.primary.contrastText).toBe('#ffffff')
+    expect(theme.palette.mode).toBe('light')
   })
 
   it('usa la superficie y los textos de los tokens del modo oscuro', () => {
@@ -27,6 +28,7 @@ describe('createMuiBridge', () => {
 
     const theme = createMuiBridge()
 
+    expect(theme.palette.mode).toBe('dark')
     expect(theme.palette.primary.main).toBe('#3d78a8')
     expect(theme.palette.background.default).toBe('#0b1320')
     expect(theme.palette.background.paper).toBe('#121d2c')

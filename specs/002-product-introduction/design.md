@@ -20,10 +20,12 @@ Implementar una landing pública en `/` como un nuevo módulo de feature de Reac
 **Alternativas consideradas**: Solo variables CSS sin sincronización con MUI.
 **Justificación**: El prototipo muestra que el modo oscuro debe afectar los componentes de MUI; el bridge existente lee los tokens al momento de crearse.
 
-### Decisión: Los botones primarios usan los tokens de la app al implementar
-**Elección**: El prototipo mantiene su teal hardcodeado (`#337082`, hover `#2b5f6d`) por ahora. Al implementar en React, los botones primarios deben estilizarse desde los tokens: `background: var(--primary)`, `color: var(--on-primary)`, hover `var(--primary-active)`.
-**Alternativas consideradas**: Swap directo a `var(--accent)` — mismo tono, parece la solución limpia.
-**Justificación**: `--accent` pasa a ser `#7fb2c0` en modo oscuro y el texto blanco sobre él mide **2.33:1** (WCAG AA requiere 4.5:1). `--primary` mide 13.48:1 en claro (`#182f4f`) y 4.72:1 en oscuro (`#3d78a8`), mientras que el teal actual mide 5.55:1. El teal se mantiene como acento de marca; el azul marino es el color de acción.
+> **Gotcha de tokens**: `landing.module.css` redeclara la paleta del prototipo en `.page` (fondo blanco, borde y textos claros). Una declaración propia gana sobre el valor heredado de `:root`, así que el modo oscuro DEBE repetir esos tokens en `html[data-theme='dark'] .page`; de lo contrario la página queda blanca con tarjetas oscuras y texto oscuro. El bridge de MUI además fija `palette.mode` según `data-theme`.
+
+### Decisión: Los botones primarios usan el teal de marca (`--brand-teal`)
+**Elección**: Los CTA primarios de la landing (hero, planes, barra de lista de espera y demo) usan `background: var(--brand-teal)` (`#337082`), `color: #ffffff` y hover `var(--brand-teal-active)` (`#2b5f6d`), igual que el prototipo. En la landing no se usa `--color-primary` (navy).
+**Alternativas consideradas**: Estilizarlos con `var(--color-primary)` (`#182f4f` en claro, `#3d78a8` en oscuro) o con `var(--accent)`.
+**Justificación**: Blanco sobre `#337082` mide **5.55:1** tanto en claro como en oscuro, así que pasa WCAG AA y el botón se ve idéntico en los dos temas, como en el prototipo. `var(--accent)` en oscuro es `#7fb2c0` y da **2.33:1** (falla AA), por eso queda descartado. El navy daba 13.48:1 en claro pero 2.33:1 en oscuro con el `--primary` oscuro (`#3d78a8`), y además se apartaba del prototipo sin ganar contraste real. El navy sigue siendo el color de acción del resto de la app; la landing conserva el teal de marca.
 
 ### Decisión: CTA de lista de espera como barra inferior sticky
 **Elección**: `#waitlist` es una barra full-bleed con `position: sticky; bottom: 0` usando el mismo tratamiento que el header (fondo translúcido con `color-mix`, `backdrop-filter`, borde en el borde interior). El copy queda dentro de `.wrap` para alinearse con el resto de las secciones, y a ≤900px se apila con un botón de ancho completo. La sección va como **último hijo de `<main>`**: en sticky, la posición de flujo del elemento es su punto de desenganche, así que con el flujo al pie de la página la barra queda visible desde la carga y se libera recién cuando el footer entra en pantalla (sin `fixed` ni `IntersectionObserver`).
@@ -71,7 +73,7 @@ Usuario -> LandingPage (secciones)
 | `frontend/web/src/features/landing/components/Footer/` | Crear | 3 filas: logo + iconos sociales (`space-between`), línea de soporte, copyright |
 | `frontend/web/src/features/landing/components/Faq/` | Crear | FAQ en acordeón |
 | `frontend/web/src/styles/tokens.css` | Modificar | Agregar tokens de modo oscuro, tokens de radius (10px) |
-| `frontend/web/src/assets/` | Modificar | Los logos son PNG con transparencia (`Stockma_*.png`) y **márgenes transparentes grandes** — dimensionarlos por el artwork visible, no por el canvas (`Stockma_vertical.png` es 860x290 pero la marca ocupa ~49% del ancho). `Stockma_vertical_trim.png` es una copia recortada al ras agregada para el footer. El recoloreo con `currentColor` no aplica — elegir el PNG que sirva para cada superficie |
+| `frontend/web/src/assets/` | Modificar | Los logos son PNG con transparencia (`Stockma_*.png`) y **márgenes transparentes grandes** — dimensionarlos por el artwork visible, no por el canvas (`Stockma_vertical.png` es 860x290 pero la marca ocupa ~49% del ancho). `Stockma_vertical_trim.png` es una copia recortada al ras agregada para el footer. El recoloreo con `currentColor` no aplica — elegir el PNG que sirva para cada superficie. Para oscuro se agregan `Stockma_horizontal_dark.png` y `Stockma_vertical_trim_dark.png` (navy→blanco, teal→`#7fb2c0`) y el componente alterna ambos con `display` según `data-theme` |
 
 ## Interfaces / Contratos
 ```typescript

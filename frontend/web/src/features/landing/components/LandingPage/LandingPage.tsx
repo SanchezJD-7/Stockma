@@ -1,5 +1,6 @@
 import { type MouseEvent } from 'react'
 import '../../landing.css'
+import shared from '../../landing.module.css'
 
 import { Comparison } from '../Comparison/Comparison'
 import { DemoSection } from '../DemoSection/DemoSection'
@@ -36,7 +37,7 @@ export function LandingPage() {
   }
 
   return (
-    <div id='landing-page' onClick={handleInternalNavigation}>
+    <div id='landing-page' className={shared.page} onClick={handleInternalNavigation}>
       <Header />
       <main>
         <Hero />

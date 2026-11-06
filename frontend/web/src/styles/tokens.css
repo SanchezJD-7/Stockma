@@ -1,6 +1,7 @@
 :root {
   --brand-navy: #182f4f;
   --brand-teal: #337082;
+  --brand-teal-active: #2b5f6d;
 
   --color-primary: #182f4f;
   --color-primary-active: #142843;
@@ -29,6 +30,19 @@
   --color-field-bg: #e3eef1;
   --color-field-accent: var(--brand-teal);
 
+  --color-accent: var(--brand-teal);
+  --color-accent-strong: #2a5f6e;
+  --color-tint-accent: rgba(51, 112, 130, 0.12);
+  --color-tint-green: rgba(46, 125, 50, 0.12);
+  --color-tint-yellow: rgba(180, 83, 9, 0.12);
+  --color-tint-red: rgba(180, 35, 24, 0.12);
+  --color-shadow-sm: 0 1px 3px rgba(10, 10, 10, 0.08);
+  --color-shadow-lg: 0 24px 60px rgba(8, 20, 38, 0.14);
+
+  --radius-card: 10px;
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
   --status-green: #2e7d32;
   --status-yellow: #f9a825;
   --status-red: #c62828;
@@ -55,7 +69,19 @@
   --color-text-secondary: #9fadc0;
   --color-field-bg: rgba(127, 178, 192, 0.14);
   --color-field-accent: #7fb2c0;
+
+  --color-accent: #7fb2c0;
+  --color-accent-strong: #9ac6d2;
+  --color-tint-accent: rgba(127, 178, 192, 0.14);
+  --color-tint-green: rgba(111, 191, 115, 0.14);
+  --color-tint-yellow: rgba(224, 164, 88, 0.16);
+  --color-tint-red: rgba(242, 139, 130, 0.16);
+  --color-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --color-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+
   --status-green: #6fbf73;
   --status-yellow: #e0a458;
   --status-red: #f28b82;
+
+  color-scheme: dark;
 }

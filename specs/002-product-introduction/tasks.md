@@ -76,8 +76,9 @@ Chain strategy: stacked-to-main
 - [x] 7.3 `HeroMockTable.test.tsx`: pestaña conmuta panel visible.
 - [x] 7.4 `LandingPage.test.tsx`: los CTA de lista de espera están habilitados, no navegan y no abren modal.
 - [x] 7.5 `LandingPage.test.tsx`: 11 secciones con sus ids en inglés y en orden.
+- [x] 7.6 `Pricing.test.tsx`: clic/Enter/Espacio marcan `is-selected` y `aria-pressed` en la tarjeta activa y desmarcan la anterior.
 
 ## Phase 8: Gate
 
 - [x] 8.1 `node scripts/check-neutral-es.mjs` → ok (sin voseo).
-- [ ] 8.2 `Stockma_landing.html`: paridad claro/oscuro, ≤900px, ≤600px.
+- [x] 8.2 `Stockma_landing.html`: paridad claro/oscuro, ≤900px, ≤600px. Verificado en 1440/900/600/375: sin scroll horizontal, h1 56→30px, h2 44→25px, menú móvil y barra apilada; logos con variante oscura.

@@ -3,6 +3,7 @@ import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined'
 import { useState } from 'react'
+import logoDarkUrl from '../../../../assets/Stockma_horizontal_dark.png'
 import logoUrl from '../../../../assets/Stockma_horizontal.png'
 import { GhostButton } from '../../../../styles/components/buttons'
 import styles from './Header.module.css'
@@ -33,19 +34,18 @@ export function Header() {
   return (
     <header id='landing-header' className={styles.root}>
       <div className={styles.inner}>
-        <div>
-          <a className={styles.brand} href='/' aria-label='Stockma inicio'>
-            <img className={styles.logo} src={logoUrl} alt='Stockma' />
-          </a>
-        </div>
-        <nav className={styles.desktopNav} aria-label='Navegación principal'>
-          {navigationLinks.map(({ href, label }) => (
-            <a key={href} className={styles.navLink} href={href}>
-              {label}
-            </a>
-          ))}
-        </nav>
+        <a className={styles.brand} href='/' aria-label='Stockma inicio'>
+          <img className={`${styles.logo} ${styles.logoLight}`} src={logoUrl} alt='' />
+          <img className={`${styles.logo} ${styles.logoDark}`} src={logoDarkUrl} alt='' />
+        </a>
         <div className={styles.actions}>
+          <nav className={styles.desktopNav} aria-label='Navegación principal'>
+            {navigationLinks.map(({ href, label }) => (
+              <a key={href} className={styles.navLink} href={href}>
+                {label}
+              </a>
+            ))}
+          </nav>
           <GhostButton
             className={styles.iconButton}
             type='button'

@@ -7,7 +7,7 @@
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-bg-surface);
 }
 
@@ -27,7 +27,7 @@
 
 .summary::after {
   content: '+';
-  color: var(--brand-teal);
+  color: var(--color-accent-strong);
   font-size: 18px;
 }
 
@@ -37,4 +37,20 @@
 
 .answer {
   padding: 0 22px 20px;
+}
+
+.answer p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .summary {
+    font-size: 15px;
+  }
+
+  .answer p {
+    font-size: 14px;
+  }
 }

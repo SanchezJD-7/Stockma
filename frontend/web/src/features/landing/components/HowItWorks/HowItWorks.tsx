@@ -1,5 +1,5 @@
 import shared from '../../landing.module.css'
-import { LandingSectionTitle } from '../../landing-texts'
+import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
 import { MutedText } from '../../../../styles/components/texts'
 import styles from './HowItWorks.module.css'
 
@@ -7,12 +7,10 @@ export function HowItWorks() {
   return (
     <section id='how-it-works' className={`${shared.section} ${shared.spaced}`}>
       <div className={shared.wrap}>
-        <div className={styles.intro}>
+        <LandingSectionHead>
           <LandingSectionTitle>De cero a tu inventario cargado</LandingSectionTitle>
-          <MutedText className={styles.introText}>
-            Tres pasos y tu equipo ya está trabajando con datos reales.
-          </MutedText>
-        </div>
+          <LandingLead>Tres pasos y tu equipo ya está trabajando con datos reales.</LandingLead>
+        </LandingSectionHead>
         <ol className={styles.steps}>
           <li className={styles.step}>
             <span className={styles.stepIndex}>1</span>

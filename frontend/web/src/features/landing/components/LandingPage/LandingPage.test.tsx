@@ -39,7 +39,6 @@ describe('LandingPage', () => {
         ),
       ).map((element) => element.id),
     ).toEqual(ids)
-    expect(screen.getAllByText('Stockma').length).toBeGreaterThan(0)
     expect(screen.getAllByRole('img', { name: 'Stockma' })).toHaveLength(2)
   })
 
@@ -84,7 +83,7 @@ describe('LandingPage', () => {
       screen.getByRole('button', { name: 'Hablar con ventas' }),
       screen.getByRole('button', { name: 'Cotizar mi plan' }),
       screen.getByRole('button', { name: 'Mientras tanto, únete a la lista de espera' }),
-      screen.getByRole('button', { name: 'Quiero entrar' }),
+      screen.getByRole('button', { name: 'Unirme a la lista de espera' }),
     ]
 
     callsToAction.forEach((button) => {

@@ -16,9 +16,11 @@ export function createMuiBridge(root: HTMLElement = document.documentElement): T
   const token = (name: string) => requireToken(root, name)
   const fieldBg = token('--color-field-bg')
   const fieldAccent = token('--color-field-accent')
+  const isDark = root.dataset.theme === 'dark'
 
   return createTheme({
     palette: {
+      mode: isDark ? 'dark' : 'light',
       primary: {
         main: token('--color-primary'),
         dark: token('--color-primary-active'),

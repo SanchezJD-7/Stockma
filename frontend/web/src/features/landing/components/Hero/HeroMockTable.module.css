@@ -1,14 +1,19 @@
-.mock {
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  background: var(--color-bg-surface);
-  box-shadow: 0 24px 60px rgba(8, 20, 38, 0.14);
-  overflow: hidden;
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.intro {
-  padding: 18px 22px 10px;
-  font-size: 13px;
+.caption {
+  margin: 0 0 14px;
+}
+
+.mock {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--color-shadow-lg);
+  overflow: hidden;
 }
 
 .heading {
@@ -16,30 +21,30 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 22px 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .headingTitle {
-  margin: 0;
-  padding: 0;
-  font-size: 22px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .lotCount {
   flex: 0 0 auto;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(51, 112, 130, 0.12);
-  color: var(--brand-teal);
-  font-size: 11px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--color-tint-green);
+  color: var(--status-green);
+  font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .tabs {
   display: flex;
   gap: 6px;
   padding: 12px 22px;
-  border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -47,7 +52,7 @@
   min-height: 32px;
   padding: 6px 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -56,12 +61,12 @@
 }
 
 .tab[aria-selected='true'] {
-  background: rgba(51, 112, 130, 0.12);
-  color: var(--brand-teal);
+  background: var(--color-tint-accent);
+  color: var(--color-accent-strong);
 }
 
 .tab:focus-visible {
-  outline: 2px solid var(--brand-teal);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -79,7 +84,7 @@
     'stock stock';
   align-items: center;
   gap: 4px 16px;
-  padding: 18px 22px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -96,7 +101,7 @@
   display: block;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -113,8 +118,9 @@
 }
 
 .quantity {
-  color: var(--color-text-secondary);
-  font-size: 12px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .expiryChip {
@@ -122,20 +128,20 @@
   align-items: center;
   justify-content: center;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(46, 125, 50, 0.12);
+  border-radius: var(--radius-pill);
+  background: var(--color-tint-green);
   color: var(--status-green);
   font-size: 12px;
   font-weight: 600;
 }
 
 .expiryChip[data-status='warn'] {
-  background: rgba(180, 83, 9, 0.12);
+  background: var(--color-tint-yellow);
   color: var(--status-yellow);
 }
 
 .expiryChip[data-status='danger'] {
-  background: rgba(180, 35, 24, 0.12);
+  background: var(--color-tint-red);
   color: var(--status-red);
 }
 
@@ -143,7 +149,7 @@
   grid-area: stock;
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-border);
 }
 
@@ -151,7 +157,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--brand-teal);
+  background: var(--color-accent);
 }
 
 .stockTrack[data-fill='high'] span {

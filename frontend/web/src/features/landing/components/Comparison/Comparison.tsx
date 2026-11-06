@@ -1,5 +1,5 @@
 import shared from '../../landing.module.css'
-import { LandingLead, LandingSectionTitle } from '../../landing-texts'
+import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
 import { MutedText } from '../../../../styles/components/texts'
 import styles from './Comparison.module.css'
 
@@ -7,14 +7,17 @@ export function Comparison() {
   return (
     <section id='comparison' className={`${shared.section} ${shared.spaced}`}>
       <div className={shared.wrap}>
-        <LandingSectionTitle>
-          De la hoja y el lápiz a un software que hace ese trabajo por ti
-        </LandingSectionTitle>
-        <LandingLead>
-          Cansado de los procesos manuales, rutinarios y agotadores que te quitan tiempo para
-          realizar tus actividades extralaborales? Con Stockma puedes tener un software automatizado
-          que te evita esos dolores de cabeza y hace todos los trabajos manuales por ti.
-        </LandingLead>
+        <LandingSectionHead>
+          <LandingSectionTitle>
+            De la hoja y el lápiz a un software que hace ese trabajo por ti
+          </LandingSectionTitle>
+          <LandingLead>
+            Cansado de los procesos manuales, rutinarios, y agotadores que te quitan tiempo para
+            realizar tus actividades extralaborales? Con Stockma puedes tener un software
+            automatizado que te evita esos dolores de cabeza y hace todos los trabajos manuales por
+            ti
+          </LandingLead>
+        </LandingSectionHead>
         <div className={`${shared.grid} ${styles.grid}`}>
           <article className={`${shared.card} ${styles.card}`}>
             <h3 className={shared.cardTitle}>
@@ -25,7 +28,7 @@ export function Comparison() {
               qué lotes están por expirar y asumir pérdidas de productos que se vencieron sin que te
               dieras cuenta.
             </MutedText>
-            <ul className={`${styles.list} ${styles.against}`}>
+            <ul className={styles.list}>
               <li>Descontrol de registros</li>
               <li>Revisiones tediosas</li>
               <li>Pérdida de inversión</li>
@@ -33,7 +36,7 @@ export function Comparison() {
               <li>Cierres de caja propensos al error</li>
             </ul>
           </article>
-          <article className={`${shared.card} ${styles.card}`}>
+          <article className={`${shared.card} ${styles.card} ${styles.after}`}>
             <h3 className={shared.cardTitle}>
               Con Stockma: Cero sorpresas, tienes el control total de tu negocio
             </h3>

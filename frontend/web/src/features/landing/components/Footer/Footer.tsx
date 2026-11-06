@@ -1,3 +1,4 @@
+import logoDarkUrl from '../../../../assets/Stockma_vertical_trim_dark.png'
 import logoUrl from '../../../../assets/Stockma_vertical_trim.png'
 import { MutedText } from '../../../../styles/components/texts'
 import styles from './Footer.module.css'
@@ -8,7 +9,8 @@ export function Footer() {
     <footer id='landing-footer' className={styles.root}>
       <div className={styles.inner}>
         <div className={styles.top}>
-          <img className={styles.logo} src={logoUrl} alt='Stockma' />
+          <img className={`${styles.logo} ${styles.logoLight}`} src={logoUrl} alt='Stockma' />
+          <img className={`${styles.logo} ${styles.logoDark}`} src={logoDarkUrl} alt='Stockma' />
           <div className={styles.social}>
             <a
               className={styles.socialLink}
@@ -37,7 +39,7 @@ export function Footer() {
         <SupportText>
           Atención, preguntas frecuentes y soporte:{' '}
           <a href='https://w.app/stockmaapp' target='_blank' rel='noreferrer'>
-            Escríbenos al WhatsApp
+            Escribenos al WhatsApp
           </a>
         </SupportText>
         <div className={styles.bottom}>

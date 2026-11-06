@@ -121,70 +121,70 @@ export function HeroMockTable() {
   }
 
   return (
-    <div className={styles.mock} role='region' aria-label='Mock visual de inventario'>
-      <div className={styles.intro}>
-        <MutedText>
-          Modelo de referencia. Así se ve tu inventario: cada producto con sus lotes, cantidades y
-          fecha de vencimiento.
-        </MutedText>
-      </div>
-      <div className={styles.heading}>
-        <h2 className={styles.headingTitle}>Inventario · Tu negocio</h2>
-        <span className={styles.lotCount}>3 lotes por vencer</span>
-      </div>
-      <div className={styles.tabs} role='tablist' aria-label='Vistas del inventario'>
-        {inventoryTabs.map((tab, index) => {
-          const isSelected = tab.id === activeTabId
+    <div className={styles.root}>
+      <MutedText className={styles.caption}>
+        Modelo de referencia. Así se ve tu inventario: cada producto con sus lotes, cantidades y
+        fecha de vencimiento.
+      </MutedText>
+      <div className={styles.mock} role='region' aria-label='Mock visual de inventario'>
+        <div className={styles.heading}>
+          <span className={styles.headingTitle}>Inventario · Tu negocio</span>
+          <span className={styles.lotCount}>3 lotes por vencer</span>
+        </div>
+        <div className={styles.tabs} role='tablist' aria-label='Vistas del inventario'>
+          {inventoryTabs.map((tab, index) => {
+            const isSelected = tab.id === activeTabId
 
-          return (
-            <button
+            return (
+              <button
+                key={tab.id}
+                id={`hero-mock-tab-${tab.id}`}
+                className={styles.tab}
+                type='button'
+                role='tab'
+                aria-selected={isSelected}
+                aria-controls={`hero-mock-panel-${tab.id}`}
+                tabIndex={isSelected ? 0 : -1}
+                onClick={() => setActiveTabId(tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+        <div className={styles.panels}>
+          {inventoryTabs.map((tab) => (
+            <div
               key={tab.id}
-              id={`hero-mock-tab-${tab.id}`}
-              className={styles.tab}
-              type='button'
-              role='tab'
-              aria-selected={isSelected}
-              aria-controls={`hero-mock-panel-${tab.id}`}
-              tabIndex={isSelected ? 0 : -1}
-              onClick={() => setActiveTabId(tab.id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
+              id={`hero-mock-panel-${tab.id}`}
+              role='tabpanel'
+              aria-labelledby={`hero-mock-tab-${tab.id}`}
+              hidden={tab.id !== activeTabId}
             >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-      <div className={styles.panels}>
-        {inventoryTabs.map((tab) => (
-          <div
-            key={tab.id}
-            id={`hero-mock-panel-${tab.id}`}
-            role='tabpanel'
-            aria-labelledby={`hero-mock-tab-${tab.id}`}
-            hidden={tab.id !== activeTabId}
-          >
-            <ul>
-              {tab.rows.map((row) => (
-                <li key={`${tab.id}-${row.name}`}>
-                  <div className={styles.rowDetails}>
-                    <strong>{row.name}</strong>
-                    <span>{row.detail}</span>
-                  </div>
-                  {row.daysUntilExpiration ? (
-                    <span className={styles.expiryChip} data-status={row.expirationStatus}>
-                      {row.daysUntilExpiration} días
-                    </span>
-                  ) : (
-                    <span className={styles.quantity}>{row.quantity}</span>
-                  )}
-                  <div className={styles.stockTrack} data-fill={row.fill} aria-hidden='true'>
-                    <span />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+              <ul>
+                {tab.rows.map((row) => (
+                  <li key={`${tab.id}-${row.name}`}>
+                    <div className={styles.rowDetails}>
+                      <strong>{row.name}</strong>
+                      <span>{row.detail}</span>
+                    </div>
+                    {row.daysUntilExpiration ? (
+                      <span className={styles.expiryChip} data-status={row.expirationStatus}>
+                        {row.daysUntilExpiration} días
+                      </span>
+                    ) : (
+                      <span className={styles.quantity}>{row.quantity}</span>
+                    )}
+                    <div className={styles.stockTrack} data-fill={row.fill} aria-hidden='true'>
+                      <span />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

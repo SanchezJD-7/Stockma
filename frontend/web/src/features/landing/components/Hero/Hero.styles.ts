@@ -8,11 +8,15 @@ export const HeroTitle = styled(PageTitle)`
   font-size: clamp(34px, 4.4vw, 56px);
   font-weight: 600;
   line-height: 1.06;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
 
   em {
     font-style: italic;
-    color: var(--brand-teal);
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 900px) {
+    max-width: 700px;
   }
 
   @media (max-width: 600px) {
@@ -28,5 +32,9 @@ export const HeroBody = styled(MutedText)`
 
   @media (max-width: 900px) {
     max-width: 700px;
+  }
+
+  @media (max-width: 600px) {
+    font-size: 16px;
   }
 `

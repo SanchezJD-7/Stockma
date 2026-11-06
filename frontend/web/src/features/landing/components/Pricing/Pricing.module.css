@@ -4,35 +4,123 @@
 }
 
 .plan {
+  gap: 14px;
   justify-content: flex-start;
+  cursor: pointer;
 }
 
 .plan[aria-pressed='true'] {
-  border-color: var(--brand-teal);
-  background: rgba(51, 112, 130, 0.08);
+  border-color: var(--color-accent);
+  background: var(--color-tint-accent);
   box-shadow:
-    0 0 0 1px var(--brand-teal),
-    0 24px 60px rgba(8, 20, 38, 0.12);
+    0 0 0 1px var(--color-accent),
+    var(--color-shadow-lg);
 }
 
-.price {
+.custom {
+  border-style: dashed;
+  border-color: var(--color-text-secondary);
+}
+
+.plan h3 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.plan .price {
   margin: 0;
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--color-text-primary);
+}
+
+.plan .price.priceSm {
+  font-size: 20px;
+  letter-spacing: 0;
 }
 
 .priceUnit {
   font-size: 14px;
+  font-weight: 500;
   color: var(--color-text-secondary);
 }
 
-.plan button {
-  margin-top: auto;
+.plan .desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
 }
 
-@media (max-width: 900px) {
+.plan ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  list-style: none;
+}
+
+.plan li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.plan li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--status-green);
+  font-weight: 600;
+}
+
+.plan button {
+  height: 44px;
+  margin-top: auto;
+  padding: 0 30px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-teal);
+  color: var(--color-white);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.plan button:hover:not(:disabled) {
+  background: var(--brand-teal-active);
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .plan h3 {
+    font-size: 17px;
+  }
+
+  .plan .desc,
+  .plan ul {
+    font-size: 13px;
+  }
+
+  .plan .price {
+    font-size: 28px;
+  }
+}
+
+/* CTA a ancho completo con altura flexible (spec §Diseño, pantallas chicas). */
+@media (max-width: 600px) {
+  .plan button {
+    width: 100%;
+    height: auto;
+    min-height: 44px;
   }
 }

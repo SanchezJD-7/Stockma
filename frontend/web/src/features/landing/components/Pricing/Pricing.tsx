@@ -1,68 +1,123 @@
+import { useState, type KeyboardEvent } from 'react'
 import shared from '../../landing.module.css'
-import { LandingLead, LandingSectionTitle } from '../../landing-texts'
+import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
 import { PrimaryButton } from '../../../../styles/components/buttons'
 import styles from './Pricing.module.css'
 
+interface PlanCard {
+  id: string
+  name: string
+  price: string
+  unit?: string
+  description: string
+  features: string[]
+  cta: string
+  custom?: boolean
+}
+
+const plans: PlanCard[] = [
+  {
+    id: 'basico',
+    name: 'Básico',
+    price: '$ 49.000',
+    unit: '/ mes',
+    description: 'Para dejar el cuaderno sin complicarte.',
+    features: ['Productos, lotes y vencimientos', 'Semáforo de vencimientos', '1 usuario'],
+    cta: 'Empezar prueba',
+  },
+  {
+    id: 'profesional',
+    name: 'Profesional',
+    price: '$ 89.000',
+    unit: '/ mes',
+    description: 'Para un equipo que trabaja sobre el mismo inventario.',
+    features: [
+      'Todo lo del Básico',
+      'Hasta 5 usuarios',
+      'Lector de códigos de barras',
+      'Reportes para el contador (próximamente)',
+    ],
+    cta: 'Empezar prueba',
+  },
+  {
+    id: 'negocio',
+    name: 'Negocio',
+    price: '$ 149.000',
+    unit: '/ mes',
+    description: 'Para negocios con más movimiento y más gente.',
+    features: [
+      'Todo lo del Profesional',
+      'Usuarios sin límite',
+      'Acompañamiento en la carga inicial',
+    ],
+    cta: 'Hablar con ventas',
+  },
+  {
+    id: 'a-tu-medida',
+    name: 'A tu medida',
+    price: 'Bajo cotización',
+    description: 'Si tu operación pide algo que no está en los planes, lo armamos contigo.',
+    features: [
+      'Las funciones que necesites',
+      'Módulos hechos para tu negocio',
+      'Acompañamiento dedicado',
+    ],
+    cta: 'Cotizar mi plan',
+    custom: true,
+  },
+]
+
 export function Pricing() {
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+
+  function togglePlan(id: string) {
+    setSelectedPlanId((current) => (current === id ? null : id))
+  }
+
+  function handlePlanKeyDown(event: KeyboardEvent<HTMLElement>, id: string) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    togglePlan(id)
+  }
+
   return (
     <section id='pricing' className={`${shared.section} ${shared.spaced}`}>
       <div className={shared.wrap}>
-        <LandingSectionTitle>Elige tu plan</LandingSectionTitle>
-        <LandingLead>
-          Los primeros 8 días son gratis. Después eliges el plan que te sirva.
-        </LandingLead>
+        <LandingSectionHead>
+          <LandingSectionTitle>Elige tu plan</LandingSectionTitle>
+          <LandingLead>
+            Los primeros 8 días son gratis. Después eliges el plan que te sirva.
+          </LandingLead>
+        </LandingSectionHead>
         <div className={`${shared.grid} ${styles.grid}`}>
-          <article className={`${shared.card} ${styles.plan}`} aria-pressed='false'>
-            <h3 className={shared.cardTitle}>Básico</h3>
-            <p className={styles.price}>
-              $ 49.000 <span className={styles.priceUnit}>/ mes</span>
-            </p>
-            <p>Para dejar el cuaderno sin complicarte.</p>
-            <ul>
-              <li>Productos, lotes y vencimientos</li>
-              <li>Semáforo de vencimientos</li>
-              <li>1 usuario</li>
-            </ul>
-            <PrimaryButton type='button'>Empezar prueba</PrimaryButton>
-          </article>
-          <article className={`${shared.card} ${styles.plan}`} aria-pressed='true'>
-            <h3 className={shared.cardTitle}>Profesional</h3>
-            <p className={styles.price}>
-              $ 89.000 <span className={styles.priceUnit}>/ mes</span>
-            </p>
-            <p>Para un equipo que trabaja sobre el mismo inventario.</p>
-            <ul>
-              <li>Todo lo del Básico</li>
-              <li>Hasta 5 usuarios</li>
-              <li>Lector de códigos de barras</li>
-              <li>Reportes para el contador (próximamente)</li>
-            </ul>
-            <PrimaryButton type='button'>Empezar prueba</PrimaryButton>
-          </article>
-          <article className={`${shared.card} ${styles.plan}`} aria-pressed='false'>
-            <h3 className={shared.cardTitle}>Negocio</h3>
-            <p className={styles.price}>
-              $ 149.000 <span className={styles.priceUnit}>/ mes</span>
-            </p>
-            <p>Para negocios con más movimiento y más gente.</p>
-            <ul>
-              <li>Todo lo del Profesional</li>
-              <li>Usuarios sin límite</li>
-              <li>Acompañamiento en la carga inicial</li>
-            </ul>
-            <PrimaryButton type='button'>Hablar con ventas</PrimaryButton>
-          </article>
-          <article className={`${shared.card} ${styles.plan}`} aria-pressed='false'>
-            <h3 className={shared.cardTitle}>A tu medida</h3>
-            <p className={styles.price}>Bajo cotización</p>
-            <p>Si tu operación pide algo que no está en los planes, lo armamos contigo.</p>
-            <ul>
-              <li>Las funciones que necesites</li>
-              <li>Módulos hechos para tu negocio</li>
-              <li>Acompañamiento dedicado</li>
-            </ul>
-            <PrimaryButton type='button'>Cotizar mi plan</PrimaryButton>
-          </article>
+          {plans.map((plan) => (
+            <article
+              key={plan.id}
+              className={`${shared.card} ${styles.plan} ${plan.custom ? styles.custom : ''} ${
+                selectedPlanId === plan.id ? 'is-selected' : ''
+              }`}
+              aria-pressed={selectedPlanId === plan.id}
+              tabIndex={0}
+              onClick={(event) => {
+                if ((event.target as Element).closest('button, a')) return
+                togglePlan(plan.id)
+              }}
+              onKeyDown={(event) => handlePlanKeyDown(event, plan.id)}
+            >
+              <h3 className={shared.cardTitle}>{plan.name}</h3>
+              <p className={`${styles.price} ${plan.custom ? styles.priceSm : ''}`}>
+                {plan.price}
+                {plan.unit ? <span className={styles.priceUnit}> {plan.unit}</span> : null}
+              </p>
+              <p className={styles.desc}>{plan.description}</p>
+              <ul>
+                {plan.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+              <PrimaryButton type='button'>{plan.cta}</PrimaryButton>
+            </article>
+          ))}
         </div>
       </div>
     </section>

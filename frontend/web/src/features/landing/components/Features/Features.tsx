@@ -1,19 +1,19 @@
 import shared from '../../landing.module.css'
-import { LandingLead, LandingSectionTitle } from '../../landing-texts'
+import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
 import { MutedText } from '../../../../styles/components/texts'
 import styles from './Features.module.css'
 
 export function Features() {
   return (
-    <section id='features' className={`${shared.section} ${shared.spaced}`}>
+    <section id='features' className={`${shared.section} ${shared.spaced} ${shared.deep}`}>
       <div className={shared.wrap}>
-        <LandingSectionTitle>
-          Funciones que hacen crecer el negocio sin volverlo un trámite
-        </LandingSectionTitle>
-        <LandingLead>
-          Tu stock centralizado, con menos trabajo manual y mayor control sobre cada uno de tus
-          productos.
-        </LandingLead>
+        <LandingSectionHead>
+          <LandingSectionTitle>Funcionalidades principales</LandingSectionTitle>
+          <LandingLead>
+            Tu stock centralizado, con menos trabajo manual y mayor control sobre cada uno de tus
+            productos.
+          </LandingLead>
+        </LandingSectionHead>
         <div className={`${shared.grid} ${styles.grid}`}>
           <article className={`${shared.card} ${styles.card}`}>
             <h3 className={shared.cardTitle}>Todo tu stock en un solo lugar</h3>

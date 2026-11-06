@@ -2,7 +2,7 @@
   position: sticky;
   bottom: 0;
   z-index: 20;
-  padding: 18px 24px;
+  padding: 18px 0;
   border-top: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-bg-page) 86%, transparent);
   backdrop-filter: blur(12px);
@@ -13,30 +13,35 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  max-width: 1160px;
-  margin: 0 auto;
 }
 
 button.cta {
   min-height: 52px;
   padding: 0 30px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-teal);
+  color: var(--color-white);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+button.cta:hover:not(:disabled) {
+  background: var(--brand-teal-active);
 }
 
 @media (max-width: 900px) {
+  .root {
+    padding: 16px 0;
+  }
+
   .inner {
     flex-direction: column;
     align-items: stretch;
+    gap: 14px;
     text-align: center;
   }
 
   button.cta {
     width: 100%;
-  }
-}
-
-@media (max-width: 600px) {
-  .root {
-    padding: 18px 16px;
   }
 }

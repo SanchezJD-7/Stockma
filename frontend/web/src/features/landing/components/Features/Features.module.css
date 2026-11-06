@@ -10,9 +10,9 @@
   display: inline-flex;
   align-self: flex-start;
   padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(51, 112, 130, 0.12);
-  color: var(--brand-teal);
+  border-radius: var(--radius-pill);
+  background: var(--color-tint-accent);
+  color: var(--color-accent-strong);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
