@@ -2,6 +2,17 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { Pricing } from './Pricing'
 
 describe('Pricing plan selection', () => {
+  it('usa CTA primario solo en el plan destacado', () => {
+    render(<Pricing />)
+
+    const buttons = screen.getAllByRole('button')
+
+    expect(buttons).toHaveLength(4)
+    expect(buttons[0].className).toBe(buttons[2].className)
+    expect(buttons[2].className).toBe(buttons[3].className)
+    expect(buttons[1].className).not.toBe(buttons[0].className)
+  })
+
   it('marca is-selected y aria-pressed al hacer clic, y desmarca la tarjeta anterior', () => {
     render(<Pricing />)
 

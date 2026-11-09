@@ -10,8 +10,7 @@ export const HeroTitle = styled(PageTitle)`
   line-height: 1.06;
   letter-spacing: -0.025em;
 
-  em {
-    font-style: italic;
+  span {
     color: var(--color-accent);
   }
 

@@ -128,7 +128,7 @@ export function HeroMockTable() {
       </MutedText>
       <div className={styles.mock} role='region' aria-label='Mock visual de inventario'>
         <div className={styles.heading}>
-          <span className={styles.headingTitle}>Inventario · Tu negocio</span>
+          <span className={styles.headingTitle}>Inventario · Supermercado Laureles</span>
           <span className={styles.lotCount}>3 lotes por vencer</span>
         </div>
         <div className={styles.tabs} role='tablist' aria-label='Vistas del inventario'>

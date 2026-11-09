@@ -365,7 +365,7 @@ Cubre FR-012 … FR-015, NFR-009, NFR-010. Contrato: [`contracts/batches-api.md`
 - [ ] **T039** `[P]` `features/auth`: `LoginPage`, `RegisterPage`, `DeviceOtpForm`, `auth-store` (Zustand)
 - [ ] **T040** `[P]` `features/inventory`: `ProductListPage`, `ProductForm`, `BatchList`, `BarcodeScanner` (`@zxing/browser`)
 - [ ] **T041** `shared/query-client` — keys de TanStack por tenant (`['tenant', tenantId, ...]`), el logout resetea la cache
-- [x] **T042** Sistema de diseño: `styles/tokens.css` (única fuente de verdad), `styles/global-styles.tsx` (botones y textos reutilizables), `styles/mui-bridge.ts` (lee los tokens resueltos y arma el theme de MUI), `styles/branding.ts` (3 colores por tenant + contraste derivado). Tipografía única `Work Sans`
+- [x] **T042** Sistema de diseño: `styles/tokens.css` (única fuente de verdad), `styles/global-styles.tsx` (botones y textos reutilizables), `styles/mui-bridge.ts` (lee los tokens resueltos y arma el theme de MUI), `styles/branding.ts` (3 colores por tenant + contraste derivado). Tipografía única `Inter`
 - [x] **T051** Persistir el branding del tenant: VO `TenantBranding` (`Primary`, `PrimaryActive`, `PrimaryBg`) en `TenantSettings` vía `OwnsOne` opcional + migración `AddTenantBranding`. Sin branding configurado se guarda `NULL`: los defaults viven en `tokens.css` y no se duplican en el backend
 - [x] **T052** `GET /api/tenant/branding` — lo consume el front al arrancar. Responde `200` con cuerpo `null` cuando no hay branding (no `404`: la ausencia es un estado válido) — depende de T051
 - [ ] **T053** `PUT /api/admin/tenant/branding` (sólo admin del tenant) — **depende de PR 3**: hoy la API no tiene autenticación configurada, así que un endpoint de escritura "sólo admin" sería un endpoint abierto

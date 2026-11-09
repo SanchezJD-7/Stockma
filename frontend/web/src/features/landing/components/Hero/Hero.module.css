@@ -40,6 +40,30 @@
   gap: 12px;
 }
 
+.animatedText {
+  display: inline-block;
+  color: var(--color-accent);
+  transition:
+    opacity 400ms ease,
+    transform 400ms ease;
+}
+
+.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.out {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animatedText {
+    transition: none;
+  }
+}
+
 button.cta,
 a.cta {
   display: inline-flex;
@@ -75,6 +99,7 @@ a.cta {
   border-color: var(--color-border);
   color: var(--color-text-primary);
 }
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -95,7 +120,6 @@ a.cta {
     padding: 56px 0 96px;
   }
 
-  /* CTA a ancho completo con altura flexible (spec §Diseño, pantallas chicas). */
   button.cta,
   a.cta {
     width: 100%;

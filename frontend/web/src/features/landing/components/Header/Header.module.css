@@ -101,6 +101,10 @@ button.menuToggle {
   }
 
   .mobileNav:not([hidden]) {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -108,6 +112,11 @@ button.menuToggle {
     gap: 10px;
     padding: 16px;
     border-top: 1px solid var(--color-border);
+    /* Overlay en vez de flujo: abrir/cerrar el menú no debe cambiar la altura
+       del header, o el destino de scrollIntoView se calcula con el panel
+       abierto y la sección queda desalineada al cerrarse. */
+    background: color-mix(in srgb, var(--color-bg-page) 94%, transparent);
+    backdrop-filter: blur(12px);
     text-align: center;
     animation: navDropDown 220ms ease;
   }
@@ -127,6 +136,12 @@ button.menuToggle {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobileNav:not([hidden]) {
+    animation: none;
   }
 }
 

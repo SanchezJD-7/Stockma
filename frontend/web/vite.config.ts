@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    watch: {
+      ignored: ['**/.tsupgrader/**'],
+    },
     proxy: {
       '/api': 'http://localhost:5265',
     },

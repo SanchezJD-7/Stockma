@@ -22,7 +22,6 @@ export const BodyText = styled.p`
 `
 
 export const MutedText = styled.p`
-  margin: 0;
   font-size: var(--fs-13);
   line-height: 1.5;
   color: var(--color-text-secondary);

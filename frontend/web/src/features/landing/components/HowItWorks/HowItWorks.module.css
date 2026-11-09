@@ -10,7 +10,8 @@
 .step {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   padding: 28px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -19,15 +20,16 @@
 }
 
 .step h3 {
-  margin: 4px 0 0;
-  font-size: 18px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.025em;
+  color: var(--color-accent-strong);
 }
 
 .step p {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -37,10 +39,12 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-circle);
-  background: var(--color-tint-accent);
+  border-radius: 10px;
+  background-color: var(--color-login-field-bg);
   color: var(--color-accent-strong);
+  font-size: 16px;
   font-weight: 700;
+  margin-bottom: 4px;
 }
 
 @media (max-width: 900px) {

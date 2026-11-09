@@ -1,3 +1,9 @@
+import InventoryRoundedIcon from '@mui/icons-material/InventoryRounded'
+import EventRoundedIcon from '@mui/icons-material/EventRounded'
+import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded'
+import SyncAltRoundedIcon from '@mui/icons-material/SyncAltRounded'
+import CreditCardRoundedIcon from '@mui/icons-material/CreditCardRounded'
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded'
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
 import { MutedText } from '../../../../styles/components/texts'
@@ -14,45 +20,73 @@ export function Features() {
             productos.
           </LandingLead>
         </LandingSectionHead>
+
         <div className={`${shared.grid} ${styles.grid}`}>
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>Todo tu stock en un solo lugar</h3>
+            <div className={styles.iconWrapper}>
+              <InventoryRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Todo tu stock en orden y visible</h3>
             <MutedText>
-              Revisa existencias, ubicaciones y movimientos sin perder tiempo buscando en 10 sitios.
+              Olvídate de buscar en cuadernos viejos o adivinar qué hay en bodega. Encuentra
+              existencias, ubicaciones y cantidades exactas en segundos.
             </MutedText>
           </article>
+
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>Los vencimientos se marcan solos</h3>
+            <div className={styles.iconWrapper}>
+              <EventRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Alertas inteligentes de vencimiento</h3>
             <MutedText>
-              Te avisamos cuándo un lote está por expirar para que lo saques antes de perderlo.
+              El sistema te avisa con tiempo qué lotes están por expirar para que los muevas antes
+              de que se conviertan en dinero perdido.
             </MutedText>
           </article>
+
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>El producto aparece al pasar el lector</h3>
+            <div className={styles.iconWrapper}>
+              <QrCodeScannerRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Lectura rápida con código de barras</h3>
             <MutedText>
-              La captura es rápida, clara y lista para registrar la operación sin errores.
+              Pasa el lector y el producto aparece al instante. Si un artículo no tiene código,
+              Stockma te ayuda a crearlo y asignarlo sin enredos.
             </MutedText>
           </article>
+
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>Todo tu equipo trabaja al mismo tiempo</h3>
+            <div className={styles.iconWrapper}>
+              <SyncAltRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Tu equipo conectado en tiempo real</h3>
             <MutedText>
-              Tu equipo puede coordinar ventas, reabastecimiento y ajustes desde un solo lugar.
+              Ventas, reabastecimiento y ajustes sincronizados al mismo tiempo. Todos trabajan sobre
+              la misma información y sin pisarse el trabajo.
             </MutedText>
           </article>
+
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>Planes según lo que necesites</h3>
-            <span className={styles.badge}>8 días de prueba gratuita</span>
+            <div className={styles.iconWrapper}>
+              <CreditCardRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Planes flexibles que crecen contigo</h3>
             <MutedText>
-              Empieza con el plan que mejor se adapte a tus necesidades y cámbialo cuando tu negocio
-              crezca.
+              Empieza a probar la plataforma sin riesgo con 8 días gratis. Elige el plan que mejor
+              se adapte a tu local y cámbialo cuando lo necesites.
             </MutedText>
           </article>
+
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>Reportes de inventario a tu medida</h3>
+            <div className={styles.iconWrapper}>
+              <FileDownloadRoundedIcon />
+            </div>
+            <h3 className={shared.cardTitle}>Reportes claros para tu tranquilidad</h3>
+            <MutedText>
+              Obtén información limpia y directa sobre qué se vende más, qué se queda quieto y saca
+              los datos que tu contador te pide sin sufrir.
+            </MutedText>
             <span className={styles.badge}>Próximamente</span>
-            <MutedText>
-              Preparados para que el negocio entienda qué vender, cuánto queda y qué conviene mover.
-            </MutedText>
           </article>
         </div>
       </div>

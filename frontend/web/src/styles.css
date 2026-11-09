@@ -11,6 +11,14 @@ body {
   font-family: var(--font-family);
 }
 
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+}
+
 body {
   margin: 0;
   font-size: var(--fs-14);

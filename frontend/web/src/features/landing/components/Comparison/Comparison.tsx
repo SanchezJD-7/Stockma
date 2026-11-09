@@ -1,6 +1,5 @@
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { MutedText } from '../../../../styles/components/texts'
 import styles from './Comparison.module.css'
 
 export function Comparison() {
@@ -9,7 +8,7 @@ export function Comparison() {
       <div className={shared.wrap}>
         <LandingSectionHead>
           <LandingSectionTitle>
-            De la hoja y el lápiz a un software que hace ese trabajo por ti
+            De los exceles y cuadernos a un inventario automatizado
           </LandingSectionTitle>
           <LandingLead>
             Cansado de los procesos manuales, rutinarios, y agotadores que te quitan tiempo para
@@ -18,39 +17,56 @@ export function Comparison() {
             ti
           </LandingLead>
         </LandingSectionHead>
+
         <div className={`${shared.grid} ${styles.grid}`}>
           <article className={`${shared.card} ${styles.card}`}>
-            <h3 className={shared.cardTitle}>
-              Sin Stockma: Procesos manuales y pérdidas invisibles
-            </h3>
-            <MutedText>
-              Terminas la jornada pero tu trabajo no acaba: te toca reacomodar inventario, adivinar
-              qué lotes están por expirar y asumir pérdidas de productos que se vencieron sin que te
-              dieras cuenta.
-            </MutedText>
+            <h3 className={shared.cardTitle}>Sin Stockma: Procesos manuales y pérdidas</h3>
             <ul className={styles.list}>
-              <li>Descontrol de registros</li>
-              <li>Revisiones tediosas</li>
-              <li>Pérdida de inversión</li>
-              <li>Rotación deficiente</li>
-              <li>Cierres de caja propensos al error</li>
+              <li>
+                <strong>Descontrol de registros:</strong> Hojas físicas y archivos de Excel con
+                múltiples versiones.
+              </li>
+              <li>
+                <strong>Revisiones tediosas:</strong> Verificación manual lote por lote al cerrar la
+                jornada.
+              </li>
+              <li>
+                <strong>Pérdida de inversión:</strong> Medicamentos e insumos vencidos por falta de
+                alertas.
+              </li>
+              <li>
+                <strong>Rotación deficiente:</strong> Errores al despachar el lote más antiguo
+                primero.
+              </li>
+              <li>
+                <strong>Cierres con error:</strong> Cuadres manuales que obligan a rehacer cuentas.
+              </li>
             </ul>
           </article>
+
           <article className={`${shared.card} ${styles.card} ${styles.after}`}>
-            <h3 className={shared.cardTitle}>
-              Con Stockma: Cero sorpresas, tienes el control total de tu negocio
-            </h3>
-            <MutedText>
-              Automatiza tu operación diaria, elimina los errores manuales y protege cada peso de tu
-              inversión.
-            </MutedText>
+            <h3 className={shared.cardTitle}>Con Stockma: Control total de tu negocio</h3>
             <ul className={styles.list}>
-              <li>Inventario en tiempo real</li>
-              <li>Semaforización inteligente</li>
-              <li>Trazabilidad FEFO</li>
-              <li>Captura rápida con IA</li>
-              <li>Auditorías a 1 clic</li>
-              <li>Optimización de tiempo</li>
+              <li>
+                <strong>Inventario en tiempo real:</strong> Una única fuente de datos para todo tu
+                equipo.
+              </li>
+              <li>
+                <strong>Alertas automáticas:</strong> Notificaciones a tiempo antes de que un lote
+                expire.
+              </li>
+              <li>
+                <strong>Venta por orden de vencimiento:</strong> El sistema te indica cuál es la
+                mercancía más vieja que debe salir primero para evitar pérdidas.
+              </li>
+              <li>
+                <strong>Captura rápida:</strong> Escaneo de facturas y códigos de barras en
+                segundos.
+              </li>
+              <li>
+                <strong>Auditorías instantáneas:</strong> Reportes limpios para tu contador a un
+                solo clic.
+              </li>
             </ul>
           </article>
         </div>

@@ -47,8 +47,10 @@ export function Faq() {
           {faqItems.map(({ question, answer }) => (
             <details key={question} className={styles.item}>
               <summary className={styles.summary}>{question}</summary>
-              <div className={styles.answer}>
-                <MutedText>{answer}</MutedText>
+              <div className={styles.answerWrapper}>
+                <div className={styles.answer}>
+                  <MutedText>{answer}</MutedText>
+                </div>
               </div>
             </details>
           ))}

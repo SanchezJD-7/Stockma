@@ -49,7 +49,7 @@ describe('AuthLayout', () => {
     )
     expect(
       getComputedStyle(document.documentElement).getPropertyValue('--color-login-field-bg'),
-    ).toBe('#e3eef1')
+    ).toBe('rgba(127,178,192,0.14)')
     expect(
       getComputedStyle(document.documentElement).getPropertyValue('--color-login-primary'),
     ).toBe('var(--brand-navy)')

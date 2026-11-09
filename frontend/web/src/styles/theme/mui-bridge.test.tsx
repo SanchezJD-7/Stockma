@@ -32,7 +32,7 @@ describe('createMuiBridge', () => {
     expect(theme.palette.primary.main).toBe('#3d78a8')
     expect(theme.palette.background.default).toBe('#0b1320')
     expect(theme.palette.background.paper).toBe('#121d2c')
-    expect(theme.palette.text.primary).toBe('#f2f5f9')
+    expect(theme.palette.text.primary).toBe('#f8fafc')
   })
 
   it('refleja el branding del tenant cuando se reconstruye', () => {

@@ -1,20 +1,56 @@
 .grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: 1fr;
+  align-items: stretch;
 }
 
 .plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   justify-content: flex-start;
   cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.plan:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.18),
+    var(--color-shadow-lg);
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
 }
 
 .plan[aria-pressed='true'] {
   border-color: var(--color-accent);
-  background: var(--color-tint-accent);
+  background: var(--color-login-field-bg);
   box-shadow:
     0 0 0 1px var(--color-accent),
-    var(--color-shadow-lg);
+    0 16px 32px rgba(0, 0, 0, 0.15);
+}
+
+.popular {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+}
+
+.badge {
+  position: absolute;
+  top: -12px;
+  left: 52%;
+  transform: translateX(-50%);
+  background: var(--color-accent);
+  color: var(--color-white);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .custom {
@@ -28,12 +64,20 @@
   letter-spacing: -0.025em;
 }
 
+.priceWrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+}
+
 .plan .price {
   margin: 0;
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-text-primary);
+  line-height: 1;
 }
 
 .plan .price.priceSm {
@@ -45,19 +89,22 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-secondary);
+  align-self: flex-end;
+  padding-bottom: 2px;
 }
 
 .plan .desc {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
+  min-height: 40px;
 }
 
 .plan ul {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
+  margin: 0 0 auto 0;
   padding: 0;
   font-size: 14px;
   list-style: none;
@@ -77,14 +124,15 @@
 }
 
 .plan button {
+  width: 100%;
   height: 44px;
-  margin-top: auto;
+  margin-top: 16px;
   padding: 0 30px;
   border-radius: var(--radius-pill);
   background: var(--brand-teal);
   color: var(--color-white);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .plan button:hover:not(:disabled) {
@@ -116,7 +164,6 @@
   }
 }
 
-/* CTA a ancho completo con altura flexible (spec §Diseño, pantallas chicas). */
 @media (max-width: 600px) {
   .plan button {
     width: 100%;

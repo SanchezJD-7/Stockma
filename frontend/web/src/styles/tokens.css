@@ -13,17 +13,17 @@
   --color-login-primary-bg: #e8eaed;
   --color-login-primary-contrast: var(--color-white);
   --color-login-text-primary: #1f2933;
-  --color-login-text-secondary: #647084;
+  --color-login-text-secondary: #475569;
   --color-login-field-bg: #e3eef1;
   --color-login-field-accent: var(--brand-teal);
 
   --color-bg-page: #f7f8fa;
   --color-bg-surface: #ffffff;
   --color-bg-surface-login: #ffffff;
-  --color-border: #e2e5ea;
-  --color-text-primary: #1f2933;
-  --color-text-secondary: #647084;
-  --color-text-disabled: #9aa3b2;
+  --color-border: #cbd5e1;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-disabled: #94a3b8;
   --color-white: #ffffff;
   --color-shadow: rgba(8, 20, 38, 0.35);
 
@@ -32,7 +32,7 @@
 
   --color-accent: var(--brand-teal);
   --color-accent-strong: #2a5f6e;
-  --color-tint-accent: rgba(51, 112, 130, 0.12);
+  --color-tint-accent: rgba(51, 112, 130, 0.4);
   --color-tint-green: rgba(46, 125, 50, 0.12);
   --color-tint-yellow: rgba(180, 83, 9, 0.12);
   --color-tint-red: rgba(180, 35, 24, 0.12);
@@ -48,7 +48,7 @@
   --status-red: #c62828;
   --status-expired: #6b7280;
 
-  --font-family: 'Work Sans', sans-serif;
+  --font-family: Inter, system-ui, sans-serif;
   --fs-12: 12px;
   --fs-13: 13px;
   --fs-14: 14px;
@@ -64,13 +64,13 @@
   --color-primary-bg: rgba(127, 178, 192, 0.14);
   --color-bg-page: #0b1320;
   --color-bg-surface: #121d2c;
-  --color-border: #23303f;
-  --color-text-primary: #f2f5f9;
-  --color-text-secondary: #9fadc0;
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
   --color-field-bg: rgba(127, 178, 192, 0.14);
   --color-field-accent: #7fb2c0;
+  --color-login-field-bg: rgba(127, 178, 192, 0.14);
 
-  --color-accent: #7fb2c0;
   --color-accent-strong: #9ac6d2;
   --color-tint-accent: rgba(127, 178, 192, 0.14);
   --color-tint-green: rgba(111, 191, 115, 0.14);

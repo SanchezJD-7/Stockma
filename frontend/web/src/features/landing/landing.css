@@ -1,3 +1,35 @@
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 73px;
+}
+
+#landing-page[data-reveal-enabled='true']
+  main
+  > section[data-reveal='true'][data-revealed='true']
+  > :first-child {
+  animation: landing-section-reveal 450ms ease-out both;
+}
+
+@keyframes landing-section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  #landing-page[data-reveal-enabled='true'] main > section[data-reveal='true'] > :first-child {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }

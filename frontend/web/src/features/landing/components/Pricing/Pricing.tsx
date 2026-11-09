@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { PrimaryButton } from '../../../../styles/components/buttons'
+import { PrimaryButton, SecondaryButton } from '../../../../styles/components/buttons'
 import styles from './Pricing.module.css'
 
 interface PlanCard {
@@ -13,6 +13,7 @@ interface PlanCard {
   features: string[]
   cta: string
   custom?: boolean
+  popular?: boolean
 }
 
 const plans: PlanCard[] = [
@@ -20,7 +21,7 @@ const plans: PlanCard[] = [
     id: 'basico',
     name: 'Básico',
     price: '$ 49.000',
-    unit: '/ mes',
+    unit: 'mes',
     description: 'Para dejar el cuaderno sin complicarte.',
     features: ['Productos, lotes y vencimientos', 'Semáforo de vencimientos', '1 usuario'],
     cta: 'Empezar prueba',
@@ -29,7 +30,7 @@ const plans: PlanCard[] = [
     id: 'profesional',
     name: 'Profesional',
     price: '$ 89.000',
-    unit: '/ mes',
+    unit: 'mes',
     description: 'Para un equipo que trabaja sobre el mismo inventario.',
     features: [
       'Todo lo del Básico',
@@ -38,12 +39,13 @@ const plans: PlanCard[] = [
       'Reportes para el contador (próximamente)',
     ],
     cta: 'Empezar prueba',
+    popular: true,
   },
   {
     id: 'negocio',
     name: 'Negocio',
     price: '$ 149.000',
-    unit: '/ mes',
+    unit: 'mes',
     description: 'Para negocios con más movimiento y más gente.',
     features: [
       'Todo lo del Profesional',
@@ -94,8 +96,8 @@ export function Pricing() {
             <article
               key={plan.id}
               className={`${shared.card} ${styles.plan} ${plan.custom ? styles.custom : ''} ${
-                selectedPlanId === plan.id ? 'is-selected' : ''
-              }`}
+                plan.popular ? styles.popular : ''
+              } ${selectedPlanId === plan.id ? 'is-selected' : ''}`}
               aria-pressed={selectedPlanId === plan.id}
               tabIndex={0}
               onClick={(event) => {
@@ -104,18 +106,25 @@ export function Pricing() {
               }}
               onKeyDown={(event) => handlePlanKeyDown(event, plan.id)}
             >
+              {plan.popular && <span className={styles.badge}>Más popular</span>}
               <h3 className={shared.cardTitle}>{plan.name}</h3>
-              <p className={`${styles.price} ${plan.custom ? styles.priceSm : ''}`}>
-                {plan.price}
-                {plan.unit ? <span className={styles.priceUnit}> {plan.unit}</span> : null}
-              </p>
+              <div className={styles.priceWrapper}>
+                <p className={`${styles.price} ${plan.custom ? styles.priceSm : ''}`}>
+                  {plan.price}
+                </p>
+                {plan.unit ? <span className={styles.priceUnit}>/ {plan.unit}</span> : null}
+              </div>
               <p className={styles.desc}>{plan.description}</p>
               <ul>
                 {plan.features.map((feature) => (
                   <li key={feature}>{feature}</li>
                 ))}
               </ul>
-              <PrimaryButton type='button'>{plan.cta}</PrimaryButton>
+              {plan.popular ? (
+                <PrimaryButton type='button'>{plan.cta}</PrimaryButton>
+              ) : (
+                <SecondaryButton type='button'>{plan.cta}</SecondaryButton>
+              )}
             </article>
           ))}
         </div>
