@@ -1,0 +1,67 @@
+.root {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 40;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-page) 88%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
+  animation: slideUp 0.3s ease forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
+}
+
+button.cta {
+  min-height: 48px;
+  padding: 0 28px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-teal);
+  color: var(--color-white);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+button.cta:hover:not(:disabled) {
+  background: var(--brand-teal-active);
+}
+
+@media (max-width: 900px) {
+  .root {
+    padding: 14px 0;
+  }
+
+  .inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    text-align: center;
+  }
+
+  button.cta {
+    width: 100%;
+  }
+}

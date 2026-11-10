@@ -27,3 +27,9 @@ appsettings.Local.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---------- Prototipos SDD (fuente de verdad del copy, no se versionan) ----------
+# Regla de gobernación: los HTML de prototipo (*_landing.html, design.html, etc.)
+# viven sólo en disco. Las specs los referencian por ruta, nunca replican su copy.
+specs/**/*.html
+specs/**/*.html.map

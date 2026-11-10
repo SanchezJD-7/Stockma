@@ -1,0 +1,73 @@
+.root {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-deep);
+  color: var(--color-white);
+}
+
+.panel {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 56px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-card);
+  background: var(--color-deep-2);
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-white);
+  line-height: 1.2;
+}
+
+.body {
+  max-width: 600px;
+  margin: 0 auto 32px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+}
+
+button.cta,
+a.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 36px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-teal);
+  color: var(--color-white);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+button.cta:hover:not(:disabled) {
+  background: var(--brand-teal-active);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 36px 20px;
+  }
+
+  button.cta,
+  a.cta {
+    width: 100%;
+  }
+}

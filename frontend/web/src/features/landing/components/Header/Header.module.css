@@ -1,0 +1,153 @@
+.root {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  width: 100%;
+  background: color-mix(in srgb, var(--color-bg-page) 86%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 1160px;
+  height: 72px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+}
+
+.logo {
+  display: block;
+  width: 160px;
+  height: 72px;
+  object-fit: cover;
+  object-position: center;
+}
+
+.logoDark {
+  display: none;
+}
+
+html[data-theme='dark'] .logoLight {
+  display: none;
+}
+
+html[data-theme='dark'] .logoDark {
+  display: block;
+}
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.navLink {
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.navLink:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.iconButton {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-circle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+button.menuToggle {
+  display: none;
+}
+
+.mobileNav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .desktopNav {
+    display: none;
+  }
+
+  button.menuToggle {
+    display: inline-flex;
+  }
+
+  .mobileNav:not([hidden]) {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    border-top: 1px solid var(--color-border);
+    /* Overlay en vez de flujo: abrir/cerrar el menú no debe cambiar la altura
+       del header, o el destino de scrollIntoView se calcula con el panel
+       abierto y la sección queda desalineada al cerrarse. */
+    background: color-mix(in srgb, var(--color-bg-page) 94%, transparent);
+    backdrop-filter: blur(12px);
+    text-align: center;
+    animation: navDropDown 220ms ease;
+  }
+
+  .mobileNav .navLink {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@keyframes navDropDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobileNav:not([hidden]) {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .logo {
+    width: 128px;
+    height: 56px;
+  }
+}

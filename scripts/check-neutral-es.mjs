@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const VOSEO = [
   "podés", "tenés", "querés", "sabés", "andás", "venís", "decís", "salís",
   "volvés", "escribís", "hacés", "entendés", "sentís", "leés", "creés",
-  "movés", "cambiás", "desactivás", "dejá", "agregá", "creá", "eliminá",
+  "movés", "cambiás", "desactivás", "coordinás", "ampliá", "dejá", "agregá", "creá", "eliminá",
   "editá", "entrá", "usá", "mirá", "fijá", "probá", "empezá", "hacé",
   "mandá", "pegá", "rompé", "poné", "cerrá", "guardá", "cambiá", "intentá",
   "esperá", "revisá", "seleccioná", "completá", "acercá", "agarrá", "tirá",
@@ -15,7 +15,7 @@ const VOSEO = [
   "haceme", "pasame", "mostrame", "avisame", "creeme", "fijate", "quedate", "acordate", "olvidate",
 ];
 
-const PATTERN = new RegExp(`\\b(?:${VOSEO.join("|")})\\b`, "g");
+const PATTERN = new RegExp(`\\b(?:${VOSEO.join("|")})\\b`, "gi");
 const SELF = fileURLToPath(import.meta.url);
 
 function listTrackedFiles() {

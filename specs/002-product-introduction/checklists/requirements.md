@@ -1,374 +1,363 @@
 # Checklist de Requerimientos: Product Introduction Landing
 
 **Feature branch**: `002-product-introduction`
-**Fuente**: [`../spec.md`](../spec.md) — la spec 002 no usa IDs FR-xxx; cada ítem usa un ID propio trazable a la sección del spec. El prototipo [`../Stockma_landing.html`](../Stockma_landing.html) es la **fuente de verdad del copy**.
-**Referencias**: [`../design.md`](../design.md) · tasks (artefacto en Engram, `sdd/002-product-introduction/tasks`; las referencias a tareas son tentativas mientras se regenera) · [`../Stockma_landing.html`](../Stockma_landing.html) (prototipo de referencia vivo)
+**Fuente**: [`../spec.md`](../spec.md) — la spec 002 no usa IDs FR-xxx; cada ítem usa un ID propio trazable a la sección del spec.
+**Fuente de verdad versionada del copy**: los componentes de landing. `Stockma_landing.html` es una referencia visual local, ignorada por Git y no normativa.
+**Referencias**: [`../design.md`](../design.md) · [`../tasks.md`](../tasks.md)
+
+> **Regla de gobernación aplicada**: este checklist gobierna _comportamiento, estructura, estado, accesibilidad y restricciones responsivas_. No contiene cadenas de UI literales. El copy se mantiene en los componentes versionados; no se exige paridad de commit con el prototipo local.
 
 Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto por al menos un test verde o una verificación manual registrada. La marca `[SIN TAREA]` indica que el comportamiento no tiene tarea correspondiente en el artefacto tasks actual.
+
+> **Estado del cierre**: rediseño visual, navegación responsive, animación de entrada, reduced motion, criterios de producto y pruebas se revisaron y validaron. El copy comercial actual se conserva como roadmap aprobado; la implementación de esas funcionalidades no forma parte de 002. El prototipo HTML permanece local e ignorado por decisión de producto.
 
 ---
 
 ## Ruta y estructura
 
-- [ ] **RUTA-01 — Switch de ruta sin React Router**
+- [x] **RUTA-01 — Switch de ruta sin React Router**
       `App.tsx` DEBE decidir por `window.location.pathname`: `/login` renderiza `AuthFlow`; cualquier otra ruta renderiza `LandingPage`.
-      *Spec*: §Alcance (último punto) · *Tareas*: 2.1, 2.3 · *Diseño*: "Decisión: Cambio de ruta sin React Router"
+      _Spec_: §Alcance (último punto) · _Tareas_: 2.1, 2.3 · _Diseño_: "Decisión: Cambio de ruta sin React Router"
       **Verificación**: `/` muestra la landing; `/login` muestra el flujo de autenticación actual; una ruta desconocida (p. ej. `/foo`) muestra la landing. Cubierto por test RTL en `App.test.tsx`.
 
-- [ ] **RUTA-02 — Landing con las 11 secciones en orden**
-      La landing DEBE renderizar, en este orden: Header, Hero, Para quién es (`#para-quien-es`), Cómo funciona (`#como-funciona`), Funcionalidades (`#producto`), Comparativa (`#comparativa`), Planes (`#planes`), Preguntas frecuentes (`#preguntas`), Agenda tu demo (`#agendar`), Barra de lista de espera (`#lista-espera`, último hijo de `<main>`), Footer.
-      *Spec*: §Estructura de la landing · *Tareas*: 3.3 [SIN TAREA para WaitlistSection y WhoItsFor]
+- [x] **RUTA-02 — Landing con las 11 secciones en orden**
+      La landing DEBE renderizar, en este orden: Header, Hero, `#audience`, `#how-it-works`, `#features`, `#comparison`, `#pricing`, `#faq`, `#demo`, `#waitlist` (último hijo de `<main>`), Footer.
+      _Spec_: §Estructura de la landing · _Tareas_: 3.3 [SIN TAREA para WaitlistSection y WhoItsFor]
       **Verificación**: cada `id` existe exactamente una vez en el DOM y el orden visual coincide con el spec.
 
 ## Header
 
-- [ ] **HEADER-01 — Barra de navegación superior sin CTA de login**
+- [x] **HEADER-01 — Barra de navegación superior sin CTA de login**
       El header DEBE contener el logo (enlace a `/`), los links de navegación y el control de cambio de tema; NO DEBE contener CTA ni botón de login.
-      *Spec*: §Alcance, punto 2 · *Tareas*: 3.4
-      **Verificación**: logo, links y toggle presentes; grep en el header: sin botón "Iniciar sesión" ni enlace de autenticación.
+      _Spec_: §Alcance, punto 2 · _Tareas_: 3.4
+      **Verificación**: logo, links y toggle presentes; grep en el header: sin botón de login ni enlace de autenticación.
 
-- [ ] **HEADER-02 — Links de navegación**
-      Los links DEBEN apuntar, en este orden, a: Producto (`#producto`), Cómo funciona (`#como-funciona`), Planes (`#planes`) y Agendar demo (`#agendar`).
-      *Spec*: §Alcance, punto 2 · *Tareas*: 3.4
-      **Verificación**: cada link navega a su ancla por scroll; los textos y targets coinciden con el prototipo.
+- [x] **HEADER-02 — Links de navegación**
+      Los 4 links DEBEN apuntar, en este orden, a: `#features`, `#how-it-works`, `#pricing` y `#demo`. Las etiquetas visibles se definen en los componentes.
+      _Spec_: §Alcance, punto 2 · _Tareas_: 3.4
+      **Verificación**: cada link navega a su ancla por scroll; las etiquetas coinciden con el copy versionado.
 
-- [ ] **HEADER-03 — Menú móvil (≤900px)**
-      El header DEBE colapsar en un menú desplegable en pantallas de ancho ≤900px, con los mismos links que la navegación de escritorio.
-      *Spec*: §Alcance, punto 2 · *Tareas*: 3.4, 4.4
+- [x] **HEADER-03 — Menú móvil (≤900px)**
+      El header DEBE colapsar en un menú desplegable en pantallas de ancho ≤900px, con los mismos targets que la navegación de escritorio.
+      _Spec_: §Alcance, punto 2 · _Tareas_: 3.4, 4.4
       **Verificación**: a 375px los links de escritorio no están visibles; el botón hamburguesa alterna el panel con `aria-expanded`; al elegir un link el menú se cierra.
 
-- [ ] **HEADER-04 — Tratamiento visual translúcido**
+- [x] **HEADER-04 — Tratamiento visual translúcido**
       El header DEBE usar fondo translúcido (`color-mix`), `backdrop-filter` (blur) y borde interior; la barra de lista de espera replica este tratamiento.
-      *Spec*: §Lista de espera (Barra) · *Tareas*: 3.4
-      **Verificación**: al hacer scroll, el contenido se ve difuminado bajo el header; header y barra `#lista-espera` comparten la misma receta visual.
+      _Spec_: §Lista de espera (Barra) · _Tareas_: 3.4
+      **Verificación**: al hacer scroll, el contenido se ve difuminado bajo el header; header y barra `#waitlist` comparten la misma receta visual.
 
 ## Hero
 
-- [ ] **HERO-01 — Título H1 con itálica**
-      El hero DEBE mostrar el H1 "Automatiza tu inventario y *deja las planillas atrás*", con la segunda parte en itálica.
-      *Spec*: §Hero · *Tareas*: 3.5
-      **Verificación**: el `h1` contiene exactamente "Automatiza tu inventario y" más un elemento en itálica (p. ej. `<em>`) con "deja las planillas atrás".
+- [x] **HERO-01 — H1 con segundo segmento rotativo**
+      El hero DEBE renderizar el H1 definido en los componentes, compuesto por dos segmentos; el segundo alterna 3 frases con animación de fundido (ciclo de 3s, transición de 400ms) y DEBE respetar `prefers-reduced-motion`.
+      _Spec_: §Hero, CA-16 · _Tareas_: 9.1, 9.17
+      **Verificación**: el `h1` contiene un `span` rotativo con las 3 frases; con `prefers-reduced-motion: reduce` la rotación no ocurre.
 
-- [ ] **HERO-02 — Subtítulo**
-      El hero DEBE mostrar el subtítulo "Stockma es la plataforma de inventarios ideal para tu negocio: cada lote con su vencimiento, cada producto con su código, y el trabajo repetitivo en manos del sistema, no en las tuyas."
-      *Spec*: §Hero · *Tareas*: 3.5
-      **Verificación**: el texto del subtítulo coincide literalmente con el spec (copy del prototipo).
+- [x] **HERO-02 — Subtítulo institucional**
+      El componente hero DEBE renderizar el subtítulo corporativo definido en los componentes, validando su jerarquía tipográfica y su correcta adaptación en viewports móviles.
+      _Spec_: §Hero · _Tareas_: 3.5
+      **Verificación**: el texto del subtítulo coincide con el copy versionado; sin desbordes a 375px.
 
-- [ ] **HERO-03 — CTA primario**
-      El CTA primario "Únete a la lista de espera" DEBE abrir la modal de lista de espera.
-      *Spec*: §Hero, §Alcance · *Tareas*: 3.5, 4.6
-      **Verificación**: el clic despliega `#waitlist-modal` sin navegar de página.
+- [x] **HERO-03 — CTA primario sin acción en esta spec**
+      El CTA primario del hero DEBE permanecer visible y habilitado, sin acción asociada en este cambio.
+      _Spec_: §Hero, §Alcance · _Tareas_: 3.5, 4.6
+      **Verificación**: el botón no está deshabilitado; el clic no abre un diálogo ni cambia ruta o hash.
 
-- [ ] **HERO-04 — CTA secundario**
-      El CTA secundario "Ver cómo funciona" DEBE ser un enlace a `#como-funciona`.
-      *Spec*: §Hero · *Tareas*: 3.5, 4.6
-      **Verificación**: el enlace tiene `href="#como-funciona"` y el clic hace scroll a la sección.
+- [x] **HERO-04 — CTA secundario**
+      El CTA secundario del hero DEBE ser un enlace a `#how-it-works`.
+      _Spec_: §Hero · _Tareas_: 3.5, 4.6
+      **Verificación**: el enlace tiene `href="#how-it-works"` y el clic hace scroll a la sección.
 
-- [ ] **HERO-05 — Mock visual de tabla interactivo**
-      La columna derecha del hero DEBE mostrar el mock decorativo pero interactivo: leyenda "Modelo de referencia. Así se ve tu inventario: cada producto con sus lotes, cantidades y fecha de vencimiento."; encabezado "Inventario · Tu negocio" con el pill "3 lotes por vencer"; un `tablist` conmutable con las pestañas "Productos" (activa por defecto), "Lotes" y "Por vencer", cada una con 3 filas de ejemplo. En "Por vencer", los chips de días son "21 días" (normal), "9 días" (warn) y "3 días" (danger).
-      *Spec*: §Hero (Mock visual de tabla) · *Tareas*: 3.5 [SIN TAREA para la conmutación de pestañas]
-      **Verificación**: los tres textos de cabecera coinciden; al hacer clic en cada pestaña cambia el panel y `aria-selected` refleja la activa; los chips de "Por vencer" muestran 21/9/3 días con sus estados cromáticos. Test unitario de la lógica de conmutación (design: estrategia de testing, fila "Unit").
+- [x] **HERO-05 — Mock visual de tabla interactivo**
+      La columna derecha del hero DEBE mostrar el mock decorativo pero interactivo: leyenda, encabezado con píldora de estado, y un `tablist` conmutable con **3 pestañas** (la primera activa por defecto), cada una con **3 filas** de ejemplo. La tercera pestaña aplica **3 chips de días** con estados cromáticos normal / warn / danger.
+      _Spec_: §Hero (Mock visual de tabla) · _Tareas_: 3.5 [SIN TAREA para la conmutación de pestañas]
+      **Verificación**: los textos de cabecera coinciden con el copy versionado; al hacer clic en cada pestaña cambia el panel y `aria-selected` refleja la activa; los 3 chips muestran sus estados cromáticos. Test unitario de la lógica de conmutación (design: estrategia de testing, fila "Unit").
 
 ## Para quién es Stockma
 
-- [ ] **QUIEN-01 — Sección de segmentos objetivo**
-      La sección `#para-quien-es` DEBE presentar tres tarjetas de segmento: "Droguerías", "Minimercados" y "Distribuidoras", con su descripción.
-      *Spec*: §Alcance, punto 3 · *Diseño*: componente `WhoItsFor` · *Tareas*: [SIN TAREA]
-      **Verificación**: la sección existe con `id="para-quien-es"` y renderiza las tres tarjetas con título y texto según el prototipo.
+- [x] **QUIEN-01 — Sección de segmentos objetivo**
+      La sección `#audience` DEBE presentar **4 tarjetas** de segmento, cada una con título y descripción definidos en los componentes.
+      _Spec_: §Alcance, punto 3 · _Diseño_: componente `WhoItsFor` · _Tareas_: 9.2
+      **Verificación**: la sección existe con `id="audience"` y renderiza las 4 tarjetas con título y texto definidos en los componentes.
 
 ## Cómo funciona
 
-- [ ] **COMO-01 — Título y subtítulo**
-      La sección `#como-funciona` DEBE usar el título "De cero a tu inventario cargado" y el subtítulo "Tres pasos y tu equipo ya está trabajando con datos reales."
-      *Spec*: §Cómo funciona · *Tareas*: 3.6
-      **Verificación**: `h2` y subtítulo coinciden literalmente con el spec.
+- [x] **COMO-01 — Título y subtítulo**
+      La sección `#how-it-works` DEBE renderizar su título y subtítulo según el copy versionado, validando la jerarquía tipográfica.
+      _Spec_: §Cómo funciona · _Tareas_: 3.6
+      **Verificación**: `h2` y subtítulo coinciden con el copy versionado.
 
-- [ ] **COMO-02 — Tres pasos con copy exacto**
-      La sección DEBE mostrar exactamente 3 pasos: 1) "Recibe tus credenciales" — "Un administrador registra tu negocio en Stockma y te entrega el acceso."; 2) "Inicia sesión y confirma con SMS" — "Correo, contraseña y un código que llega a tu celular. Blindaje extra de seguridad para que unicamente tus colaboradores tengan acceso a tu negocio."; 3) "Carga productos, lotes y fechas" — "Con su nombre y su código de barras, cada producto queda con su lote y su vencimiento."
-      *Spec*: §Cómo funciona · *Tareas*: 3.6
-      **Verificación**: el contenedor tiene 3 artículos numerados 1-3 con esos títulos y descripciones; no hay cuarto paso.
+- [x] **COMO-02 — Tres pasos**
+      La sección DEBE mostrar exactamente **3 pasos**, cada uno con título y descripción definidos en los componentes, numerados 1-3. NO DEBE existir un cuarto paso.
+      _Spec_: §Cómo funciona · _Tareas_: 3.6
+      **Verificación**: el contenedor tiene 3 artículos numerados 1-3 con título y descripción definidos en los componentes; no hay cuarto paso.
 
 ## Funcionalidades principales
 
-- [ ] **FUNC-01 — Seis tarjetas en grid 3x2 con subtítulo**
-      La sección `#producto` DEBE mostrar el subtítulo "Tu stock centralizado, con menos trabajo manual y mayor control sobre cada uno de tus productos." y 6 tarjetas en cuadrícula de 3 columnas por 2 filas en escritorio.
-      *Spec*: §Funcionalidades principales · *Tareas*: 3.7
-      **Verificación**: a ≥1024px la cuadrícula tiene 3 columnas; 6 tarjetas presentes; subtítulo coincide.
+- [x] **FUNC-01 — Seis tarjetas en grid 3x2 con icono y subtítulo**
+      La sección `#features` DEBE renderizar su subtítulo definido en los componentes y **6 tarjetas** en cuadrícula de 3 columnas por 2 filas en escritorio, **cada una encabezada por un icono**.
+      _Spec_: §Funcionalidades principales · _Tareas_: 3.7, 9.3
+      **Verificación**: a ≥1024px la cuadrícula tiene 3 columnas; 6 tarjetas presentes, cada una con su `iconWrapper`; subtítulo coincide con el copy versionado.
 
-- [ ] **FUNC-02 — Títulos exactos de las 6 tarjetas**
-      Los títulos DEBEN ser, en orden: "Todo tu stock en un solo lugar", "Los vencimientos se marcan solos", "El producto aparece al pasar el lector", "Todo tu equipo trabaja al mismo tiempo", "Planes según lo que necesites" (cuyo texto menciona "8 días de prueba gratuita") y "Reportes de inventario a tu medida".
-      *Spec*: §Funcionalidades principales · *Tareas*: 3.7
-      **Verificación**: los 6 `h3` coinciden literalmente con el spec; la tarjeta de planes menciona la prueba gratuita de 8 días.
+- [x] **FUNC-02 — Orden y títulos de las 6 tarjetas**
+      Los 6 títulos DEBEN coincidir, en orden, con los definidos en los componentes. La quinta tarjeta (planes) DEBE mencionar la duración de la prueba gratuita allí definida.
+      _Spec_: §Funcionalidades principales · _Tareas_: 3.7
+      **Verificación**: los 6 `h3` coinciden con el copy versionado; la tarjeta de planes menciona la prueba gratuita.
 
-- [ ] **FUNC-03 — Tag "Próximamente" sólo en reportes**
-      Únicamente la tarjeta "Reportes de inventario a tu medida" DEBE llevar el tag "Próximamente"; ninguna otra tarjeta lo lleva.
-      *Spec*: §Funcionalidades principales, criterio de aceptación · *Tareas*: 3.7, 4.8
-      **Verificación**: grep de la sección: exactamente un tag "Próximamente", dentro de la tarjeta de reportes.
+- [x] **FUNC-03 — Tag de estado diferido sólo en reportes**
+      Únicamente la tarjeta de reportes DEBE llevar el tag de estado diferido definido en los componentes; ninguna otra tarjeta lo lleva.
+      _Spec_: §Funcionalidades principales, criterio de aceptación · _Tareas_: 3.7, 4.8
+      **Verificación**: grep sobre la sección: exactamente un tag de estado diferido, dentro de la tarjeta de reportes.
+
+- [x] **FUNC-04 — Copy de producto aprobado para el roadmap**
+      Las descripciones actuales comunican capacidades objetivo aprobadas por producto; no constituyen una afirmación de disponibilidad actual. La tarjeta de reportes conserva su tag de estado diferido.
+      _Spec_: §Contexto, §Reglas de copy · _Tareas_: 9.15
+      **Verificación**: decisión de producto registrada; implementación backend fuera del alcance de 002.
 
 ## Comparativa
 
-- [ ] **COMP-01 — Título y subtítulo**
-      La sección `#comparativa` DEBE usar el título "De la hoja y el lápiz a un software que hace ese trabajo por ti" y el subtítulo "Cansado de los procesos manuales, rutinarios, y agotadores que te quitan tiempo para realizar tus actividades extralaborales? Con Stockma puedes tener un software automatizado que te evita esos dolores de cabeza y hace todos los trabajos manuales por ti".
-      *Spec*: §Comparativa · *Tareas*: 3.8
-      **Verificación**: `h2` y subtítulo coinciden literalmente con el spec (copy del prototipo).
+- [x] **COMP-01 — Título y subtítulo**
+      La sección `#comparison` DEBE renderizar su título y subtítulo según el copy versionado.
+      _Spec_: §Comparativa · _Tareas_: 3.8
+      **Verificación**: `h2` y subtítulo coinciden con el copy versionado.
 
-- [ ] **COMP-02 — Columna "Sin Stockma"**
-      La columna izquierda DEBE titular "Sin Stockma: Procesos manuales y pérdidas invisibles", con la intro "Terminas la jornada pero tu trabajo no acaba: te toca reacomodar inventario, adivinar qué lotes están por expirar y asumir pérdidas de productos que se vencieron sin que te dieras cuenta." y 5 bullets en negrita con descripción: Descontrol de registros, Revisiones tediosas, Pérdida de inversión, Rotación deficiente, Cierres de caja propensos al error.
-      *Spec*: §Comparativa, columna izquierda · *Tareas*: 3.8
-      **Verificación**: título, intro y los 5 bullets presentes con sus descripciones según el prototipo.
+- [x] **COMP-02 — Columna sin el producto**
+      La columna izquierda DEBE titular y listar **5 bullets** en negrita con descripción, según los componentes.
+      _Spec_: §Comparativa, columna izquierda · _Tareas_: 3.8, 9.4
+      **Verificación**: título y los 5 bullets presentes con sus descripciones según el copy versionado.
 
-- [ ] **COMP-03 — Columna "Con Stockma"**
-      La columna derecha DEBE titular "Con Stockma: Cero sorpresas, tienes el control total de tu negocio", con la intro "Automatiza tu operación diaria, elimina los errores manuales y protege cada peso de tu inversión." y 6 bullets en negrita con descripción: Inventario en tiempo real, Semaforización inteligente, Trazabilidad FEFO, Captura rápida con IA, Auditorías a 1 clic, Optimización de tiempo.
-      *Spec*: §Comparativa, columna derecha · *Tareas*: 3.8
-      **Verificación**: título, intro y los 6 bullets presentes con sus descripciones según el prototipo.
+- [x] **COMP-03 — Columna con el producto**
+      La columna derecha DEBE titular y listar **5 bullets** en negrita con descripción, según los componentes.
+      _Spec_: §Comparativa, columna derecha · _Tareas_: 3.8, 9.4
+      **Verificación**: título y los 5 bullets presentes con sus descripciones según el copy versionado.
 
-- [ ] **COMP-04 — Copy de "Con Stockma" replicado tal cual (tenencia registrada)**
-      El copy de la columna "Con Stockma" DEBE replicarse literalmente del prototipo pese a mencionar IA, FEFO, auditorías y reportes; la tensión con §Contexto está registrada en el spec para revisión con producto y NO debe "suavizarse" en la implementación por cuenta propia.
-      *Spec*: §Comparativa (Nota de copy) · *Tareas*: 4.8
-      **Verificación**: el texto renderizado es idéntico al del prototipo; si producto decide ajustarlo, el cambio se hace primero en el spec y luego en el código.
+- [x] **COMP-04 — Copy de la columna "con el producto" aprobado como roadmap**
+      Se conserva el copy actual de la columna derecha como presentación de capacidades objetivo aprobadas por producto; no se usa como prueba de disponibilidad actual.
+      _Spec_: §Comparativa, §Contexto · _Tareas_: 9.4, 9.15
+      **Verificación**: decisión de producto registrada; el componente versionado es la fuente de verdad.
 
 ## Planes
 
-- [ ] **PLAN-01 — Título y subtítulo**
-      La sección `#planes` DEBE usar el título "Elige tu plan" y el subtítulo "Los primeros 8 días son gratis. Después eliges el plan que te sirva."
-      *Spec*: §Planes · *Tareas*: 3.9
-      **Verificación**: `h2` y subtítulo coinciden literalmente con el spec.
+- [x] **PLAN-01 — Título y subtítulo**
+      La sección `#pricing` DEBE renderizar su título y subtítulo según el copy versionado.
+      _Spec_: §Planes · _Tareas_: 3.9
+      **Verificación**: `h2` y subtítulo coinciden con el copy versionado.
 
-- [ ] **PLAN-02 — Cuatro planes con copy exacto**
-      DEBEN mostrarse los 4 planes: **Básico** — $ 49.000 / mes — "Para dejar el cuaderno sin complicarte." — bullets: productos, lotes y vencimientos / semáforo de vencimientos / 1 usuario — botón "Empezar prueba" (secundario); **Profesional** — $ 89.000 / mes — "Para un equipo que trabaja sobre el mismo inventario." — bullets: todo lo del Básico / hasta 5 usuarios / lector de códigos de barras / reportes para el contador (próximamente) — botón "Empezar prueba" (primario); **Negocio** — $ 149.000 / mes — "Para negocios con más movimiento y más gente." — bullets: todo lo del Profesional / usuarios sin límite / acompañamiento en la carga inicial — botón "Hablar con ventas" (secundario); **A tu medida** — "Bajo cotización" — "Si tu operación pide algo que no está en los planes, lo armamos contigo." — bullets: las funciones que necesites / módulos hechos para tu negocio / acompañamiento dedicado — botón "Cotizar mi plan" (secundario).
-      *Spec*: §Planes · *Tareas*: 3.9 · *Diseño*: interfaz `Plan`
-      **Verificación**: nombres, precios, descripciones, bullets y labels de botones coinciden con el spec; los precios son placeholders sin pasarela.
+- [x] **PLAN-02 — Cuatro planes**
+      DEBEN mostrarse **4 planes** cuyo orden, nombres, precios, descripciones, bullets y labels de botón coinciden con el copy versionado. El CTA de la segunda tarjeta es **primario**; los otros tres, **secundarios**. Los precios son placeholders sin pasarela.
+      _Spec_: §Planes · _Tareas_: 3.9 · _Diseño_: interfaz `Plan`
+      **Verificación**: nombres, precios, descripciones, bullets y labels coinciden con el copy versionado; el orden de primarios/secundarios es el esperado.
 
-- [ ] **PLAN-03 — Altura uniforme**
+- [x] **PLAN-03 — Altura uniforme**
       Las 4 tarjetas DEBEN tener la misma altura con el botón alineado al pie (`grid-auto-rows: 1fr`, `align-items: stretch`, `margin-top: auto` en el botón).
-      *Spec*: §Planes · *Tareas*: 3.9
+      _Spec_: §Planes · _Tareas_: 3.9
       **Verificación**: con descripciones y bullets de distinta longitud, las 4 tarjetas miden lo mismo y los botones quedan a la misma altura.
 
-- [ ] **PLAN-04 — Plan "A tu medida" con borde punteado**
-      La tarjeta "A tu medida" DEBE usar borde punteado y el estilo diferenciado del prototipo.
-      *Spec*: §Planes · *Tareas*: 3.9
-      **Verificación**: la cuarta tarjeta tiene borde discontinuo y muestra "Bajo cotización" en lugar de precio numérico.
+- [x] **PLAN-04 — Cuarta tarjeta con borde punteado**
+      La cuarta tarjeta DEBE usar borde punteado y el estilo diferenciado definido en los componentes, mostrando el indicador de cotización en lugar de precio numérico.
+      _Spec_: §Planes · _Tareas_: 3.9
+      **Verificación**: la cuarta tarjeta tiene borde discontinuo y no muestra precio numérico.
 
-- [ ] **PLAN-05 — Los 4 botones abren la modal de lista de espera**
-      Los 4 botones de los planes DEBEN tener `href="#lista-espera"` + `data-open-waitlist` y abrir la modal de lista de espera; NO deben navegar a `#agendar`.
-      *Spec*: §Planes (último párrafo), criterio de aceptación · *Tareas*: 3.9, 4.6
-      **Verificación**: cada botón tiene ambos atributos y el clic despliega `#waitlist-modal`; ninguno dirige a la sección de demo.
+- [x] **PLAN-05 — CTA de planes sin acción en esta spec**
+      Los 4 botones de los planes DEBEN permanecer visibles y habilitados, sin abrir modal, navegar o enviar datos.
+      _Spec_: §Planes, §Fuera de alcance · _Tareas_: 3.9
+      **Verificación**: cada botón está habilitado; el clic no abre diálogo ni cambia ruta o hash.
 
-- [ ] **PLAN-06 — Tarjetas de plan seleccionables**
+- [x] **PLAN-06 — Tarjetas de plan seleccionables**
       Las tarjetas de plan DEBEN ser seleccionables: clic, Enter o Espacio marcan la tarjeta con la clase `is-selected` y actualizan `aria-pressed`.
-      *Spec*: §Planes (último párrafo) · *Tareas*: [SIN TAREA]
+      _Spec_: §Planes (último párrafo) · _Tareas_: [SIN TAREA]
       **Verificación**: test de teclado y puntero: la tarjeta activa queda en `is-selected`, `aria-pressed="true"`, y al seleccionar otra se desmarca la anterior.
+
+- [x] **PLAN-07 — Badge de popularidad**
+      La tarjeta destacada DEBE llevar un badge de popularidad definido en los componentes; ninguna otra tarjeta lo lleva.
+      _Spec_: §Planes · _Tareas_: 9.5
+      **Verificación**: revisión de código 2026-11-08: el badge existe sólo en la segunda tarjeta (`popular: true`).
 
 ## Preguntas frecuentes
 
-- [ ] **FAQ-01 — Acordeón de preguntas**
-      La sección `#preguntas` DEBE mostrar un acordeón con las preguntas del prototipo (fuente de verdad del copy), p. ej. "¿Cuánto cuesta?" con la respuesta "Hay planes según lo que necesites. Los primeros 8 días son gratis."
-      *Spec*: §Alcance, punto 9 · *Tareas*: 3.11
-      **Verificación**: la sección existe con `id="preguntas"`; al abrir una pregunta se muestra su respuesta y al cerrarla se oculta; el copy coincide con el prototipo.
+- [x] **FAQ-01 — Acordeón de preguntas**
+      La sección `#faq` DEBE renderizar su subtítulo y un acordeón con **6 preguntas**, cada una con su respuesta, definidas en los componentes.
+      _Spec_: §Alcance, punto 9 · _Tareas_: 3.11
+      **Verificación**: la sección existe con `id="faq"`; hay 6 preguntas; al abrir una se muestra su respuesta y al cerrarla se oculta; el copy coincide con los componentes.
 
 ## Agenda tu demo
 
-- [ ] **DEMO-01 — Apartado `#agendar` con tarjeta acentuada**
-      El apartado `#agendar` DEBE mostrar una tarjeta con fondo acentuado y bordes de 10px.
-      *Spec*: §Agenda tu demo · *Tareas*: 3.10
+- [x] **DEMO-01 — Apartado `#demo` con tarjeta acentuada**
+      El apartado `#demo` DEBE mostrar una tarjeta con fondo acentuado y bordes de 10px.
+      _Spec_: §Agenda tu demo · _Tareas_: 3.10
       **Verificación**: la tarjeta usa el fondo acentuado definido y `border-radius` de 10px.
 
-- [ ] **DEMO-02 — Badge "Próximamente"**
-      La tarjeta DEBE mostrar el badge "Próximamente".
-      *Spec*: §Agenda tu demo, criterio de aceptación · *Tareas*: 3.10
-      **Verificación**: el badge es visible dentro de la tarjeta, antes del título.
+- [x] **DEMO-02 — Sin badge de estado diferido**
+      La tarjeta NO DEBE mostrar badge de estado diferido (eliminado en el rediseño 2026-11-08).
+      _Spec_: §Agenda tu demo · _Tareas_: 9.6
+      **Verificación**: revisión de código: no existe ningún badge dentro de la tarjeta `#demo`.
 
-- [ ] **DEMO-03 — Título y descripción**
-      DEBE mostrar el título "Agenda tu demo" y la descripción "Estamos terminando de construir Stockma y todavía no podemos mostrarte el producto funcionando. Cuando esté listo vas a poder agendar 30 minutos por videollamada: vemos tu inventario real, cargamos un par de productos y revisamos el plan que mejor se ajusta a tu negocio."
-      *Spec*: §Agenda tu demo · *Tareas*: 3.10
-      **Verificación**: copy exacto del spec (copy del prototipo).
+- [x] **DEMO-03 — Título y descripción**
+      La tarjeta DEBE renderizar su título y descripción según el copy versionado.
+      _Spec_: §Agenda tu demo · _Tareas_: 3.10
+      **Verificación**: copy según los componentes.
 
-- [ ] **DEMO-04 — Botón "Agendar demo" deshabilitado**
-      El botón 1 "Agendar demo" DEBE estar deshabilitado (`disabled`) y sin acción asociada.
-      *Spec*: §Agenda tu demo, criterio de aceptación · *Tareas*: 3.10
-      **Verificación**: el atributo `disabled` está presente; el clic no abre nada ni navega.
+- [x] **DEMO-04 — Sin botón deshabilitado**
+      La tarjeta NO DEBE mostrar un botón deshabilitado (el botón de agendar se eliminó en el rediseño 2026-11-08); el único CTA es el de lista de espera.
+      _Spec_: §Agenda tu demo · _Tareas_: 9.6
+      **Verificación**: revisión de código: no hay elementos `disabled` en la tarjeta.
 
-- [ ] **DEMO-05 — CTA secundario a la lista de espera**
-      El botón 2 "Mientras tanto, únete a la lista de espera" DEBE abrir la modal de lista de espera.
-      *Spec*: §Agenda tu demo, criterio de aceptación · *Tareas*: 3.10, 4.6
-      **Verificación**: el clic despliega `#waitlist-modal`.
+- [x] **DEMO-05 — CTA de lista de espera sin acción en esta spec**
+      El CTA (lista de espera) DEBE permanecer visible y habilitado, sin acción asociada.
+      _Spec_: §Agenda tu demo, §Fuera de alcance · _Tareas_: 3.10
+      **Verificación**: el botón está habilitado; el clic no abre diálogo ni cambia ruta o hash.
 
-## Lista de espera — barra sticky
+## Lista de espera — barra fija
 
-- [ ] **LISTA-01 — Barra sticky, último hijo de `<main>`**
-      La barra `#lista-espera` DEBE ser el último hijo de `<main>` con `position: sticky; bottom: 0`, de ancho completo (full-bleed), con el mismo tratamiento visual del header; su contenido va dentro de `.wrap`.
-      *Spec*: §Lista de espera (Barra), §Estructura (paso 10) · *Diseño*: "Decisión: CTA de lista de espera como barra inferior sticky" · *Tareas*: [SIN TAREA]
-      **Verificación**: en el DOM, `#lista-espera` es el último hijo de `<main>`; la barra toca los bordes izquierdo y derecho del viewport; su copy está alineado al mismo eje `.wrap` que el resto de secciones.
+- [x] **LISTA-01 — Barra fija, `<aside>` y último hijo de `<main>`**
+      La barra `#waitlist` DEBE ser el último hijo de `<main>`, renderizada como `<aside aria-label>` con `id="waitlist"`, con `position: fixed; bottom: 0` y de ancho completo (full-bleed), con el mismo tratamiento visual del header; su contenido va dentro de `.wrap`.
+      _Spec_: §Lista de espera (Barra), §Estructura (paso 10) · _Diseño_: "Decisión: CTA de lista de espera como barra inferior fija con ocultamiento por observador" · _Tareas_: 9.7
+      **Verificación**: en el DOM, el `<aside>` es el último hijo de `<main>` y tiene `id="waitlist"`; la barra toca los bordes izquierdo y derecho del viewport; su contenido está alineado al eje `.wrap`.
 
-- [ ] **LISTA-02 — Visibilidad desde la carga y liberación con el footer**
-      La barra DEBE estar visible desde que carga la página y liberarse únicamente cuando el footer entra en pantalla, sin `fixed` ni `IntersectionObserver`.
-      *Spec*: §Lista de espera (Barra) · *Diseño*: mismo, con gotcha de `.wrap`
-      **Verificación**: al cargar, la barra está pegada al pie; al hacer scroll hasta el final, el footer la empuja y queda en su posición de flujo; no hay `position: fixed` ni observadores en el código.
+- [x] **LISTA-02 — Ocultamiento sobre `#demo` con IntersectionObserver**
+      La barra DEBE estar visible desde que carga la página y ocultarse mientras `#demo` está en pantalla (IntersectionObserver, `threshold: 0.1`), volviendo a aparecer con animación de entrada al salir de vista; el observer DEBE desconectarse al desmontar.
+      _Spec_: §Lista de espera (Barra) · _Diseño_: misma decisión, con gotcha de `.wrap` · _Tareas_: 9.7
+      **Verificación**: al cargar, la barra está fija al pie; al entrar `#demo` desaparece; al salir, reaparece. Nota de testing: jsdom no implementa `IntersectionObserver` — los tests que renderizan la landing necesitan mock (ver `design.md`, gotchas de testing).
 
-- [ ] **LISTA-03 — Apilado en móvil (≤900px)**
-      A ≤900px la barra DEBE apilarse con el texto centrado y el botón ocupando todo el ancho.
-      *Spec*: §Lista de espera (Barra) · *Tareas*: [SIN TAREA]
-      **Verificación**: a 375px, texto y botón están en columnas apiladas, el botón mide el ancho del contenedor y no hay scroll horizontal.
+- [x] **LISTA-03 — Apilado en móvil (≤900px)**
+      A ≤900px la barra DEBE apilarse con el contenido centrado y el botón ocupando todo el ancho.
+      _Spec_: §Lista de espera (Barra) · _Tareas_: [SIN TAREA]
+      **Verificación**: a 375px, contenido y botón están en columnas apiladas, el botón mide el ancho del contenedor y no hay scroll horizontal.
 
-- [ ] **LISTA-04 — Copy de la barra**
-      La barra DEBE mostrar el título "Únete a la lista de espera" y el texto "Rellena el formulario y recibe en primicia información de nuestro lanzamiento".
-      *Spec*: §Lista de espera (Barra) · *Tareas*: [SIN TAREA]
-      **Verificación**: ambos textos coinciden exactamente con el spec.
+- [x] **LISTA-04 — Copy de la barra**
+      La barra DEBE renderizar su título y texto según el copy versionado.
+      _Spec_: §Lista de espera (Barra) · _Tareas_: [SIN TAREA]
+      **Verificación**: ambos textos coinciden con los componentes.
 
-## Lista de espera — modal
+- [x] **LISTA-05 — CTA de la barra sin acción en esta spec**
+      El CTA de la barra DEBE permanecer visible y habilitado, sin navegación, modal ni envío de datos.
+      _Spec_: §Lista de espera (Barra), §Fuera de alcance
+      **Verificación**: el botón no está deshabilitado y al hacer clic no cambia ruta/hash ni abre un diálogo.
 
-- [ ] **MODAL-01 — Apertura y cierre**
-      La modal `#waitlist-modal` DEBE abrirse desde todos los CTAs de lista de espera (hero, planes, demo, barra) y cerrarse con la X, clic fuera del diálogo y tecla Esc.
-      *Spec*: §Lista de espera (Modal), §Hero, §Planes, §Agenda tu demo · *Tareas*: [SIN TAREA] · *Diseño*: flujo de datos
-      **Verificación**: los cuatro CTAs despliegan la misma modal; los tres mecanismos de cierre funcionan; el diálogo tiene `role="dialog"` y `aria-modal="true"`.
+## Alcance diferido
 
-- [ ] **MODAL-02 — Campos del formulario**
-      El formulario DEBE tener nombre completo, teléfono móvil y correo electrónico; el teléfono DEBE mostrar la bandera de Colombia y el prefijo `+57` fijo dentro del mismo cuadro, sin selector de país.
-      *Spec*: §Lista de espera (Modal), criterio de aceptación · *Tareas*: [SIN TAREA]
-      **Verificación**: un solo cuadro con borde único contiene bandera SVG, "+57" no editable, divisor de 1px y el input; no hay desplegable de países.
-
-- [ ] **MODAL-03 — Envío sin backend**
-      Al enviar, el formulario DEBE hacer `preventDefault` y aplicar el estado `is-submitted` que muestra el mensaje de éxito, sin llamadas de red.
-      *Spec*: §Lista de espera (Modal), botón · *Tareas*: [SIN TAREA]
-      **Verificación**: el clic en "Unirme a la lista de espera" no recarga la página ni emite requests; el formulario adquiere la clase `is-submitted`.
-
-- [ ] **MODAL-04 — Estado de éxito: qué se oculta y qué se mantiene**
-      En estado `is-submitted` DEBEN ocultarse los campos y el botón, el título del encabezado SE MANTIENE y sólo se oculta el subtítulo; el contenido se apila centrado.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: tras enviar, el `h2` "Únete a la lista de espera" sigue visible, el subtítulo no, y no quedan inputs ni botón de envío.
-
-- [ ] **MODAL-05 — Saludo personalizado**
-      El estado de éxito DEBE mostrar "¡Listo, {nombre}!" con el primer nombre del formulario capitalizado por JS; sin JS, el texto por defecto es "¡Listo!".
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: enviar con nombre "ana maría gonzález" muestra "¡Listo, Ana!"; el HTML sin procesar contiene "¡Listo!".
-
-- [ ] **MODAL-06 — Badge circular animado**
-      El estado de éxito DEBE incluir un badge circular: círculo con `--accent-tint`, dos ondas *ripple* saliendo y un check dibujándose con `stroke-dashoffset` dentro de un *pop*, todo en el teal de botones `--brand-teal`.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: inspección de la animación: hay keyframes para las ondas y el trazo del check; el color resuelve a `--brand-teal`.
-
-- [ ] **MODAL-07 — Texto del mensaje de éxito**
-      El estado de éxito DEBE mostrar "Estás en la lista de espera. Te avisaremos por WhatsApp y correo cuando nuestro software esté disponible."
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: el texto coincide exactamente.
-
-- [ ] **MODAL-08 — Respeto de `prefers-reduced-motion`**
-      Con `prefers-reduced-motion: reduce`, las animaciones del estado de éxito DEBEN desactivarse o reducirse.
-      *Spec*: §Lista de espera (Modal) · *Tareas*: [SIN TAREA]
-      **Verificación**: con la preferencia activa en el sistema, el badge aparece sin ondas ni trazo animado; existe la media query `@media (prefers-reduced-motion: reduce)`.
+La modal, el formulario de datos y el envío de correo pertenecen a la spec 003. El prototipo HTML local no es requisito para implementar 002.
 
 ## Footer
 
-- [ ] **FOOT-01 — Estructura de tres filas**
+- [x] **FOOT-01 — Estructura de tres filas**
       El footer DEBE tener tres filas sin navegación interna.
-      *Spec*: §Alcance (Footer) · *Diseño*: componente `Footer` · *Tareas*: 3.12 [ambiguo: la tarea no detalla las 3 filas]
+      _Spec_: §Alcance (Footer) · _Diseño_: componente `Footer` · _Tareas_: 3.12 [ambiguo: la tarea no detalla las 3 filas]
       **Verificación**: el footer contiene exactamente tres bloques apilados y ningún link de navegación de la app.
 
-- [ ] **FOOT-02 — Fila 1: logo e iconos sociales enlazados**
-      La primera fila DEBE mostrar el logo apilado recortado (`Stockma_vertical_trim.png`, 118px) a la izquierda e iconos circulares de WhatsApp e Instagram (SVG inline con `currentColor`) a la derecha, en disposición `space-between`; el icono de WhatsApp DEBE enlazar a `https://w.app/stockmaapp` y el de Instagram a `https://www.instagram.com/stockma_app?dlrf=MXAzNTU1OWl5YzIwZw==`, ambos en nueva pestaña con `rel` seguro.
-      *Spec*: §Diseño (Footer), criterio de aceptación · *Tareas*: 3.12
-      **Verificación**: el logo usa el archivo `_trim` a 118px; ambos iconos son enlaces con las URLs exactas y heredan el color del texto.
+- [x] **FOOT-02 — Fila 1: logo e iconos sociales enlazados**
+      La primera fila DEBE mostrar el logo apilado recortado (`Stockma_vertical_trim.png`, 118px) a la izquierda e iconos circulares de WhatsApp e Instagram (componentes de `@mui/icons-material` con `currentColor`) a la derecha, en disposición `space-between`; el icono de WhatsApp DEBE enlazar a `https://w.app/stockmaapp` y el de Instagram a `https://www.instagram.com/stockma_app?dlrf=MXAzNTU1OWl5YzIwZw==`, ambos en nueva pestaña con `rel` seguro.
+      _Spec_: §Diseño (Footer), criterio de aceptación · _Tareas_: 3.12, 9.8
+      **Verificación**: el logo usa el archivo `_trim` a 118px; ambos iconos son enlaces con las URLs exactas y heredan el color del texto. _(El rediseño reemplazó los SVG inline por iconos de MUI.)_
 
-- [ ] **FOOT-03 — Fila 2: soporte con enlace y copyright**
-      La segunda fila DEBE mostrar, en disposición `space-between`, la línea "Atención, preguntas frecuentes y soporte: Escribenos al WhatsApp" (el ancla "Escribenos al WhatsApp" enlaza a `https://w.app/stockmaapp`) y el copyright "© 2026 Stockma" / "Hecho en Colombia". NO DEBE exigirse el número de teléfono visible.
-      *Spec*: §Alcance (Footer), §Diseño (Footer), criterio de aceptación · *Tareas*: 3.12
-      **Verificación**: el ancla apunta a `w.app/stockmaapp`; ambos textos presentes; no hay número +57 expuesto.
+- [x] **FOOT-03 — Fila 2: soporte con enlace y copyright**
+      La segunda fila DEBE mostrar, en disposición `space-between`, la línea de soporte (cuyo ancla apunta a `https://w.app/stockmaapp`) y el copyright. NO DEBE exigirse el número de teléfono visible.
+      _Spec_: §Alcance (Footer), §Diseño (Footer), criterio de aceptación · _Tareas_: 3.12
+      **Verificación**: el ancla apunta a `w.app/stockmaapp`; ambos textos están presentes; no hay número +57 expuesto.
 
-- [ ] **FOOT-04 — Sin navegación interna**
+- [x] **FOOT-04 — Sin navegación interna**
       El footer NO DEBE incluir links a secciones ni a páginas internas de la app.
-      *Spec*: §Alcance (Footer) · *Tareas*: 3.12
+      _Spec_: §Alcance (Footer) · _Tareas_: 3.12
       **Verificación**: inspección del DOM: los únicos enlaces del footer son WhatsApp e Instagram (más el ancla de soporte a WhatsApp).
 
-- [ ] **FOOT-05 — Alineación al eje `.wrap` (gotcha del shorthand)**
+- [x] **FOOT-05 — Alineación al eje `.wrap` (gotcha del shorthand)**
       El contenido del footer DEBE alinearse al mismo eje que el resto de la página (24px de padding lateral); cualquier elemento con `class="wrap ..."` DEBE fijar su padding vertical con `padding-block`, nunca con el shorthand `padding`.
-      *Spec*: criterio de aceptación · *Diseño*: gotcha de `.wrap` · *Tareas*: 3.12
+      _Spec_: criterio de aceptación · _Diseño_: gotcha de `.wrap` · _Tareas_: 3.12
       **Verificación**: a cualquier ancho, el borde izquierdo del logo del footer alinea con el de las secciones; grep en los estilos del footer: sin shorthand `padding` sobre clases que incluyan `wrap`.
 
-- [ ] **FOOT-06 — Costura superior hairline**
+- [x] **FOOT-06 — Costura superior hairline**
       El footer DEBE separarse de su vecina (la barra clara de lista de espera, no la sección demo) con `border-top: 1px solid var(--border)`.
-      *Spec*: §Diseño (Footer) · *Tareas*: 3.12
-      **Verificación**: el borde superior existe y usa el token `--border`; la sección inmediatamente anterior al footer en el flujo es la barra `#lista-espera`.
+      _Spec_: §Diseño (Footer) · _Tareas_: 3.12
+      **Verificación**: el borde superior existe y usa el token `--border`; la sección inmediatamente anterior al footer en el flujo es la barra `#waitlist`.
 
 ## Modo oscuro
 
-- [ ] **TEMA-01 — Toggle con `data-theme`**
+- [x] **TEMA-01 — Toggle con `data-theme`**
       El control de tema DEBE alternar el atributo `data-theme` entre `light` y `dark` en la raíz, afectando a toda la landing.
-      *Spec*: §Diseño (Modo oscuro) · *Tareas*: 1.1, 4.3 · *Diseño*: "Decisión: Extensión del sistema de temas"
-      **Verificación**: test unitario de la lógica de `theme-mode.ts`; al alternar, los colores de secciones, header y barra cambian sin recargar.
+      _Spec_: §Diseño (Modo oscuro) · _Tareas_: 1.1, 4.3 · _Diseño_: "Decisión: Extensión del sistema de temas"
+      **Verificación**: test RTL de `Header.test.tsx` (alterna `data-theme`, persiste y emite `stockma-theme-change`); al alternar, los colores de secciones, header y barra cambian sin recargar. El override `html[data-theme='dark'] .page` evita que los tokens claros declarados en `.page` pisen el tema oscuro.
 
-- [ ] **TEMA-02 — Persistencia en `localStorage`**
+- [x] **TEMA-02 — Persistencia en `localStorage`**
       La preferencia DEBE persistirse en la clave `localStorage` `stockma-theme` y restaurarse en la próxima carga.
-      *Spec*: §Diseño (Modo oscuro) · *Tareas*: 1.1, 1.2
-      **Verificación**: alternar a oscuro, recargar, y verificar `localStorage.getItem('stockma-theme') === 'dark'` y el tema aplicado. La clave coincide con el prototipo.
+      _Spec_: §Diseño (Modo oscuro) · _Tareas_: 1.1, 1.2
+      **Verificación**: alternar a oscuro, recargar, y verificar `localStorage.getItem('stockma-theme') === 'dark'` y el tema aplicado.
 
-- [ ] **TEMA-03 — Anti-FOUC en `index.html`**
+- [x] **TEMA-03 — Anti-FOUC en `index.html`**
       `index.html` DEBE incluir un script que aplique el tema guardado antes del primer render, sin destello del tema opuesto.
-      *Spec*: §Diseño (Modo oscuro) · *Tareas*: 1.4
+      _Spec_: §Diseño (Modo oscuro) · _Tareas_: 1.4
       **Verificación**: con el tema en oscuro y recarga con caché fría, no se ve ningún frame en claro; el script corre antes de cargar el bundle.
 
-- [ ] **TEMA-04 — Sincronización con el tema MUI**
+- [x] **TEMA-04 — Sincronización con el tema MUI**
       El puente de MUI DEBE recrearse (o escuchar el evento `stockma-theme-change`) al cambiar el tema, para que los componentes MUI de la app actualicen sus colores.
-      *Spec*: §Alcance, §Archivos involucrados (`mui-bridge.ts`) · *Tareas*: 2.2, 2.4
+      _Spec_: §Alcance, §Archivos involucrados (`mui-bridge.ts`) · _Tareas_: 2.2, 2.4
       **Verificación**: test de integración o manual: alternar el tema en la landing actualiza los tokens que consume `createMuiBridge()`; los componentes MUI existentes reflejan el modo activo tras navegar a `/login`.
 
 ## Estilo global, responsive y copy
 
-- [ ] **EST-01 — Tipografía única Work Sans**
-      La landing DEBE usar Work Sans como única tipografía, cargada desde `index.html`.
-      *Spec*: §Contexto, §Diseño · *Tareas*: 1.4
-      **Verificación**: `font-family` efectivo resuelve a Work Sans en todo el árbol de la landing; los links de la fuente están en `index.html`.
+- [x] **EST-01 — Tipografía única Inter**
+      La landing DEBE usar Inter como única tipografía, cargada desde `index.html`.
+      _Spec_: §Contexto, §Diseño · _Tareas_: 1.4
+      **Verificación**: `font-family` efectivo resuelve a Inter en todo el árbol de la landing; los links de la fuente están en `index.html`.
 
-- [ ] **EST-02 — Bordes coherentes con tokens (10px)**
+- [x] **EST-02 — Bordes coherentes con tokens (10px)**
       Los componentes DEBEN usar los tokens globales de radio (10px); no DEBEN existir radios sueltos ajenos a los tokens.
-      *Spec*: §Diseño (Bordes), criterio de aceptación ("8-10px") · *Tareas*: 1.3 [SIN TAREA para tokens de radio]
+      _Spec_: §Diseño (Bordes), criterio de aceptación ("8-10px") · _Tareas_: 1.3 [SIN TAREA para tokens de radio]
       **Verificación**: los radios de tarjetas, botones, inputs y modales resuelven a tokens (rango 8-10px); grep sin valores de radio arbitrarios.
 
-- [ ] **EST-03 — Botones primarios con tokens de acción (nunca `--accent`)**
-      Los botones primarios DEBEN usar `background: var(--primary)`, `color: var(--on-primary)` y hover `var(--primary-active)`; NO DEBEN usar `--accent` como fondo (2.33:1 con texto blanco en modo oscuro, contra los 4.5:1 de WCAG AA).
-      *Spec*: §Diseño (Botones primarios) · *Diseño*: "Decisión: Los botones primarios usan los tokens de la app al implementar" · *Tareas*: [SIN TAREA]
-      **Verificación**: grep en estilos de botones: sin `--accent` como `background` de primarios; contraste medido ≥4.5:1 en claro y oscuro. El teal de marca se mantiene sólo como acento.
+- [x] **EST-03 — Botones primarios de la landing con teal de marca**
+      Los botones primarios de la landing DEBEN usar `background: var(--brand-teal)`, `color: var(--color-white)` y hover `var(--brand-teal-active)`; NO DEBEN usar `--color-accent` como fondo. El teal de marca da 5.55:1 con texto blanco tanto en claro como en oscuro.
+      _Spec_: §Diseño (Botones primarios) · _Diseño_: "Decisión: Los botones primarios usan el teal de marca (`--brand-teal`)" · _Tareas_: [SIN TAREA]
+      **Verificación**: grep en estilos de botones: primarios con `--brand-teal`; `--color-accent` reservado para texto/iconos sobre tints. Contraste ≥4.5:1 en ambos temas.
 
-- [ ] **EST-04 — Escala tipográfica en pantallas chicas (≤600px)**
-      A ≤600px la landing DEBE reducir la escala tipográfica (h1 30px, h2 de sección 25px, cuerpo 14px) y los botones principales DEBEN ir a ancho completo con altura flexible.
-      *Spec*: §Diseño (Pantallas chicas) · *Tareas*: 4.4 [ambiguo: la tarea no menciona la escala]
-      **Verificación**: a 375px, el `h1` mide 30px, los `h2` de sección 25px, el cuerpo 14px y los CTAs ocupan el ancho disponible.
+- [x] **EST-04 — Escala tipográfica en pantallas chicas (≤600px)**
+      A ≤600px la landing DEBE reducir la escala tipográfica (h1 30px, h2 de sección 26px, lead 15px, cuerpo de tarjetas/pasos 14px) y los botones principales DEBEN ir a ancho completo con altura flexible.
+      _Spec_: §Diseño (Pantallas chicas) · _Tareas_: 4.4, 9.10 [ambiguo: la tarea no menciona la escala]
+      **Verificación**: a 375px, el `h1` mide 30px, los `h2` de sección 26px, tarjetas/pasos 14px, lead 15px y los CTAs ocupan el ancho disponible. _(Valores actualizados por el rediseño; revisión de código 2026-11-08.)_
 
-- [ ] **EST-05 — Sin scroll horizontal en ningún ancho**
+- [x] **EST-05 — Sin scroll horizontal en ningún ancho**
       La landing NO DEBE producir scroll horizontal a ≤900px ni ≤600px.
-      *Spec*: responsive implícito en §Diseño · *Tareas*: 4.4
+      _Spec_: responsive implícito en §Diseño · _Tareas_: 4.4
       **Verificación**: `document.documentElement.scrollWidth <= innerWidth` a 900px, 600px y 375px.
 
-- [ ] **EST-06 — Gate de español neutro**
+- [x] **EST-06 — Gate de español neutro**
       El repositorio DEBE pasar `node scripts/check-neutral-es.mjs` sin violaciones de voseo.
-      *Spec*: §Contexto, criterio de aceptación · *Tareas*: 4.7
+      _Spec_: §Contexto, criterio de aceptación · _Tareas_: 4.7
       **Verificación**: el comando termina con código 0; el hook pre-commit lo ejecuta.
 
-- [ ] **EST-07 — Copy: capacidades reales y tags "Próximamente"**
-      Todo el copy DEBE describir capacidades verificadas en el código base; las capacidades futuras que se mencionen (reportes) DEBEN ir siempre marcadas como "Próximamente". La única excepción consentida es el copy de la columna "Con Stockma" (ver COMP-04).
-      *Spec*: §Contexto, §Reglas de copy, criterio de aceptación · *Tareas*: 4.8
-      **Verificación**: revisión de copy de todas las secciones; grep de "reportes"/"Próximamente": toda mención de reportes lleva su tag.
+- [x] **EST-07 — Copy comercial aprobado como roadmap**
+      El copy actual representa capacidades objetivo aprobadas por producto y no evidencia disponibilidad actual; la tarjeta de reportes mantiene el tag de estado diferido.
+      _Spec_: §Contexto, §Reglas de copy · _Tareas_: 9.15
+      **Verificación**: decisión de producto registrada; el estado de implementación se determina por el código, no por el texto de landing.
 
-- [ ] **EST-08 — Assets de marca en PNG**
+- [x] **EST-09 — Paleta neutra slate y densidad de secciones**
+      Los neutros de `tokens.css` DEBEN usar la escala slate (`--color-text-primary`, `--color-border`, `--color-tint-accent` al 40%) y la separación vertical de secciones DEBE ser de 50px (mayor densidad pedida en §Contexto).
+      _Spec_: §Contexto, §Diseño (Densidad y paleta) · _Tareas_: 9.9, 9.10
+      **Verificación**: tests `mui-bridge.test.tsx` y `AuthLayout.test.tsx` comparan los valores actualizados de `tokens.css`.
+
+- [x] **EST-08 — Assets de marca en PNG**
       La landing DEBE importar los logos PNG de `frontend/web/src/assets/` (horizontal, vertical, vertical_trim, logo, name) con los imports de Vite, dimensionados por el artwork visible (los PNG tienen márgenes transparentes grandes), con favicon PNG y sin los SVG de marca antiguos.
-      *Spec*: §Contexto (identidad visual), §Archivos involucrados · *Diseño*: fila `assets/` de la tabla de cambios · *Tareas*: 1.5 [contradictoria: habla de "theme variants"; el design prohíbe recolorear PNGs]
-      **Verificación**: los componentes usan los PNG correctos por superficie (trim en footer, horizontal en header); grep sin imports de los SVG antiguos; el tamaño declarado corresponde al artwork, no al canvas.
+      _Spec_: §Contexto (identidad visual), §Archivos involucrados · _Diseño_: fila `assets/` de la tabla de cambios · _Tareas_: 1.5
+      **Verificación**: los componentes usan los PNG correctos por superficie (trim en footer, horizontal en header) y alternan las variantes `_dark` en modo oscuro; grep sin imports de los SVG antiguos; el tamaño declarado corresponde al artwork, no al canvas.
 
 ---
 
 ## Criterios de aceptación del spec → ítems de este checklist
 
-- [ ] **CA-01 — Landing accesible en `/` con todas las secciones** → RUTA-01, RUTA-02
-- [ ] **CA-02 — Nav funcional y responsive (incluye menú móvil)** → HEADER-02, HEADER-03
-- [ ] **CA-03 — Modo claro/oscuro funcional** → TEMA-01, TEMA-02, TEMA-03, TEMA-04
-- [ ] **CA-04 — Hero: CTA primario abre la modal de lista de espera, CTA secundario lleva a `#como-funciona` y las pestañas del mock cambian de panel** → HERO-03, HERO-04, HERO-05
-- [ ] **CA-05 — Tarjetas de planes misma altura** → PLAN-03
-- [ ] **CA-06 — Los 4 botones de planes abren la modal de lista de espera** → PLAN-05
-- [ ] **CA-07 — Sección "Agenda tu demo": badge "Próximamente", botón "Agendar demo" deshabilitado y CTA que abre la lista de espera** → DEMO-02, DEMO-04, DEMO-05
-- [ ] **CA-08 — Modal de lista de espera abre/cierra y muestra el estado de éxito** → MODAL-01, MODAL-03, MODAL-04
-- [ ] **CA-09 — Teléfono de la lista de espera: bandera de Colombia + `+57` en un solo cuadro** → MODAL-02
-- [ ] **CA-10 — Barra de lista de espera pegada al pie y de ancho completo; apilada y a todo el ancho en móvil** → LISTA-01, LISTA-02, LISTA-03
-- [ ] **CA-11 — Footer alineado al mismo eje que el resto de la página (24px de padding lateral)** → FOOT-05
-- [ ] **CA-12 — Sin voseo (pasa gate)** → EST-06
-- [ ] **CA-13 — Sin promesas de funcionalidades no implementadas (los reportes van siempre marcados como "Próximamente")** → FUNC-03, EST-07
-- [ ] **CA-14 — Bordes coherentes 8-10px** → EST-02
-- [ ] **CA-15 — Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright** → FOOT-01, FOOT-02, FOOT-03, FOOT-04
+- [x] **CA-01 — Landing accesible en `/` con todas las secciones** → RUTA-01, RUTA-02
+- [x] **CA-02 — Nav funcional y responsive (incluye menú móvil)** → HEADER-02, HEADER-03
+- [x] **CA-03 — Modo claro/oscuro funcional** → TEMA-01, TEMA-02, TEMA-03, TEMA-04
+- [x] **CA-04 — Hero: CTA primario sin acción, CTA secundario lleva a `#how-it-works` y las pestañas del mock cambian de panel** → HERO-03, HERO-04, HERO-05
+- [x] **CA-05 — Tarjetas de planes misma altura** → PLAN-03
+- [x] **CA-06 — Los 4 botones de planes permanecen activos sin acción en esta spec** → PLAN-05
+- [x] **CA-07 — Demo: tarjeta acentuada con CTA único de lista de espera sin acción (sin badge ni botón deshabilitado)** → DEMO-01, DEMO-02, DEMO-04, DEMO-05
+- [x] **CA-08 — CTA de lista de espera habilitados sin modal, navegación ni envío** → HERO-03, PLAN-05, DEMO-05, LISTA-05
+- [x] **CA-09 — Barra de lista de espera fija al pie, oculta sobre `#demo` y apilada en móvil** → LISTA-01, LISTA-02, LISTA-03
+- [x] **CA-10 — Footer alineado al mismo eje que el resto de la página (24px de padding lateral)** → FOOT-05
+- [x] **CA-11 — Sin voseo (pasa gate)** → EST-06
+- [x] **CA-12 — Copy comercial conservado como roadmap aprobado; la tarjeta de reportes mantiene el tag diferido** → FUNC-03, EST-07, COMP-04
+- [x] **CA-13 — Bordes coherentes 8-10px** → EST-02
+- [x] **CA-14 — Footer: logo, iconos de WhatsApp e Instagram con enlace, línea de soporte con enlace a WhatsApp y copyright** → FOOT-01, FOOT-02, FOOT-03, FOOT-04
+- [x] **CA-15 — Copy versionado gobernado por componentes; prototipo local no normativo ni requerido en Git** → FUNC-03, EST-07, COMP-04
+- [x] **CA-16 — Hero: segundo segmento rotativo (3 frases, fundido) respetando `prefers-reduced-motion`** → HERO-01
+- [x] **CA-17 — `#audience` con 4 tarjetas de segmento** → QUIEN-01

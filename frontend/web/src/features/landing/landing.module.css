@@ -1,0 +1,88 @@
+.page {
+  --color-bg-page: #ffffff;
+  --color-bg-deep: #f6f6f6;
+  --color-deep: #0b1b2e;
+  --color-deep-2: #12324a;
+  --color-border: #e6e6e6;
+  --color-text-primary: #0a0a0a;
+  --color-text-secondary: #555555;
+
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+html[data-theme='dark'] .page {
+  --color-bg-page: #0b1320;
+  --color-bg-deep: #0f1a29;
+  --color-deep: #081120;
+  --color-deep-2: #10314a;
+  --color-border: #23303f;
+  --color-text-primary: #f2f5f9;
+  --color-text-secondary: #9fadc0;
+}
+
+.section {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.spaced {
+  padding: 50px 0;
+}
+
+.deep {
+  background: var(--color-bg-deep);
+}
+
+.wrap {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--color-shadow-sm);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--color-accent-strong);
+}
+
+.card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .spaced {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+
+  .cardTitle {
+    font-size: 16px;
+  }
+
+  .card p {
+    font-size: 14px;
+  }
+}

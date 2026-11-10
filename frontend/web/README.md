@@ -70,7 +70,7 @@ Reglas:
   componentes llaman `alpha()` al renderizar y no pueden parsearlo.
 - El theme es una **foto** de los tokens. Después de cambiar el branding hay que
   reconstruirlo.
-- Tipografía única: **Work Sans**.
+- Tipografía única: **Inter**.
 
 ### Textos de la interfaz
 
