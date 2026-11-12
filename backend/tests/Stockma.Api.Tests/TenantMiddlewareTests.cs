@@ -262,9 +262,11 @@ public class TenantMiddlewareTests
                     "/api/auth/logout",
                     "/api/auth/forgot-password",
                     "/api/auth/reset-password",
+                    "/api/waitlist",
                 ],
                 "T055a: agregar una ruta aca amplia la superficie sin autenticar. "
                 + "T069 agrega forgot/reset-password: el email resuelve el tenant, no hay header. "
-                + "Ambos responden uniforme (202/401) y corren bajo el rate limit de Auth");
+                + "Ambos responden uniforme (202/401) y corren bajo el rate limit de Auth. "
+                + "Spec 003 agrega /api/waitlist: registro público sin cuenta ni tenant (201/409/400)");
     }
 }
