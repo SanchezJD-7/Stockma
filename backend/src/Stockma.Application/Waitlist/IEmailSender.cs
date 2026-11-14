@@ -1,6 +1,6 @@
 namespace Stockma.Application.Waitlist;
 
-public sealed record EmailMessage(string ToEmail, string ToName, string Subject, string HtmlBody);
+public sealed record EmailMessage(string ToEmail, string ToName);
 
 public interface IEmailSender
 {

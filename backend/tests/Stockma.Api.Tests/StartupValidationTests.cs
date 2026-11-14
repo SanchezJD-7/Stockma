@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Stockma.Application.Waitlist;
+using Stockma.Infrastructure.Email;
 using Stockma.Infrastructure.Identity;
 
 namespace Stockma.Api.Tests;
@@ -19,7 +22,11 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
             builder.UseEnvironment(environment);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(settings.ToDictionary(s => s.Key, s => s.Value)));
-            builder.ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>());
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IValidateOptions<SmsOptions>>();
+                services.RemoveAll<IValidateOptions<EmailOptions>>();
+            });
         });
 
     private static void ShouldFailAtStartup(WebApplicationFactory<Program> app, string expected)
@@ -129,5 +136,87 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
         using var app = With("Development", ("ForwardedHeaders:KnownNetworks:0", network));
 
         ShouldFailAtStartup(app, "ForwardedHeaders:KnownNetworks");
+    }
+
+    [Fact]
+    public void TheBaseAppSettings_CarryNoSendGridSecrets()
+    {
+        var baseSettings = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        var sendGrid = baseSettings.GetSection("SendGrid");
+        sendGrid.Exists().Should().BeTrue("la sección SendGrid está cableada en la configuración base");
+        sendGrid["ApiKey"].Should()
+            .BeNullOrEmpty("las credenciales van en user-secrets o variables de entorno, nunca en el repositorio");
+        sendGrid["TemplateId"].Should()
+            .BeNullOrEmpty("el ID de la plantilla se configura por entorno, no se versiona");
+        sendGrid["FromEmail"].Should().BeNullOrEmpty("el remitente se configura por entorno, no se versiona");
+        sendGrid["FromName"].Should().BeNullOrEmpty("el nombre del remitente se configura por entorno, no se versiona");
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void OutsideDevelopment_AMissingSendGridApiKey_FailsAtStartup(string environment)
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment(environment)
+            .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
+
+        ShouldFailAtStartup(app, "SendGrid:ApiKey");
+    }
+
+    [Theory]
+    [InlineData("SG.test-key", "", "hola@stockma.app", "SendGrid:TemplateId")]
+    [InlineData("SG.test-key", "d-abc123", "", "SendGrid:FromEmail")]
+    public void OutsideDevelopment_AMissingSendGridSetting_FailsAtStartup(
+        string apiKey,
+        string templateId,
+        string fromEmail,
+        string expectedSetting)
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment("Production")
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["SendGrid:ApiKey"] = apiKey,
+                    ["SendGrid:TemplateId"] = templateId,
+                    ["SendGrid:FromEmail"] = fromEmail,
+                }))
+            .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
+
+        ShouldFailAtStartup(app, expectedSetting);
+    }
+
+    [Fact]
+    public void InDevelopment_WithoutSendGridConfiguration_TheApiStarts()
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+
+        var act = () => app.CreateClient();
+
+        act.Should().NotThrow("en Development las credenciales se cargan con user-secrets cuando haga falta");
+    }
+
+    [Fact]
+    public void Development_WithSendGridConfigured_ResolvesTheSendGridEmailSender()
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment("Development")
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["SendGrid:ApiKey"] = "SG.test-key",
+                    ["SendGrid:TemplateId"] = "d-abc123",
+                    ["SendGrid:FromEmail"] = "hola@stockma.app",
+                })));
+
+        using var scope = app.Services.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IEmailSender>().Should()
+            .BeOfType<EmailSender>("el registro sigue el patrón de AddSmsSender: cliente HttpClient + IEmailSender");
     }
 }

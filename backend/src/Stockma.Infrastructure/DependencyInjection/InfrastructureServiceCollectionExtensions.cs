@@ -135,4 +135,25 @@ public static class InfrastructureServiceCollectionExtensions
 
         return services;
     }
+
+    public static IServiceCollection AddSendGridEmailSender(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isDevelopment)
+    {
+        services
+            .AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.ApiKey), EmailOptions.MissingApiKeyMessage)
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.TemplateId), EmailOptions.MissingTemplateIdMessage)
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.FromEmail), EmailOptions.MissingFromEmailMessage)
+            .ValidateOnStart();
+
+        services.AddHttpClient<EmailSender>();
+        services.AddScoped<IEmailSender>(provider => provider.GetRequiredService<EmailSender>());
+        return services;
+    }
 }

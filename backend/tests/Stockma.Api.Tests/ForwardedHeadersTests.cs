@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Stockma.Infrastructure.Email;
 using Stockma.Infrastructure.Identity;
 
 namespace Stockma.Api.Tests;
@@ -97,7 +98,11 @@ public class ForwardedHeadersTests(StockmaApiFactory factory) : IClassFixture<St
             builder.UseSetting("https_port", "443");
             builder.UseSetting("ForwardedHeaders:KnownProxies:0", ProxyAddress);
             builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, RemoteAddressStartupFilter>());
-            builder.ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>());
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IValidateOptions<SmsOptions>>();
+                services.RemoveAll<IValidateOptions<EmailOptions>>();
+            });
         });
 
     private static async Task<HttpResponseMessage> GetProductsAsync(HttpClient client, string? forwardedProto)

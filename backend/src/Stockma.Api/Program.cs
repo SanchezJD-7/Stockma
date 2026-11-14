@@ -13,6 +13,7 @@ using Stockma.Api.Middleware;
 using Stockma.Application.Identity;
 using Stockma.Application.DependencyInjection;
 using Stockma.Infrastructure.DependencyInjection;
+using Stockma.Infrastructure.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +90,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSmsSender(builder.Configuration, builder.Environment.IsDevelopment());
+builder.Services.AddSendGridEmailSender(builder.Configuration, builder.Environment.IsDevelopment());
+builder.Services.AddHostedService<EmailBackgroundService>();
 
 if (RuntimeDatabaseRoleCheck.AppliesTo(builder.Environment))
 {

@@ -35,16 +35,29 @@ public class RegisterWaitlistEntryCommandTests
     }
 
     [Fact]
-    public async Task Register_EnqueuesAConfirmationEmailWithTheFullName()
+    public async Task Register_EnqueuesOnlyRecipientAndName_AfterTheEntryIsPersisted()
     {
         await CreateHandler().Handle(Command(), default);
 
+        repository.Added.Should().ContainSingle();
         emailQueue.Messages.Should().ContainSingle();
-        var message = emailQueue.Messages[0];
-        message.ToEmail.Should().Be("juan@ejemplo.com");
-        message.ToName.Should().Be("Juan Pérez");
-        message.Subject.Should().Contain("lista de espera");
-        message.HtmlBody.Should().Contain("Juan Pérez", "el correo de confirmación es personalizado con el nombre");
+        emailQueue.Messages[0].Should()
+            .Be(
+                new EmailMessage("juan@ejemplo.com", "Juan Pérez"),
+                "el mensaje sólo lleva destinatario y nombre: el contenido lo aporta la dynamic template de SendGrid");
+    }
+
+    [Fact]
+    public async Task Register_WhenPersistingFails_DoesNotEnqueueAnyEmail()
+    {
+        repository.Throws = true;
+
+        Func<Task> act = () => CreateHandler().Handle(Command(), default);
+
+        await act.Should().ThrowAsync<InvalidOperationException>(
+            "si la persistencia falla no hay registro que confirmar");
+        repository.Added.Should().BeEmpty();
+        emailQueue.Messages.Should().BeEmpty("el correo sólo se encola después de persistir con éxito");
     }
 
     [Fact]
@@ -119,9 +132,15 @@ public class RegisterWaitlistEntryCommandTests
     {
         public List<WaitlistEntry> Added { get; } = [];
         public bool EmailExists { get; set; }
+        public bool Throws { get; set; }
 
         public Task AddAsync(WaitlistEntry entry, CancellationToken cancellationToken = default)
         {
+            if (Throws)
+            {
+                throw new InvalidOperationException("La base de datos no está disponible.");
+            }
+
             if (EmailExists)
             {
                 throw new WaitlistEmailAlreadyRegisteredException(entry.Email);
@@ -145,6 +164,18 @@ public class RegisterWaitlistEntryCommandTests
             }
 
             Messages.Add(message);
+        }
+
+        public async IAsyncEnumerable<EmailMessage> ReadAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+
+            foreach (var message in Messages)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return message;
+            }
         }
     }
 }

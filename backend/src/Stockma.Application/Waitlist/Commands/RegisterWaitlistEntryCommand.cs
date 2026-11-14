@@ -57,13 +57,7 @@ public sealed class RegisterWaitlistEntryCommandHandler(
         {
             emailQueue.Enqueue(new EmailMessage(
                 ToEmail: entry.Email,
-                ToName: entry.FullName,
-                Subject: "Ya estás en la lista de espera de Stockma",
-                HtmlBody: $"""
-                    <p>Hola {entry.FullName},</p>
-                    <p>Gracias por registrarte en la lista de espera de Stockma.</p>
-                    <p>Te avisaremos por correo la fecha oficial de nuestro lanzamiento.</p>
-                    """));
+                ToName: entry.FullName));
         }
         catch (Exception ex)
         {

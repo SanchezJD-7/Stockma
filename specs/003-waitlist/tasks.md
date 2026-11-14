@@ -45,11 +45,11 @@
 
 ## Phase 3: Email SendGrid y secretos (TDD)
 
-- [ ] 3.1 `backend/tests/Stockma.Infrastructure.Tests/SendGridEmailSenderTests.cs`: **RED** — envía con `template_id` + `dynamic_template_data` (nombre del usuario); **el contenido vive EXCLUSIVAMENTE en la dynamic template del usuario en SendGrid — cero HTML en el código**; API que falla lanza error de envío (no de dominio); sin API key o sin TemplateId → error de configuración claro.
-- [ ] 3.2 `backend/src/Stockma.Infrastructure/Email/`: **GREEN** — `EmailSender` + `EmailOptions` (SendGrid: ApiKey, FromEmail, FromName, **TemplateId obligatorio** — el de la plantilla que el usuario ya tiene en su cuenta —) con `AddHttpClient` y registro condicional siguiendo `AddSmsSender`.
-- [ ] 3.3 `backend/src/Stockma.Api/appsettings.json`: sección `SendGrid` **sin valores**; `user-secrets set "SendGrid:ApiKey" ...` en dev; env var `SendGrid__ApiKey` en prod; `ValidateOnStart`.
-- [ ] 3.4 `backend/tests/Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`: **ampliar** — el handler encola SOLO destinatario + nombre (`EmailMessage` se achica: se eliminan Subject/HtmlBody, el contenido lo aporta la plantilla de SendGrid) después de persistir; un fallo al encolar/enviar deja el `201` intacto y sólo loguea.
-- [ ] 3.5 `backend/tests/Stockma.Api.Tests/StartupValidationTests.cs`: verificar que `appsettings.json` sigue sin secretos reales (gate existente).
+- [x] 3.1 `backend/tests/Stockma.Infrastructure.Tests/SendGridEmailSenderTests.cs`: **RED** — envía con `template_id` + `dynamic_template_data` (nombre del usuario); **el contenido vive EXCLUSIVAMENTE en la dynamic template del usuario en SendGrid — cero HTML en el código**; API que falla lanza error de envío (no de dominio); sin API key o sin TemplateId → error de configuración claro.
+- [x] 3.2 `backend/src/Stockma.Infrastructure/Email/`: **GREEN** — `EmailSender` + `EmailOptions` (SendGrid: ApiKey, FromEmail, FromName, **TemplateId obligatorio** — el de la plantilla que el usuario ya tiene en su cuenta —) con `AddHttpClient` y registro condicional siguiendo `AddSmsSender`.
+- [x] 3.3 `backend/src/Stockma.Api/appsettings.json`: sección `SendGrid` **sin valores**; `user-secrets set "SendGrid:ApiKey" ...` en dev; env var `SendGrid__ApiKey` en prod; `ValidateOnStart`.
+- [x] 3.4 `backend/tests/Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`: **ampliar** — el handler encola SOLO destinatario + nombre (`EmailMessage` se achica: se eliminan Subject/HtmlBody, el contenido lo aporta la plantilla de SendGrid) después de persistir; un fallo al encolar/enviar deja el `201` intacto y sólo loguea.
+- [x] 3.5 `backend/tests/Stockma.Api.Tests/StartupValidationTests.cs`: verificar que `appsettings.json` sigue sin secretos reales (gate existente).
 
 ## Phase 4: Frontend (TDD)
 
