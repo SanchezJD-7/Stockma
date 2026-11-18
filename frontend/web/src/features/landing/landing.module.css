@@ -1,25 +1,15 @@
 .page {
-  --color-bg-page: #ffffff;
-  --color-bg-deep: #f6f6f6;
-  --color-deep: #0b1b2e;
-  --color-deep-2: #12324a;
-  --color-border: #e6e6e6;
-  --color-text-primary: #0a0a0a;
-  --color-text-secondary: #555555;
+  --color-bg-page: var(--landing-bg-page);
+  --color-bg-deep: var(--landing-bg-deep);
+  --color-deep: var(--landing-deep);
+  --color-deep-2: var(--landing-deep-2);
+  --color-border: var(--landing-border);
+  --color-text-primary: var(--landing-text-primary);
+  --color-text-secondary: var(--landing-text-secondary);
 
   background: var(--color-bg-page);
   color: var(--color-text-primary);
   line-height: 1.6;
-}
-
-html[data-theme='dark'] .page {
-  --color-bg-page: #0b1320;
-  --color-bg-deep: #0f1a29;
-  --color-deep: #081120;
-  --color-deep-2: #10314a;
-  --color-border: #23303f;
-  --color-text-primary: #f2f5f9;
-  --color-text-secondary: #9fadc0;
 }
 
 .section {
@@ -60,7 +50,7 @@ html[data-theme='dark'] .page {
 
 .cardTitle {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--color-accent-strong);
@@ -68,7 +58,7 @@ html[data-theme='dark'] .page {
 
 .card p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.6;
 }
 
@@ -79,10 +69,10 @@ html[data-theme='dark'] .page {
   }
 
   .cardTitle {
-    font-size: 16px;
+    font-size: var(--fs-16);
   }
 
   .card p {
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 }

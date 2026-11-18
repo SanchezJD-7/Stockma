@@ -21,7 +21,7 @@
 
 .step h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 600;
   letter-spacing: -0.025em;
   color: var(--color-accent-strong);
@@ -29,7 +29,7 @@
 
 .step p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.6;
 }
 
@@ -42,7 +42,7 @@
   border-radius: 10px;
   background-color: var(--color-login-field-bg);
   color: var(--color-accent-strong);
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -55,10 +55,10 @@
 
 @media (max-width: 600px) {
   .step h3 {
-    font-size: 16px;
+    font-size: var(--fs-16);
   }
 
   .step p {
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 }

@@ -36,8 +36,17 @@
   --color-tint-green: rgba(46, 125, 50, 0.12);
   --color-tint-yellow: rgba(180, 83, 9, 0.12);
   --color-tint-red: rgba(180, 35, 24, 0.12);
+  --color-backdrop: rgba(15, 23, 42, 0.55);
+  --color-border-on-deep: rgba(255, 255, 255, 0.12);
+  --color-divider-on-deep: rgba(255, 255, 255, 0.08);
+  --color-text-on-deep-muted: rgba(255, 255, 255, 0.75);
   --color-shadow-sm: 0 1px 3px rgba(10, 10, 10, 0.08);
   --color-shadow-lg: 0 24px 60px rgba(8, 20, 38, 0.14);
+  --color-shadow-dialog: 0 24px 64px rgba(15, 23, 42, 0.35);
+  --color-shadow-bar: 0 -10px 30px rgba(0, 0, 0, 0.08);
+  --color-shadow-panel: 0 20px 40px rgba(0, 0, 0, 0.3);
+  --color-shadow-card-hover: 0 16px 32px rgba(0, 0, 0, 0.18);
+  --color-shadow-card-selected: 0 16px 32px rgba(0, 0, 0, 0.15);
 
   --radius-card: 10px;
   --radius-pill: 999px;
@@ -49,13 +58,33 @@
   --status-expired: #6b7280;
 
   --font-family: Inter, system-ui, sans-serif;
+  --fs-11: 11px;
   --fs-12: 12px;
   --fs-13: 13px;
   --fs-14: 14px;
+  --fs-15: 15px;
   --fs-16: 16px;
+  --fs-17: 17px;
   --fs-18: 18px;
+  --fs-20: 20px;
   --fs-22: 22px;
+  --fs-26: 26px;
   --fs-28: 28px;
+  --fs-30: 30px;
+  --fs-32: 32px;
+  --fs-display-lg: clamp(34px, 4.4vw, 56px);
+  --fs-display-md: clamp(32px, 4.5vw, 48px);
+  --fs-display-sm: clamp(28px, 4vw, 38px);
+  --fs-bar-title: clamp(20px, 2.6vw, 26px);
+  --fs-modal-title: clamp(20px, 2.4vw, 24px);
+
+  --landing-bg-page: #ffffff;
+  --landing-bg-deep: #f6f6f6;
+  --landing-deep: #0b1b2e;
+  --landing-deep-2: #12324a;
+  --landing-border: #e6e6e6;
+  --landing-text-primary: #0a0a0a;
+  --landing-text-secondary: #555555;
 }
 
 [data-theme='dark'] {
@@ -82,6 +111,14 @@
   --status-green: #6fbf73;
   --status-yellow: #e0a458;
   --status-red: #f28b82;
+
+  --landing-bg-page: #0b1320;
+  --landing-bg-deep: #0f1a29;
+  --landing-deep: #081120;
+  --landing-deep-2: #10314a;
+  --landing-border: #23303f;
+  --landing-text-primary: #f2f5f9;
+  --landing-text-secondary: #9fadc0;
 
   color-scheme: dark;
 }

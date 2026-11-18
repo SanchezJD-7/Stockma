@@ -23,7 +23,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 22px;
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 500;
   color: var(--color-text-primary);
   list-style: none;
@@ -38,7 +38,7 @@
 .summary::after {
   content: '+';
   color: var(--color-accent-strong);
-  font-size: 18px;
+  font-size: var(--fs-18);
   font-weight: 600;
   transition: transform 0.25s ease;
 }
@@ -68,13 +68,13 @@
 
 .answer p {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-15);
   line-height: 1.6;
 }
 
 @media (max-width: 600px) {
   .summary {
-    font-size: 15px;
+    font-size: var(--fs-15);
     padding: 16px 18px;
   }
 
@@ -83,6 +83,6 @@
   }
 
   .answer p {
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 }

@@ -44,7 +44,7 @@ html[data-theme='dark'] .logoDark {
   flex-wrap: wrap;
   padding-block: 12px 16px;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.5;
 }
 
