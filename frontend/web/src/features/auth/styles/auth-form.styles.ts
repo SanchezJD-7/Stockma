@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
-import { GhostButton, PrimaryButton } from '../../../styles/components/buttons'
-import { MutedText, SectionTitle } from '../../../styles/components/texts'
+import { GhostButton, PrimaryButton } from '../../../styles/components/buttons.styles'
+import { MutedText, SectionTitle } from '../../../styles/components/texts.styles'
 
 export const FormTitle = styled(SectionTitle)`
   margin: 0 calc(-1 * var(--card-padding-x));

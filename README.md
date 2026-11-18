@@ -63,4 +63,4 @@ dotnet run --project src/Stockma.Api -- bootstrap-demo
 | `frontend/web`                       | React 19 + Vite + MUI. Ver su [README](./frontend/web/README.md) |
 | `packages/contracts`                 | OpenAPI + cliente TS generado con orval (Fase 7)                 |
 | `ops/`                               | `docker-compose.yml`                                             |
-| `specs/001-inventory-foundation`     | Spec, plan, data model, contratos y tareas                       |
+| `specs/`                               | Specs por cambio (001, 002, 003): spec, contratos, design y tasks |

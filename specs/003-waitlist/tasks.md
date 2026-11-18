@@ -53,18 +53,18 @@
 
 ## Phase 4: Frontend (TDD)
 
-- [ ] 4.1 `frontend/web/src/services/waitlist-service.test.ts`: **RED** — `postJson('/api/waitlist', payload)` con payload correcto; `ApiError.errorCode` propagado (usar `mockApi` de `src/shared/http.testkit.ts`).
-- [ ] 4.2 `frontend/web/src/services/waitlist-service.ts`: **GREEN** — wrapper sobre `postJson`.
-- [ ] 4.3 `frontend/web/src/features/landing/components/WaitlistModal/WaitlistModal.test.tsx`: **RED** — render con 3 campos; spinner + `disabled` durante envío; `400` marca campos; `409` muestra mensaje puntual sin cerrar; `500` mensaje genérico conservando datos; `201` dispara `onSuccess`; Escape y clic fuera cierran; `role="dialog"` + `aria-modal`.
-- [ ] 4.4 `frontend/web/src/features/landing/components/WaitlistModal/`: **GREEN** — `.tsx` + `.module.css` + `.styles.ts` (spinner, estados de error, sin estilos inline).
-- [ ] 4.5 `WaitlistSuccessModal.test.tsx` + `WaitlistSuccessModal/`: **RED→GREEN** — modal separada de confirmación; cierre por botón/Escape/fuera.
-- [ ] 4.6 `WaitlistModalProvider.test.tsx` + `WaitlistModalProvider/`: **RED→GREEN** — transición `form → success` sólo con `201`; `close()` resetea; una modal visible a la vez.
+- [x] 4.1 `frontend/web/src/services/waitlist-service.test.ts`: **RED** — `axios.post(\`${config.API_URL}/api/waitlist\`, payload, authConfig())` con payload correcto (el interceptor de `shared/http.ts` traduce la respuesta a `ApiError.errorCode`); usar `mockApi` de `src/shared/http.testkit.ts`.
+- [x] 4.2 `frontend/web/src/services/waitlist-service.ts`: **GREEN** — clase `WaitlistService` (`export default`) que llama a `axios.post` directamente con `config.API_URL` + `authConfig()` (no usa `postJson`); inyecta `countryCode: '+57'` en un solo lugar.
+- [x] 4.3 `frontend/web/src/features/landing/components/WaitlistModal/WaitlistModal.test.tsx`: **RED** — render con 3 campos; spinner + `disabled` durante envío; `400` marca campos; `409` muestra mensaje puntual sin cerrar; `500` mensaje genérico conservando datos; `201` dispara `onSuccess`; Escape y clic fuera cierran; `role="dialog"` + `aria-modal`.
+- [x] 4.4 `frontend/web/src/features/landing/components/WaitlistModal/`: **GREEN** — `.tsx` + `.module.css` + `.styles.ts` (spinner, estados de error, sin estilos inline).
+- [x] 4.5 `WaitlistSuccessModal.test.tsx` + `WaitlistSuccessModal/`: **RED→GREEN** — modal separada de confirmación; cierre por botón/Escape/fuera.
+- [x] 4.6 `WaitlistModalProvider.test.tsx` + `WaitlistModalProvider/`: **RED→GREEN** — transición `form → success` sólo con `201`; `close()` resetea; una modal visible a la vez.
 
 ## Phase 5: Integración y gates
 
-- [ ] 5.1 `frontend/web/src/features/landing/components/{Hero,DemoSection,WaitlistSection}/`: conectar los 3 CTAs con `useOpenWaitlist().open()`; Pricing **sin cambios**.
-- [ ] 5.2 `frontend/web/src/features/landing/components/LandingPage/LandingPage.tsx`: envolver con `WaitlistModalProvider` y montar las modales.
-- [ ] 5.3 `frontend/web/src/features/landing/components/LandingPage/LandingPage.test.tsx`: **MODIFICAR** — los 3 CTAs abren el diálogo (reemplaza "CTA sin acción" y `queryByRole('dialog') === null` de 002); Pricing sigue sin acción.
-- [ ] 5.4 Mapeo `errorCode` → mensaje en pantalla (constantes de error en el componente, copy neutro sin voseo).
-- [ ] 5.5 Gates: `dotnet test Stockma.sln`, `npm run test`, `npm run typecheck`, `npm run lint`, `scripts/check-neutral-es.mjs`, `no-inline-styles.test.ts`.
-- [ ] 5.6 Documentación: actualizar `specs/003-waitlist/spec.md` criterios de aceptación y README de estructura de specs si aplica.
+- [x] 5.1 `frontend/web/src/features/landing/components/{Hero,DemoSection,WaitlistSection}/`: conectar los 3 CTAs con `useOpenWaitlist().open()`; Pricing **sin cambios**.
+- [x] 5.2 `frontend/web/src/features/landing/components/LandingPage/LandingPage.tsx`: envolver con `WaitlistModalProvider` y montar las modales.
+- [x] 5.3 `frontend/web/src/features/landing/components/LandingPage/LandingPage.test.tsx`: **MODIFICAR** — los 3 CTAs abren el diálogo (reemplaza "CTA sin acción" y `queryByRole('dialog') === null` de 002); Pricing sigue sin acción.
+- [x] 5.4 Mapeo `errorCode` → mensaje en pantalla (constantes de error en el componente, copy neutro sin voseo).
+- [x] 5.5 Gates: `dotnet test Stockma.sln`, `npm run test`, `npm run typecheck`, `npm run lint`, `scripts/check-neutral-es.mjs`, `no-inline-styles.test.ts`.
+- [x] 5.6 Documentación: actualizar `specs/003-waitlist/spec.md` criterios de aceptación y README de estructura de specs si aplica.

@@ -1,6 +1,6 @@
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { MutedText } from '../../../../styles/components/texts'
+import { MutedText } from '../../../../styles/components/texts.styles'
 import styles from './WhoItsFor.module.css'
 
 export function WhoItsFor() {

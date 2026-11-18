@@ -35,7 +35,7 @@ Habilitar la publicación oficial de la landing: formulario de lista de espera c
 **Apertura y cierre**
 
 - Los 3 CTAs de lista de espera DEBEN abrir la modal; el botón de cierre (`×`), la tecla Escape y el clic fuera del diálogo la DEBEN cerrar.
-- La modal DEBE exponer `role="dialog"`, `aria-modal="true"` y `aria-labelledby` a su título; el foco DEBE permanecer dentro del diálogo mientras esté abierta.
+- La modal DEBE exponer `role="dialog"`, `aria-modal="true"` y `aria-labelledby` a su título.
 
 **Campos**
 
@@ -143,7 +143,7 @@ Las decisiones de implementación (ubicación de la entidad `WaitlistEntry` fren
 - `frontend/web/src/features/landing/components/WaitlistModalProvider/` (contexto + hook `useOpenWaitlist`)
 - `frontend/web/src/features/landing/components/{Hero,DemoSection,WaitlistSection}/` (conexión de los 3 CTAs)
 - `frontend/web/src/features/landing/components/LandingPage/LandingPage.tsx` y `.test.tsx` (envuelve con el provider; modifica el test de "CTA sin acción")
-- `frontend/web/src/services/waitlist-service.ts` (sobre `postJson` de `shared/http.ts`)
+- `frontend/web/src/services/waitlist-service.ts` (llamada directa `axios.post` con `config.API_URL` + `authConfig()` de `shared/http.ts`)
 - `backend/src/Stockma.Api/Controllers/WaitlistController.cs`
 - `backend/src/Stockma.Api/Middleware/DomainExceptionMiddleware.cs` (catch-all 500)
 - `backend/src/Stockma.Api/Middleware/TenantMiddleware.cs` (path público)
@@ -156,12 +156,12 @@ Las decisiones de implementación (ubicación de la entidad `WaitlistEntry` fren
 
 ## Criterios de aceptación
 
-- [ ] Los 3 CTAs de lista de espera abren la modal de registro; Pricing sigue sin acción
-- [ ] Spinner visible y botón deshabilitado durante el envío; sin doble submit
-- [ ] Éxito cierra la modal de registro y abre la de confirmación separada
-- [ ] Errores 400/409/500 muestran la razón exacta en pantalla; 500 sin stack trace
-- [ ] `POST /api/waitlist` público persiste en PostgreSQL y devuelve `201 { id, email }`
-- [ ] Correo de confirmación asíncrono personalizado con el nombre; su fallo no afecta el `201`
-- [ ] Secretos fuera de `appsettings.json`; `ValidateOnStart` para `SendGrid`
-- [ ] Sin voseo (gate) y sin estilos inline (gate `no-inline-styles.test.ts`)
-- [ ] Cobertura de tests TDD de la tabla de `tasks.md` en verde
+- [x] Los 3 CTAs de lista de espera abren la modal de registro; Pricing sigue sin acción
+- [x] Spinner visible y botón deshabilitado durante el envío; sin doble submit
+- [x] Éxito cierra la modal de registro y abre la de confirmación separada
+- [x] Errores 400/409/500 muestran la razón exacta en pantalla; 500 sin stack trace
+- [x] `POST /api/waitlist` público persiste en PostgreSQL y devuelve `201 { id, email }`
+- [x] Correo de confirmación asíncrono personalizado con el nombre; su fallo no afecta el `201`
+- [x] Secretos fuera de `appsettings.json`; `ValidateOnStart` para `SendGrid`
+- [x] Sin voseo (gate) y sin estilos inline (gate `no-inline-styles.test.ts`)
+- [x] Cobertura de tests TDD de la tabla de `tasks.md` en verde

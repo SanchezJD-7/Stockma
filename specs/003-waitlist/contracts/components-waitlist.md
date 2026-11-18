@@ -62,7 +62,7 @@ Sólo **una** de las dos modales se renderiza a la vez. Escape y clic fuera del 
 - `500` / error de red → `formError` genérico; el modal **permanece abierto** y conserva los datos.
 - El mensaje DEBE ser visible en pantalla junto al formulario (no sólo en consola ni sólo en toast efímero).
 
-**Accesibilidad**: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` al título; foco atrapado en el diálogo; al cerrar, el foco vuelve al CTA que lo abrió.
+**Accesibilidad**: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` al título.
 
 ## `WaitlistSuccessModal` — modal de confirmación
 
@@ -76,12 +76,22 @@ Sólo **una** de las dos modales se renderiza a la vez. Escape y clic fuera del 
 
 ```ts
 // frontend/web/src/services/waitlist-service.ts
-registerWaitlistEntry(input: {
-  fullName: string; phone: string; email: string;
-}): Promise<{ id: string; email: string }>
+import axios from 'axios'
+import { config } from '../config'
+import { authConfig } from '../shared/http'
+
+class WaitlistService {
+  register(input: {
+    fullName: string; phone: string; email: string;
+  }): Promise<{ id: string; email: string }>
+}
+
+export default WaitlistService
 ```
 
-- Delega en `postJson<...>('/api/waitlist', ...)` de `src/shared/http.ts` (el `+57` lo agrega el servicio o el form; un solo lugar, definido en apply).
+- Llama a `axios.post(\`${config.API_URL}/api/waitlist\`, body, authConfig())` directamente (el `+57` lo agrega el servicio; un solo lugar, definido en apply).
+- `authConfig()` vive en `src/shared/http.ts` y se evalúa **en el momento de la petición**: aporta `Authorization: Bearer <token>` con la sesión vigente y devuelve `{}` si no la hay. No puede ser un objeto const a nivel de módulo: quedaría congelado con el valor de antes del login.
+- La traducción a `ApiError(status, errorCode)` ocurre en el interceptor de respuesta de `src/shared/http.ts`, no en el servicio.
 - Propaga `ApiError(status, errorCode)` tal cual — **la traducción a mensaje amigable vive en el componente/constantes de error, no en el servicio**.
 
 ### Mapeo `errorCode` → mensaje

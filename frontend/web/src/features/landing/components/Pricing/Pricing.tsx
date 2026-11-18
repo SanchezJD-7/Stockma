@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { PrimaryButton, SecondaryButton } from '../../../../styles/components/buttons'
+import { PrimaryButton, SecondaryButton } from '../../../../styles/components/buttons.styles'
 import styles from './Pricing.module.css'
 
 interface PlanCard {

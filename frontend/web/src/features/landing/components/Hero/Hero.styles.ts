@@ -1,11 +1,11 @@
 import styled from '@emotion/styled'
-import { MutedText, PageTitle } from '../../../../styles/components/texts'
+import { MutedText, PageTitle } from '../../../../styles/components/texts.styles'
 
 export const HeroTitle = styled(PageTitle)`
   margin: 0;
   max-width: 620px;
   font-family: var(--font-family);
-  font-size: clamp(34px, 4.4vw, 56px);
+  font-size: var(--fs-display-lg);
   font-weight: 600;
   line-height: 1.06;
   letter-spacing: -0.025em;
@@ -19,14 +19,14 @@ export const HeroTitle = styled(PageTitle)`
   }
 
   @media (max-width: 600px) {
-    font-size: 30px;
+    font-size: var(--fs-30);
   }
 `
 
 export const HeroBody = styled(MutedText)`
   max-width: 520px;
   margin: 0;
-  font-size: 17px;
+  font-size: var(--fs-17);
   line-height: 1.65;
 
   @media (max-width: 900px) {
@@ -34,6 +34,6 @@ export const HeroBody = styled(MutedText)`
   }
 
   @media (max-width: 600px) {
-    font-size: 16px;
+    font-size: var(--fs-16);
   }
 `

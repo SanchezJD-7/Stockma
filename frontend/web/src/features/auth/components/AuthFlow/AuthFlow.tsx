@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { MutedText, PageTitle } from '../../../../styles/components/texts'
+import { MutedText, PageTitle } from '../../../../styles/components/texts.styles'
 import { AuthLayout } from '../AuthLayout/AuthLayout'
 import { SessionScreen } from './AuthFlow.styles'
 import { useAuthStore } from '../../store/auth-store'
