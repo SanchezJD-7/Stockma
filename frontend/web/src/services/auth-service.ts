@@ -1,4 +1,6 @@
-import { postJson } from '../shared/http'
+import axios from 'axios'
+import { config } from '../config'
+import { authConfig } from '../shared/http'
 
 export interface LoginRequest {
   email: string
@@ -38,9 +40,13 @@ interface LoginResponseBody {
   requiresDeviceConfirmation?: boolean
 }
 
-export class AuthService {
+class AuthService {
   async login(request: LoginRequest): Promise<LoginResult> {
-    const data = await postJson<LoginResponseBody>('/api/auth/login', request)
+    const { data } = await axios.post<LoginResponseBody>(
+      `${config.API_URL}/api/auth/login`,
+      request,
+      authConfig(),
+    )
 
     if (data.requiresDeviceConfirmation) {
       return { kind: 'requires-confirmation' }
@@ -56,14 +62,28 @@ export class AuthService {
   }
 
   async confirmDevice(request: ConfirmDeviceRequest): Promise<ConfirmDeviceResult> {
-    return postJson<ConfirmDeviceResult>('/api/auth/confirm-device', request)
+    const { data } = await axios.post<ConfirmDeviceResult>(
+      `${config.API_URL}/api/auth/confirm-device`,
+      request,
+      authConfig(),
+    )
+
+    return data
   }
 
   async refresh(request: RefreshRequest): Promise<RefreshResult> {
-    return postJson<RefreshResult>('/api/auth/refresh', request)
+    const { data } = await axios.post<RefreshResult>(
+      `${config.API_URL}/api/auth/refresh`,
+      request,
+      authConfig(),
+    )
+
+    return data
   }
 
   async logout(): Promise<void> {
-    await postJson<void>('/api/auth/logout')
+    await axios.post(`${config.API_URL}/api/auth/logout`, undefined, authConfig())
   }
 }
+
+export default AuthService

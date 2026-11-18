@@ -1,7 +1,7 @@
-import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import { useRef, useState, type FormEvent } from 'react'
-import { AuthService } from '../../../../services/auth-service'
+import AuthService from '../../../../services/auth-service'
+import { FormAlert } from '../../../../styles/components/FormAlert'
 import { FormBody, FormTitle, SubmitButton } from '../../styles/auth-form.styles'
 import { useFlashError } from '../../hooks/useFlashError'
 import { authErrorMessage } from '../../utils/auth-error-message'
@@ -74,7 +74,7 @@ export function LoginPage({
           onChange={(event) => setPassword(event.target.value)}
           fullWidth
         />
-        {error && <Alert severity='error'>{error}</Alert>}
+        {error && <FormAlert>{error}</FormAlert>}
         <SubmitButton type='submit' disabled={submitting}>
           {submitting ? 'Ingresando…' : 'Ingresar'}
         </SubmitButton>
