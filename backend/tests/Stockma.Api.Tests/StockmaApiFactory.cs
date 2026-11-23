@@ -48,6 +48,7 @@ public sealed class StockmaApiFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["Jwt:Issuer"] = "stockma-api",
                 ["Jwt:Audience"] = "stockma-web",
                 ["Jwt:ExpiresMinutes"] = "15",
+                [CorsConfigurationCheck.SectionName + ":0"] = "https://test.local",
             });
         });
     }

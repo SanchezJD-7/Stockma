@@ -68,6 +68,14 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
         act.Should().NotThrow();
     }
 
+    [Fact]
+    public void OutsideDevelopment_WithoutCorsOrigins_FailsAtStartup()
+    {
+        using var app = With("Production", (CorsConfigurationCheck.SectionName + ":0", ""));
+
+        ShouldFailAtStartup(app, "Cors:AllowedOrigins");
+    }
+
     [Theory]
     [InlineData("Development")]
     [InlineData("Production")]
@@ -139,39 +147,39 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
     }
 
     [Fact]
-    public void TheBaseAppSettings_CarryNoSendGridSecrets()
+    public void TheBaseAppSettings_CarryNoBrevoSecrets()
     {
         var baseSettings = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false)
             .Build();
 
-        var sendGrid = baseSettings.GetSection("SendGrid");
-        sendGrid.Exists().Should().BeTrue("la sección SendGrid está cableada en la configuración base");
-        sendGrid["ApiKey"].Should()
+        var brevo = baseSettings.GetSection("Brevo");
+        brevo.Exists().Should().BeTrue("la sección Brevo está cableada en la configuración base");
+        brevo["ApiKey"].Should()
             .BeNullOrEmpty("las credenciales van en user-secrets o variables de entorno, nunca en el repositorio");
-        sendGrid["TemplateId"].Should()
-            .BeNullOrEmpty("el ID de la plantilla se configura por entorno, no se versiona");
-        sendGrid["FromEmail"].Should().BeNullOrEmpty("el remitente se configura por entorno, no se versiona");
-        sendGrid["FromName"].Should().BeNullOrEmpty("el nombre del remitente se configura por entorno, no se versiona");
+        brevo["TemplateId"].Should()
+            .Be("0", "el ID de la plantilla se configura por entorno; 0 significa sin definir");
+        brevo["FromEmail"].Should().BeNullOrEmpty("el remitente se configura por entorno, no se versiona");
+        brevo["FromName"].Should().BeNullOrEmpty("el nombre del remitente se configura por entorno, no se versiona");
     }
 
     [Theory]
     [InlineData("Production")]
     [InlineData("Staging")]
-    public void OutsideDevelopment_AMissingSendGridApiKey_FailsAtStartup(string environment)
+    public void OutsideDevelopment_AMissingBrevoApiKey_FailsAtStartup(string environment)
     {
         using var app = factory.WithWebHostBuilder(builder => builder
             .UseEnvironment(environment)
             .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
 
-        ShouldFailAtStartup(app, "SendGrid:ApiKey");
+        ShouldFailAtStartup(app, "Brevo:ApiKey");
     }
 
     [Theory]
-    [InlineData("SG.test-key", "", "hola@stockma.app", "SendGrid:TemplateId")]
-    [InlineData("SG.test-key", "d-abc123", "", "SendGrid:FromEmail")]
-    public void OutsideDevelopment_AMissingSendGridSetting_FailsAtStartup(
+    [InlineData("xkeysib-test", "0", "hola@stockma.app", "Brevo:TemplateId")]
+    [InlineData("xkeysib-test", "27", "", "Brevo:FromEmail")]
+    public void OutsideDevelopment_AMissingBrevoSetting_FailsAtStartup(
         string apiKey,
         string templateId,
         string fromEmail,
@@ -182,9 +190,9 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["SendGrid:ApiKey"] = apiKey,
-                    ["SendGrid:TemplateId"] = templateId,
-                    ["SendGrid:FromEmail"] = fromEmail,
+                    ["Brevo:ApiKey"] = apiKey,
+                    ["Brevo:TemplateId"] = templateId,
+                    ["Brevo:FromEmail"] = fromEmail,
                 }))
             .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
 
@@ -192,7 +200,7 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
     }
 
     [Fact]
-    public void InDevelopment_WithoutSendGridConfiguration_TheApiStarts()
+    public void InDevelopment_WithoutBrevoConfiguration_TheApiStarts()
     {
         using var app = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
 
@@ -202,16 +210,16 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
     }
 
     [Fact]
-    public void Development_WithSendGridConfigured_ResolvesTheSendGridEmailSender()
+    public void Development_WithBrevoConfigured_ResolvesTheBrevoEmailSender()
     {
         using var app = factory.WithWebHostBuilder(builder => builder
             .UseEnvironment("Development")
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["SendGrid:ApiKey"] = "SG.test-key",
-                    ["SendGrid:TemplateId"] = "d-abc123",
-                    ["SendGrid:FromEmail"] = "hola@stockma.app",
+                    ["Brevo:ApiKey"] = "xkeysib-test",
+                    ["Brevo:TemplateId"] = "27",
+                    ["Brevo:FromEmail"] = "hola@stockma.app",
                 })));
 
         using var scope = app.Services.CreateScope();

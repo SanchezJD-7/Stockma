@@ -263,10 +263,14 @@ public class TenantMiddlewareTests
                     "/api/auth/forgot-password",
                     "/api/auth/reset-password",
                     "/api/waitlist",
+                    "/health",
                 ],
                 "T055a: agregar una ruta aca amplia la superficie sin autenticar. "
                 + "T069 agrega forgot/reset-password: el email resuelve el tenant, no hay header. "
                 + "Ambos responden uniforme (202/401) y corren bajo el rate limit de Auth. "
-                + "Spec 003 agrega /api/waitlist: registro público sin cuenta ni tenant (201/409/400)");
+                + "Spec 003 agrega /api/waitlist: registro público sin cuenta ni tenant (201/409/400). "
+                + "/health es un probe de infraestructura fuera de /api/ para el keep-alive de UptimeRobot "
+                + "(Render free se apaga a los 15 min): responde solo {status, utc}, no toca la BD "
+                + "ni expone datos de negocio o de tenant, y el monitor hace un GET literal sin headers.");
     }
 }

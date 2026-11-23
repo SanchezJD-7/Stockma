@@ -17,6 +17,7 @@ public sealed class TenantMiddleware(RequestDelegate next)
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/waitlist",
+            "/health",
         };
 
     public async Task InvokeAsync(HttpContext httpContext, ITenantContext tenantContext)
