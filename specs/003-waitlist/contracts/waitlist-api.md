@@ -152,10 +152,10 @@ Location: /api/waitlist/3b8d1f60-2c14-4a9e-8f77-0a5b3e2d9c41
 **Correo sintácticamente válido pero inexistente**
 - **DADO** `email: "n0existe@dominioinexistente.com"` bien formado
 - **CUANDO** se procesa
-- **ENTONCES** responde `201` y persiste (no se verifica buzón); el rebote lo gestiona SendGrid con sus supresiones, fuera de alcance
+- **ENTONCES** responde `201` y persiste (no se verifica buzón); el rebote lo gestiona Brevo con sus supresiones, fuera de alcance
 
-**Fallo de SendGrid**
-- **DADO** el registro persistido correctamente y la API de SendGrid no disponible
+**Fallo de Brevo**
+- **DADO** el registro persistido correctamente y la API de Brevo no disponible
 - **CUANDO** se intenta el envío asíncrono
 - **ENTONCES** la respuesta al cliente sigue siendo `201` y el fallo queda en el log
 
@@ -179,10 +179,10 @@ Location: /api/waitlist/3b8d1f60-2c14-4a9e-8f77-0a5b3e2d9c41
 | Errores claros en pantalla | 400 / 409 / 500 con `errorCode` + mapa de campos |
 | Registro duplicado | 409 sobre índice único del correo normalizado |
 | Interceptor global | Sección "Manejo de errores global" |
-| Secretos | Fuera de este contrato — `SendGrid:ApiKey` vía User Secrets / env var `SendGrid__ApiKey` |
+| Secretos | Fuera de este contrato — `Brevo:ApiKey` vía User Secrets / env var `Brevo__ApiKey` |
 
 ## Fuera de alcance
 
 - `GET /api/waitlist` (admin de la lista), `DELETE`, exportación.
 - Deduplicación/merge de registros y verificación de buzón.
-- Webhooks/Event Webhook de SendGrid.
+- Webhooks/Event Webhook de Brevo.

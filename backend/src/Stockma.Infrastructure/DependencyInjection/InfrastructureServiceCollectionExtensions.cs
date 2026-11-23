@@ -136,7 +136,7 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddSendGridEmailSender(
+    public static IServiceCollection AddBrevoEmailSender(
         this IServiceCollection services,
         IConfiguration configuration,
         bool isDevelopment)
@@ -147,7 +147,7 @@ public static class InfrastructureServiceCollectionExtensions
             .Validate(
                 options => isDevelopment || !string.IsNullOrWhiteSpace(options.ApiKey), EmailOptions.MissingApiKeyMessage)
             .Validate(
-                options => isDevelopment || !string.IsNullOrWhiteSpace(options.TemplateId), EmailOptions.MissingTemplateIdMessage)
+                options => isDevelopment || options.TemplateId > 0, EmailOptions.MissingTemplateIdMessage)
             .Validate(
                 options => isDevelopment || !string.IsNullOrWhiteSpace(options.FromEmail), EmailOptions.MissingFromEmailMessage)
             .ValidateOnStart();

@@ -56,7 +56,7 @@ CTA (Hero|Demo|WaitlistSection)
                           ├─→ Handler: valida → IWaitlistRepository.SaveAsync (Postgres, índice único lower(email))
                           ├─→ IEmailQueue.Enqueue (post-commit)
                           └─→ 201 {id,email} ──→ Provider (fase: success) ──→ WaitlistSuccessModal
-BackgroundService ──→ IEmailQueue ──→ IEmailSender (SendGrid) ──→ correo con nombre ──→ fallo: log, nada más
+BackgroundService ──→ IEmailQueue ──→ IEmailSender (Brevo) ──→ correo con nombre ──→ fallo: log, nada más
 
 errores: ModelState / DomainException / Exception
   └─→ DomainExceptionMiddleware ──→ problem+json {errorCode} ──→ WaitlistModal muestra mensaje puntual
@@ -74,9 +74,9 @@ errores: ModelState / DomainException / Exception
 | `Stockma.Api/Middleware/TenantMiddleware.cs` | Modify | `/api/waitlist` en `UnauthenticatedPaths` |
 | `Stockma.Api/Program.cs` | Modify | Registrar `IEmailQueue` + `BackgroundService` |
 | `Stockma.Infrastructure/Waitlist/WaitlistRepository.cs` | Create | 23505 → excepción de dominio |
-| `Stockma.Infrastructure/Email/{EmailSender,EmailOptions,EmailQueue,EmailBackgroundService}.cs` | Create | SendGrid + `ValidateOnStart` (patrón `SmsOptions`) |
+| `Stockma.Infrastructure/Email/{EmailSender,EmailOptions,EmailQueue,EmailBackgroundService}.cs` | Create | Brevo + `ValidateOnStart` (patrón `SmsOptions`) |
 | `Stockma.Infrastructure/Persistence/Configurations/WaitlistEntryConfiguration.cs` + `Migrations/*_AddWaitlistEntries.cs` | Create | Tabla + índice único `lower(email)`; sin RLS |
-| `Stockma.Api/appsettings.json` | Modify | Sección `SendGrid` vacía (gate de secretos) |
+| `Stockma.Api/appsettings.json` | Modify | Sección `Brevo` vacía (gate de secretos) |
 | `frontend .../components/{WaitlistModal,WaitlistSuccessModal,WaitlistModalProvider}/` | Create | Modales + contexto (`.module.css`, `.styles.ts`) |
 | `frontend .../services/waitlist-service.ts` | Create | Wrapper de `postJson` |
 | `frontend .../components/{Hero,DemoSection,WaitlistSection,LandingPage}/` | Modify | Conexión de CTAs + test modificado |
@@ -107,11 +107,11 @@ Detalle y orden (rojo→verde): `tasks.md` fases 1-5.
 ## Migración / Rollout
 
 1. `dotnet ef database update --project src/Stockma.Infrastructure --startup-project src/Stockma.Infrastructure` (manual, patrón del repo).
-2. Secrets **antes** de desplegar: `SendGrid__ApiKey` (env) + remitente verificado — `ValidateOnStart` bloquea el arranque si faltan, consistente con `Jwt`/`Sms`.
+2. Secrets **antes** de desplegar: `Brevo__ApiKey` (env) + remitente verificado — `ValidateOnStart` bloquea el arranque si faltan, consistente con `Jwt`/`Sms`.
 3. Sin feature flag: los CTAs ya están visibles desde la 002; el PR-4 los conecta.
 4. Rollback: revert de los 4 PRs; la tabla nueva no estorba a versiones anteriores.
 
 ## Preguntas abiertas
 
 - [ ] Deploy real de la landing: ¿comparte origen con la API? (define si aplica CORS — Decisión 5)
-- [ ] `EmailOptions`: ¿plantilla SendGrid (TemplateId) o HTML embebido en el backend? Recomendación: HTML embebido por simplicidad en 003.
+- [ ] `EmailOptions`: ¿plantilla Brevo (TemplateId) o HTML embebido en el backend? Recomendación: HTML embebido por simplicidad en 003.

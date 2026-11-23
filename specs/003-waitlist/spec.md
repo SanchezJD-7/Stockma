@@ -4,7 +4,7 @@
 
 ## Objetivo
 
-Habilitar la publicación oficial de la landing: formulario de lista de espera con persistencia en PostgreSQL, manejo de errores global con razón exacta en pantalla y correo de confirmación asíncrono vía SendGrid.
+Habilitar la publicación oficial de la landing: formulario de lista de espera con persistencia en PostgreSQL, manejo de errores global con razón exacta en pantalla y correo de confirmación asíncrono vía Brevo.
 
 ## Contexto
 
@@ -20,13 +20,13 @@ Habilitar la publicación oficial de la landing: formulario de lista de espera c
 - Campos: nombre completo, teléfono móvil con prefijo fijo `+57`, correo electrónico.
 - Spinner en el botón durante el envío; en éxito se cierra la modal de registro y abre una **modal de confirmación separada**.
 - Endpoint público `POST /api/waitlist` con persistencia en PostgreSQL y errores `application/problem+json` con `errorCode` (400 / 409 / 500 catch-all).
-- Correo de confirmación asíncrono personalizado con el nombre del usuario (SendGrid); su fallo **nunca** falla el registro.
+- Correo de confirmación asíncrono personalizado con el nombre del usuario (Brevo); su fallo **nunca** falla el registro.
 - Secretos de entorno: User Secrets en dev, variables de entorno en prod, `appsettings.json` sin valores reales.
 
 ## Fuera de alcance
 
 - CORS (en dev lo resuelve el proxy de Vite; evaluar en design si la landing publicada comparte origen).
-- Verificación de existencia de buzón, doble opt-in, webhooks/Event Webhook y panel de supresiones de SendGrid.
+- Verificación de existencia de buzón, doble opt-in, webhooks/Event Webhook y panel de supresiones de Brevo.
 - Modal de login, CTAs de Pricing, administración de la lista (visualización/exportación), deduplicación de registros.
 - Migración automática de esquema al arrancar (se aplica con `dotnet ef database update`, como el resto).
 
@@ -111,19 +111,19 @@ Contrato detallado en `contracts/waitlist-api.md`. Resumen:
 - GIVEN un correo bien formado cuyo buzón no existe (ej. typo en el dominio)
 - WHEN se envía el formulario
 - THEN la API responde `201` y el registro se persiste (no se verifica existencia de buzón)
-- AND el rebote posterior lo gestiona SendGrid con sus listas de supresión, fuera del alcance de esta spec
+- AND el rebote posterior lo gestiona Brevo con sus listas de supresión, fuera del alcance de esta spec
 
 ## Persistencia y correo de confirmación
 
 - El registro DEBE persistirse en PostgreSQL **antes** de encolar el envío del correo.
 - El correo DEBE ser personalizado con el nombre del usuario y enviarse de forma asíncrona.
-- Un fallo de envío (API de SendGrid caída, remitente no verificado, rebote) DEBE loguearse y **NO** alterar la respuesta `201` ni el registro persistido.
-- Las credenciales NO DEBEN figurar en `appsettings.json`; se leen de User Secrets (`user-secrets set "SendGrid:ApiKey" ...`) o variables de entorno (`SendGrid__ApiKey`) y DEBEN validarse al iniciar (`ValidateOnStart`, patrón de `JwtOptions`/`SmsOptions`).
+- Un fallo de envío (API de Brevo caída, remitente no verificado, rebote) DEBE loguearse y **NO** alterar la respuesta `201` ni el registro persistido.
+- Las credenciales NO DEBEN figurar en `appsettings.json`; se leen de User Secrets (`user-secrets set "Brevo:ApiKey" ...`) o variables de entorno (`Brevo__ApiKey`) y DEBEN validarse al iniciar (`ValidateOnStart`, patrón de `JwtOptions`/`SmsOptions`).
 
-#### Scenario: SendGrid no disponible
+#### Scenario: Brevo no disponible
 
 - GIVEN el registro persistido correctamente
-- WHEN la llamada a SendGrid falla
+- WHEN la llamada a Brevo falla
 - THEN la respuesta al cliente sigue siendo `201` con la modal de confirmación
 - AND el fallo queda registrado en el log
 
@@ -149,10 +149,10 @@ Las decisiones de implementación (ubicación de la entidad `WaitlistEntry` fren
 - `backend/src/Stockma.Api/Middleware/TenantMiddleware.cs` (path público)
 - `backend/src/Stockma.Application/Waitlist/` (comando, handler, DTO, puerto de repositorio, puerto `IEmailSender`)
 - `backend/src/Stockma.Domain/Entities/WaitlistEntry.cs`
-- `backend/src/Stockma.Infrastructure/Waitlist/` (repositorio, `EmailSender` SendGrid, opciones)
+- `backend/src/Stockma.Infrastructure/Waitlist/` (repositorio, `EmailSender` Brevo, opciones)
 - `backend/src/Stockma.Infrastructure/Persistence/Configurations/` + `Migrations/` (tabla e índice único de correo)
-- `backend/src/Stockma.Api/appsettings.json` (sección `SendGrid` sin valores) + User Secrets
-- Tests: `Stockma.Domain.Tests/WaitlistEntryTests.cs`, `Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`, `Stockma.Api.Tests/WaitlistEndpointsTests.cs`, `Stockma.Infrastructure.Tests/{WaitlistRepositoryTests,SendGridEmailSenderTests}.cs`, `frontend .../WaitlistModal.test.tsx`, `WaitlistSuccessModal.test.tsx`, `waitlist-service.test.ts`
+- `backend/src/Stockma.Api/appsettings.json` (sección `Brevo` sin valores) + User Secrets
+- Tests: `Stockma.Domain.Tests/WaitlistEntryTests.cs`, `Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`, `Stockma.Api.Tests/WaitlistEndpointsTests.cs`, `Stockma.Infrastructure.Tests/{WaitlistRepositoryTests,BrevoEmailSenderTests}.cs`, `frontend .../WaitlistModal.test.tsx`, `WaitlistSuccessModal.test.tsx`, `waitlist-service.test.ts`
 
 ## Criterios de aceptación
 
@@ -162,6 +162,6 @@ Las decisiones de implementación (ubicación de la entidad `WaitlistEntry` fren
 - [x] Errores 400/409/500 muestran la razón exacta en pantalla; 500 sin stack trace
 - [x] `POST /api/waitlist` público persiste en PostgreSQL y devuelve `201 { id, email }`
 - [x] Correo de confirmación asíncrono personalizado con el nombre; su fallo no afecta el `201`
-- [x] Secretos fuera de `appsettings.json`; `ValidateOnStart` para `SendGrid`
+- [x] Secretos fuera de `appsettings.json`; `ValidateOnStart` para `Brevo`
 - [x] Sin voseo (gate) y sin estilos inline (gate `no-inline-styles.test.ts`)
 - [x] Cobertura de tests TDD de la tabla de `tasks.md` en verde

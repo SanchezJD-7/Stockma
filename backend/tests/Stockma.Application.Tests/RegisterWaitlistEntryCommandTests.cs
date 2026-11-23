@@ -44,7 +44,7 @@ public class RegisterWaitlistEntryCommandTests
         emailQueue.Messages[0].Should()
             .Be(
                 new EmailMessage("juan@ejemplo.com", "Juan Pérez"),
-                "el mensaje sólo lleva destinatario y nombre: el contenido lo aporta la dynamic template de SendGrid");
+                "el mensaje sólo lleva destinatario y nombre: el contenido lo aporta la plantilla de Brevo");
     }
 
     [Fact]

@@ -126,7 +126,7 @@ public class EmailBackgroundServiceTests
             if (FailuresRemaining > 0)
             {
                 FailuresRemaining--;
-                throw new EmailDeliveryException("SendGrid respondió 503 ServiceUnavailable");
+                throw new EmailDeliveryException("Brevo respondió 503 ServiceUnavailable");
             }
 
             Sent.Add(message);

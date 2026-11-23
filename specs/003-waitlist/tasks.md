@@ -21,7 +21,7 @@
 |---|---|---|
 | PR-1 | Dominio + aplicación (TDD) | Entidad, comando/handler, DTOs, puertos, tests rojo→verde |
 | PR-2 | API + interceptor + persistencia | Controller, catch-all, allowlist de tenant, repository + migración, tests de endpoint |
-| PR-3 | Email SendGrid + secretos | `IEmailSender`, opciones, `ValidateOnStart`, tests de sender y de "fallo no letal" |
+| PR-3 | Email Brevo + secretos | `IEmailSender`, opciones, `ValidateOnStart`, tests de sender y de "fallo no letal" |
 | PR-4 | Frontend (TDD) | Servicio, provider, 2 modales, tests; conexión de CTAs y test modificado de LandingPage |
 
 ## Phase 1: Dominio y aplicación (TDD)
@@ -43,12 +43,12 @@
 - [x] 2.7 `backend/src/Stockma.Infrastructure/Waitlist/WaitlistRepository.cs` + `Persistence/Configurations/WaitlistEntryConfiguration.cs`: **GREEN** — traducción 23505 y configuración.
 - [x] 2.8 `backend/src/Stockma.Infrastructure/Persistence/Migrations/`: generar migración `AddWaitlistEntries` (índice único sobre `lower(Email)`); verificar `dotnet ef database update`.
 
-## Phase 3: Email SendGrid y secretos (TDD)
+## Phase 3: Email Brevo y secretos (TDD)
 
-- [x] 3.1 `backend/tests/Stockma.Infrastructure.Tests/SendGridEmailSenderTests.cs`: **RED** — envía con `template_id` + `dynamic_template_data` (nombre del usuario); **el contenido vive EXCLUSIVAMENTE en la dynamic template del usuario en SendGrid — cero HTML en el código**; API que falla lanza error de envío (no de dominio); sin API key o sin TemplateId → error de configuración claro.
-- [x] 3.2 `backend/src/Stockma.Infrastructure/Email/`: **GREEN** — `EmailSender` + `EmailOptions` (SendGrid: ApiKey, FromEmail, FromName, **TemplateId obligatorio** — el de la plantilla que el usuario ya tiene en su cuenta —) con `AddHttpClient` y registro condicional siguiendo `AddSmsSender`.
-- [x] 3.3 `backend/src/Stockma.Api/appsettings.json`: sección `SendGrid` **sin valores**; `user-secrets set "SendGrid:ApiKey" ...` en dev; env var `SendGrid__ApiKey` en prod; `ValidateOnStart`.
-- [x] 3.4 `backend/tests/Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`: **ampliar** — el handler encola SOLO destinatario + nombre (`EmailMessage` se achica: se eliminan Subject/HtmlBody, el contenido lo aporta la plantilla de SendGrid) después de persistir; un fallo al encolar/enviar deja el `201` intacto y sólo loguea.
+- [x] 3.1 `backend/tests/Stockma.Infrastructure.Tests/BrevoEmailSenderTests.cs`: **RED** — envía con `templateId` (número) + `params.Name`; **el contenido vive EXCLUSIVAMENTE en la plantilla transaccional de la cuenta de Brevo — cero HTML en el código**; API que falla lanza error de envío (no de dominio); sin API key o sin TemplateId → error de configuración claro.
+- [x] 3.2 `backend/src/Stockma.Infrastructure/Email/`: **GREEN** — `EmailSender` + `EmailOptions` (Brevo: ApiKey, FromEmail, FromName, **TemplateId obligatorio** — el de la plantilla que el usuario ya tiene en su cuenta —) con `AddHttpClient` y registro condicional siguiendo `AddSmsSender`.
+- [x] 3.3 `backend/src/Stockma.Api/appsettings.json`: sección `Brevo` **sin valores**; `user-secrets set "Brevo:ApiKey" ...` en dev; env var `Brevo__ApiKey` en prod; `ValidateOnStart`.
+- [x] 3.4 `backend/tests/Stockma.Application.Tests/RegisterWaitlistEntryCommandTests.cs`: **ampliar** — el handler encola SOLO destinatario + nombre (`EmailMessage` se achica: se eliminan Subject/HtmlBody, el contenido lo aporta la plantilla de Brevo) después de persistir; un fallo al encolar/enviar deja el `201` intacto y sólo loguea.
 - [x] 3.5 `backend/tests/Stockma.Api.Tests/StartupValidationTests.cs`: verificar que `appsettings.json` sigue sin secretos reales (gate existente).
 
 ## Phase 4: Frontend (TDD)

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -10,7 +9,8 @@ namespace Stockma.Infrastructure.Email;
 
 public sealed class EmailSender : IEmailSender
 {
-    private const string MailEndpoint = "https://api.sendgrid.com/v3/mail/send";
+    private const string MailEndpoint = "https://api.brevo.com/v3/smtp/email";
+    private const string ApiKeyHeaderName = "api-key";
     private const int MaximumDetailLength = 300;
     private readonly HttpClient httpClient;
     private readonly EmailOptions options;
@@ -39,11 +39,11 @@ public sealed class EmailSender : IEmailSender
         }
         catch (HttpRequestException exception)
         {
-            throw new EmailDeliveryException($"SendGrid no pudo ser contactado: {exception.Message}", exception);
+            throw new EmailDeliveryException($"Brevo no pudo ser contactado: {exception.Message}", exception);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new EmailDeliveryException($"SendGrid no respondió a tiempo: {exception.Message}", exception);
+            throw new EmailDeliveryException($"Brevo no respondió a tiempo: {exception.Message}", exception);
         }
 
         logger.LogInformation(
@@ -59,7 +59,7 @@ public sealed class EmailSender : IEmailSender
             throw new InvalidOperationException(EmailOptions.MissingApiKeyMessage);
         }
 
-        if (string.IsNullOrWhiteSpace(options.TemplateId))
+        if (options.TemplateId <= 0)
         {
             throw new InvalidOperationException(EmailOptions.MissingTemplateIdMessage);
         }
@@ -69,29 +69,23 @@ public sealed class EmailSender : IEmailSender
     {
         var request = new HttpRequestMessage(HttpMethod.Post, MailEndpoint)
         {
-            Content = JsonContent.Create(new SendGridMailRequest
+            Content = JsonContent.Create(new BrevoMailRequest
             {
-                Personalization =
-                [
-                    new SendGridPersonalization
-                    {
-                        To = [new SendGridRecipient { Email = message.ToEmail, Name = message.ToName }],
-                        DynamicTemplateData = new Dictionary<string, string> { ["Name"] = message.ToName },
-                    },
-                ],
-                From = new SendGridRecipient { Email = options.FromEmail, Name = options.FromName },
+                To = [new BrevoRecipient { Email = message.ToEmail, Name = message.ToName }],
+                Sender = new BrevoRecipient { Email = options.FromEmail, Name = options.FromName },
                 TemplateId = options.TemplateId,
+                Params = new Dictionary<string, string> { ["Name"] = message.ToName },
             }),
         };
 
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        request.Headers.Add(ApiKeyHeaderName, options.ApiKey);
 
         return request;
     }
 
     private static string Describe(HttpStatusCode statusCode, string body)
     {
-        var detail = $"SendGrid respondió {(int)statusCode} {statusCode}";
+        var detail = $"Brevo respondió {(int)statusCode} {statusCode}";
 
         if (string.IsNullOrWhiteSpace(body))
         {
@@ -103,28 +97,22 @@ public sealed class EmailSender : IEmailSender
         return $"{detail}: {(trimmed.Length > MaximumDetailLength ? trimmed[..MaximumDetailLength] : trimmed)}";
     }
 
-    private sealed class SendGridMailRequest
+    private sealed class BrevoMailRequest
     {
-        [JsonPropertyName("personalization")]
-        public required SendGridPersonalization[] Personalization { get; init; }
+        [JsonPropertyName("sender")]
+        public required BrevoRecipient Sender { get; init; }
 
-        [JsonPropertyName("from")]
-        public required SendGridRecipient From { get; init; }
-
-        [JsonPropertyName("template_id")]
-        public required string TemplateId { get; init; }
-    }
-
-    private sealed class SendGridPersonalization
-    {
         [JsonPropertyName("to")]
-        public required SendGridRecipient[] To { get; init; }
+        public required BrevoRecipient[] To { get; init; }
 
-        [JsonPropertyName("dynamic_template_data")]
-        public required Dictionary<string, string> DynamicTemplateData { get; init; }
+        [JsonPropertyName("templateId")]
+        public required int TemplateId { get; init; }
+
+        [JsonPropertyName("params")]
+        public required Dictionary<string, string> Params { get; init; }
     }
 
-    private sealed class SendGridRecipient
+    private sealed class BrevoRecipient
     {
         [JsonPropertyName("email")]
         public required string Email { get; init; }

@@ -14,7 +14,7 @@ namespace Stockma.Api.Tests;
 
 public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixture<StockmaApiFactory>
 {
-    private static IWebHostBuilder WithoutSendGridValidation(IWebHostBuilder builder) =>
+    private static IWebHostBuilder WithoutBrevoValidation(IWebHostBuilder builder) =>
         builder.ConfigureTestServices(services => services.RemoveAll<IValidateOptions<EmailOptions>>());
 
     [Fact]
@@ -31,7 +31,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     public void OutsideDevelopment_WithoutARealProvider_FailsAtStartup(string environment)
     {
         using var app = factory.WithWebHostBuilder(builder =>
-            WithoutSendGridValidation(builder.UseEnvironment(environment)));
+            WithoutBrevoValidation(builder.UseEnvironment(environment)));
 
         var act = () => app.CreateClient();
 
@@ -45,7 +45,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     [InlineData("Staging")]
     public void OutsideDevelopment_WithTheConsoleProvider_FailsAtStartup(string environment)
     {
-        using var app = factory.WithWebHostBuilder(builder => WithoutSendGridValidation(builder
+        using var app = factory.WithWebHostBuilder(builder => WithoutBrevoValidation(builder
             .UseEnvironment(environment)
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["Sms:Provider"] = "console" }))));
@@ -67,7 +67,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
         string sender,
         string missingSetting)
     {
-        using var app = factory.WithWebHostBuilder(builder => WithoutSendGridValidation(builder
+        using var app = factory.WithWebHostBuilder(builder => WithoutBrevoValidation(builder
             .UseEnvironment("Production")
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>

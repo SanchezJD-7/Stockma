@@ -10,22 +10,22 @@ using Stockma.Infrastructure.Email;
 
 namespace Stockma.Infrastructure.Tests;
 
-public class SendGridEmailSenderTests
+public class BrevoEmailSenderTests
 {
-    private const string ApiKey = "SG.test-key";
-    private const string TemplateId = "d-11111111111111111111111111111111";
+    private const string ApiKey = "xkeysib-test-key";
+    private const int TemplateId = 27;
     private const string FromEmail = "hola@stockma.app";
     private const string FromName = "Stockma";
     private const string RecipientEmail = "juan@ejemplo.com";
     private const string RecipientName = "Juan Pérez";
-    private const string SendGridMailEndpoint = "https://api.sendgrid.com/v3/mail/send";
+    private const string BrevoMailEndpoint = "https://api.brevo.com/v3/smtp/email";
 
     private sealed class StubHandler : HttpMessageHandler
     {
         private readonly Queue<Func<HttpResponseMessage>> results = new();
-        private readonly List<(Uri Uri, string? Scheme, string? Parameter, string Body)> requests = new();
+        private readonly List<(Uri Uri, string? Authorization, string? ApiKey, string Body)> requests = new();
 
-        public IReadOnlyList<(Uri Uri, string? Scheme, string? Parameter, string Body)> Requests => requests;
+        public IReadOnlyList<(Uri Uri, string? Authorization, string? ApiKey, string Body)> Requests => requests;
 
         public int CallCount => requests.Count;
 
@@ -48,7 +48,7 @@ public class SendGridEmailSenderTests
             requests.Add((
                 request.RequestUri!,
                 request.Headers.Authorization?.Scheme,
-                request.Headers.Authorization?.Parameter,
+                request.Headers.TryGetValues("api-key", out var values) ? values.Single() : null,
                 body));
 
             if (results.Count == 0)
@@ -77,7 +77,7 @@ public class SendGridEmailSenderTests
     private static EmailMessage NewMessage() => new(RecipientEmail, RecipientName);
 
     [Fact]
-    public async Task SendAsync_PostsTheTemplateIdAndTheNameAsDynamicTemplateData()
+    public async Task SendAsync_PostsTheTemplateIdAndTheNameAsParams()
     {
         var handler = new StubHandler();
         handler.RespondWith(HttpStatusCode.Accepted);
@@ -87,34 +87,34 @@ public class SendGridEmailSenderTests
 
         var request = handler.Requests.Should().ContainSingle().Subject;
         request.Uri.Should()
-            .Be(new Uri(SendGridMailEndpoint), "el envío usa la API mail/send de SendGrid");
-        request.Scheme.Should().Be("Bearer", "SendGrid autentica con la API key en el header Authorization");
-        request.Parameter.Should().Be(ApiKey);
+            .Be(new Uri(BrevoMailEndpoint), "el envío usa la API smtp/email de Brevo");
+        request.Authorization.Should()
+            .BeNull("Brevo no autentica con Authorization: Bearer");
+        request.ApiKey.Should()
+            .Be(ApiKey, "Brevo recibe la API key en el header api-key");
 
         using var payload = JsonDocument.Parse(request.Body);
         var root = payload.RootElement;
 
-        root.GetProperty("template_id").GetString()
+        root.GetProperty("templateId").GetInt32()
             .Should()
-            .Be(TemplateId, "el contenido vive en la dynamic template de la cuenta del usuario, no en el backend");
+            .Be(TemplateId, "Brevo espera templateId como número, no como string con prefijo d-");
 
-        var personalization = root.GetProperty("personalization").EnumerateArray().Should().ContainSingle().Subject;
-
-        var to = personalization.GetProperty("to").EnumerateArray().Should().ContainSingle().Subject;
+        var to = root.GetProperty("to").EnumerateArray().Should().ContainSingle().Subject;
         to.GetProperty("email").GetString().Should().Be(RecipientEmail);
         to.GetProperty("name").GetString().Should().Be(RecipientName, "la plantilla recibe el nombre del destinatario");
 
-        var templateData = personalization.GetProperty("dynamic_template_data");
-        templateData.EnumerateObject().Select(property => property.Name)
+        var templateParams = root.GetProperty("params");
+        templateParams.EnumerateObject().Select(property => property.Name)
             .Should()
             .Equal(
                 new[] { "Name" },
-                "la plantilla renderiza {{Name}}: la clave debe ir en PascalCase");
-        templateData.GetProperty("Name").GetString().Should().Be(RecipientName);
+                "la plantilla renderiza {{ params.Name }}: la clave va en params, PascalCase");
+        templateParams.GetProperty("Name").GetString().Should().Be(RecipientName);
 
-        var from = root.GetProperty("from");
-        from.GetProperty("email").GetString().Should().Be(FromEmail);
-        from.GetProperty("name").GetString().Should().Be(FromName);
+        var senderElement = root.GetProperty("sender");
+        senderElement.GetProperty("email").GetString().Should().Be(FromEmail);
+        senderElement.GetProperty("name").GetString().Should().Be(FromName);
     }
 
     [Fact]
@@ -130,37 +130,37 @@ public class SendGridEmailSenderTests
         body.Should()
             .NotContain("html")
             .And.NotContain("subject")
-            .And.NotContain("<p>", "cero HTML en el backend: todo el contenido lo aporta la plantilla de SendGrid");
+            .And.NotContain("<p>", "cero HTML en el backend: todo el contenido lo aporta la plantilla de Brevo");
 
         using var payload = JsonDocument.Parse(body);
         payload.RootElement.EnumerateObject().Select(property => property.Name)
             .Should()
             .Equal(
-                new[] { "personalization", "from", "template_id" },
-                "el payload sólo lleva destinatario, remitente y plantilla");
+                new[] { "sender", "to", "templateId", "params" },
+                "el payload sólo lleva remitente, destinatario, plantilla y parámetros");
     }
 
     [Fact]
-    public async Task SendAsync_WhenSendGridFails_ThrowsADeliveryErrorNotADomainException()
+    public async Task SendAsync_WhenBrevoFails_ThrowsADeliveryErrorNotADomainException()
     {
         var handler = new StubHandler();
         handler.RespondWith(
             HttpStatusCode.InternalServerError,
-            "{\"errors\":[{\"message\":\"temporary failure\"}]}");
+            "{\"code\":\"unavailable\",\"message\":\"temporary failure\"}");
         var sender = CreateSender(handler);
 
         var act = () => sender.SendAsync(NewMessage());
 
         var exception = await act.Should().ThrowAsync<EmailDeliveryException>(
             "un fallo de la API es un error de envío y lo decide el BackgroundService, no el handler");
-        exception.Which.Message.Should().Contain("500", "el detalle explica qué respondió SendGrid");
+        exception.Which.Message.Should().Contain("500", "el detalle explica qué respondió Brevo");
         exception.Which.Should()
             .NotBeAssignableTo<DomainException>(
                 "las excepciones de dominio se mapean a respuestas con errorCode; el envío nunca debe entrar en ese mapeo");
     }
 
     [Fact]
-    public async Task SendAsync_WhenSendGridIsUnreachable_ThrowsADeliveryError()
+    public async Task SendAsync_WhenBrevoIsUnreachable_ThrowsADeliveryError()
     {
         var handler = new StubHandler();
         handler.ThrowWith(new HttpRequestException("sin red"));
@@ -170,15 +170,15 @@ public class SendGridEmailSenderTests
 
         var exception = await act.Should().ThrowAsync<EmailDeliveryException>(
             "un fallo de transporte también es error de envío, no un error de dominio");
-        exception.Which.Message.Should().Contain("SendGrid");
+        exception.Which.Message.Should().Contain("Brevo");
     }
 
     [Theory]
-    [InlineData("", "d-11111111111111111111111111111111", "SendGrid:ApiKey")]
-    [InlineData("SG.test-key", "", "SendGrid:TemplateId")]
+    [InlineData("", 27, "Brevo:ApiKey")]
+    [InlineData("xkeysib-test-key", 0, "Brevo:TemplateId")]
     public async Task SendAsync_WithoutAnEssentialSetting_ThrowsAClearConfigurationError(
         string apiKey,
-        string templateId,
+        int templateId,
         string expectedSetting)
     {
         var handler = new StubHandler();
