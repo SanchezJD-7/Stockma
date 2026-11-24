@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { PrimaryButton } from '../../../../styles/components/buttons'
+import { PrimaryButton } from '../../../../styles/components/buttons.styles'
 import shared from '../../landing.module.css'
 import styles from './WaitlistSection.module.css'
 import { WaitlistBody, WaitlistTitle } from './WaitlistSection.styles'
+import { useOpenWaitlist } from '../WaitlistModalProvider/WaitlistModalProvider'
 
 export function WaitlistSection() {
   const [hidden, setHidden] = useState(false)
+  const { open } = useOpenWaitlist()
 
   useEffect(() => {
     const demoElement = document.getElementById('demo')
@@ -15,9 +17,7 @@ export function WaitlistSection() {
       ([entry]) => {
         setHidden(entry.isIntersecting)
       },
-      {
-        threshold: 0.1,
-      },
+      { threshold: 0.1 },
     )
 
     observer.observe(demoElement)
@@ -38,7 +38,7 @@ export function WaitlistSection() {
             Rellena el formulario y recibe en primicia información de nuestro lanzamiento
           </WaitlistBody>
         </div>
-        <PrimaryButton className={styles.cta} type='button'>
+        <PrimaryButton className={styles.cta} type='button' onClick={open}>
           Unirme a la lista de espera
         </PrimaryButton>
       </div>

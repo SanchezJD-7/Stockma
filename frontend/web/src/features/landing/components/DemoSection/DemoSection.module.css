@@ -1,5 +1,5 @@
 .root {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--color-divider-on-deep);
   background: var(--color-deep);
   color: var(--color-white);
 }
@@ -8,16 +8,16 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 56px 32px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-on-deep);
   border-radius: var(--radius-card);
   background: var(--color-deep-2);
   text-align: center;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--color-shadow-panel);
 }
 
 .title {
   margin: 0 0 16px;
-  font-size: clamp(28px, 4vw, 38px);
+  font-size: var(--fs-display-sm);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--color-white);
@@ -27,9 +27,9 @@
 .body {
   max-width: 600px;
   margin: 0 auto 32px;
-  font-size: 16px;
+  font-size: var(--fs-16);
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--color-text-on-deep-muted);
 }
 
 .actions {
@@ -47,7 +47,7 @@ a.cta {
   border-radius: var(--radius-pill);
   background: var(--brand-teal);
   color: var(--color-white);
-  font-size: 15px;
+  font-size: var(--fs-15);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;

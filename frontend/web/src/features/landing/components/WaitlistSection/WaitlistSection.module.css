@@ -8,7 +8,7 @@
   border-top: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-bg-page) 88%, transparent);
   backdrop-filter: blur(12px);
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--color-shadow-bar);
   animation: slideUp 0.3s ease forwards;
 }
 
@@ -40,7 +40,7 @@ button.cta {
   border-radius: var(--radius-pill);
   background: var(--brand-teal);
   color: var(--color-white);
-  font-size: 15px;
+  font-size: var(--fs-15);
   font-weight: 500;
   white-space: nowrap;
 }

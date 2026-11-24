@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { PrimaryButton } from '../../../../styles/components/buttons'
+import { PrimaryButton } from '../../../../styles/components/buttons.styles'
 import styles from './Hero.module.css'
 import { HeroBody, HeroTitle } from './Hero.styles'
 import { HeroMockTable } from './HeroMockTable'
+import { useOpenWaitlist } from '../WaitlistModalProvider/WaitlistModalProvider'
 
 const ROTATING_TEXTS = [
   'deja las planillas atrás',
@@ -13,6 +14,7 @@ const ROTATING_TEXTS = [
 export function Hero() {
   const [index, setIndex] = useState(0)
   const [fadeState, setFadeState] = useState<'in' | 'out'>('in')
+  const { open } = useOpenWaitlist()
 
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
@@ -49,7 +51,7 @@ export function Hero() {
             vender y hacer crecer tu negocio.
           </HeroBody>
           <div className={styles.actions}>
-            <PrimaryButton className={styles.cta} type='button'>
+            <PrimaryButton className={styles.cta} type='button' onClick={open}>
               Únete a la lista de espera
             </PrimaryButton>
             <a className={styles.cta} href='#how-it-works'>

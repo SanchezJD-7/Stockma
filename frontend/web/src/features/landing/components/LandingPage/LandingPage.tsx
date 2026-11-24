@@ -11,6 +11,7 @@ import { Header } from '../Header/Header'
 import { Hero } from '../Hero/Hero'
 import { HowItWorks } from '../HowItWorks/HowItWorks'
 import { Pricing } from '../Pricing/Pricing'
+import { WaitlistModalProvider } from '../WaitlistModalProvider/WaitlistModalProvider'
 import { WaitlistSection } from '../WaitlistSection/WaitlistSection'
 import { WhoItsFor } from '../WhoItsFor/WhoItsFor'
 
@@ -93,20 +94,22 @@ export function LandingPage() {
   }
 
   return (
-    <div id='landing-page' className={shared.page} onClick={handleInternalNavigation}>
-      <Header />
-      <main>
-        <Hero />
-        <WhoItsFor />
-        <HowItWorks />
-        <Features />
-        <Comparison />
-        <Pricing />
-        <Faq />
-        <DemoSection />
-        <WaitlistSection />
-      </main>
-      <Footer />
-    </div>
+    <WaitlistModalProvider>
+      <div id='landing-page' className={shared.page} onClick={handleInternalNavigation}>
+        <Header />
+        <main>
+          <Hero />
+          <WhoItsFor />
+          <HowItWorks />
+          <Features />
+          <Comparison />
+          <Pricing />
+          <Faq />
+          <DemoSection />
+          <WaitlistSection />
+        </main>
+        <Footer />
+      </div>
+    </WaitlistModalProvider>
   )
 }

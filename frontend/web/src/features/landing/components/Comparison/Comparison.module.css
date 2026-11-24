@@ -38,7 +38,7 @@
 .list li {
   position: relative;
   padding-left: 26px;
-  font-size: 15px;
+  font-size: var(--fs-15);
   color: var(--color-text-secondary);
   list-style: none;
 }
@@ -69,6 +69,6 @@
 
 @media (max-width: 600px) {
   .list li {
-    font-size: 14px;
+    font-size: var(--fs-14);
   }
 }

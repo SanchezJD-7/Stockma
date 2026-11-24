@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { AuthService } from './auth-service'
+import AuthService from './auth-service'
 import { ApiError } from '../shared/http'
 import { json, mockApi, restoreHttp } from '../shared/http.testkit'
 

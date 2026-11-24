@@ -11,7 +11,15 @@ public static class ProblemResponses
 
     public static IActionResult ValidationFailed(ModelStateDictionary modelState)
     {
-        var problem = new ValidationProblemDetails(modelState)
+        var errors = modelState.ToDictionary(
+            entry => NormalizeKey(entry.Key),
+            entry => entry.Value!.Errors
+                .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage)
+                    ? (error.Exception?.Message ?? "Valor inválido.")
+                    : error.ErrorMessage)
+                .ToArray());
+
+        var problem = new ValidationProblemDetails(errors)
         {
             Status = StatusCodes.Status400BadRequest,
             Title = "Solicitud inválida",
@@ -19,6 +27,15 @@ public static class ProblemResponses
         };
 
         return new BadRequestObjectResult(problem) { ContentTypes = { ContentType } };
+    }
+
+    private static string NormalizeKey(string key)
+    {
+        var name = key[(key.LastIndexOf('.') + 1)..];
+
+        return name.Length == 0
+            ? name
+            : char.ToLowerInvariant(name[0]) + name[1..];
     }
 
     public static async ValueTask WriteRateLimitedAsync(HttpContext httpContext, CancellationToken cancellationToken)

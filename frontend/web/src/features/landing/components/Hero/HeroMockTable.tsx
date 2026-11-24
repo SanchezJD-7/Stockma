@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import { MutedText } from '../../../../styles/components/texts'
+import { MutedText } from '../../../../styles/components/texts.styles'
 import styles from './HeroMockTable.module.css'
 
 type InventoryTabId = 'products' | 'lots' | 'expiring'

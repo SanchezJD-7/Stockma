@@ -76,7 +76,7 @@ a.cta {
   background: var(--brand-teal);
   color: var(--color-white);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--fs-16);
   font-weight: 400;
   text-decoration: none;
   cursor: pointer;

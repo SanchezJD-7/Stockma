@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-const components = import.meta.glob<string>(
-  ['../features/**/*.tsx', '!../features/**/*.test.tsx'],
-  { query: '?raw', import: 'default', eager: true },
-)
+const components = import.meta.glob<string>(['../**/*.tsx', '!../**/*.test.tsx'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+})
 
-/**
- * Los componentes de una feature no declaran estilos: solo consumen tokens.
- *
- * Permitido: `className={styles.title}` o `className={`${shared.card} ${styles.plan}`}`,
- * donde `styles` viene de un `*.module.css` del feature.
- * Prohibido: cualquier valor de estilo escrito en el componente (`style`, `sx`, `css`,
- * `styled`) y las clases globales literales (`className='app-landing'`), que escapan
- * al scoping del módulo.
- */
 const forbidden = [
   { name: 'styled', pattern: /@emotion\/styled|\bstyled\s*[.(]/ },
   { name: 'css', pattern: /@emotion\/react|\bcss\s*=\s*\{|\bcss\s*`/ },

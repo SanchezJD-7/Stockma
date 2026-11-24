@@ -1,10 +1,10 @@
 import styled from '@emotion/styled'
-import { MutedText } from '../../../../styles/components/texts'
+import { MutedText } from '../../../../styles/components/texts.styles'
 
 export const SupportText = styled(MutedText)`
   padding: 10px 0;
   border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
+  font-size: var(--fs-14);
   text-align: center;
 
   a {

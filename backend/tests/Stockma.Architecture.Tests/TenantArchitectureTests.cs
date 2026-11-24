@@ -9,6 +9,8 @@ public class TenantArchitectureTests
 {
     private static readonly Type[] IsolationRoots = [typeof(Tenant)];
 
+    private static readonly string[] GlobalEntities = ["WaitlistEntry"];
+
     [Fact]
     public void EveryDomainEntity_MustImplementITenantEntity()
     {
@@ -18,7 +20,7 @@ public class TenantArchitectureTests
             .And()
             .AreClasses()
             .And()
-            .DoNotHaveName(IsolationRoots.Select(type => type.Name).ToArray())
+            .DoNotHaveName(IsolationRoots.Select(type => type.Name).Concat(GlobalEntities).ToArray())
             .Should()
             .ImplementInterface(typeof(ITenantEntity))
             .GetResult();

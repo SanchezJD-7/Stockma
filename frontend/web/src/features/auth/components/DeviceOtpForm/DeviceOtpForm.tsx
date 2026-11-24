@@ -1,9 +1,9 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
-import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { AuthService } from '../../../../services/auth-service'
+import AuthService from '../../../../services/auth-service'
+import { FormAlert } from '../../../../styles/components/FormAlert'
 import {
   ActionRow,
   BackButton,
@@ -92,7 +92,7 @@ export function DeviceOtpForm({
           slotProps={{ htmlInput: { maxLength: 6, inputMode: 'numeric' } }}
           fullWidth
         />
-        {error && <Alert severity='error'>{error}</Alert>}
+        {error && <FormAlert>{error}</FormAlert>}
         {resendAvailableAt !== undefined && (
           <Hint>
             {resendInMs > 0

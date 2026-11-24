@@ -54,7 +54,7 @@ html[data-theme='dark'] .logoDark {
 .navLink {
   padding: 8px 14px;
   border-radius: var(--radius-pill);
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 500;
   color: var(--color-text-secondary);
   text-decoration: none;

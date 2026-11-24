@@ -1,8 +1,11 @@
 import shared from '../../landing.module.css'
-import { PrimaryButton } from '../../../../styles/components/buttons'
+import { PrimaryButton } from '../../../../styles/components/buttons.styles'
 import styles from './DemoSection.module.css'
+import { useOpenWaitlist } from '../WaitlistModalProvider/WaitlistModalProvider'
 
 export function DemoSection() {
+  const { open } = useOpenWaitlist()
+
   return (
     <section id='demo' className={`${shared.section} ${shared.spaced} ${styles.root}`}>
       <div className={shared.wrap}>
@@ -14,7 +17,7 @@ export function DemoSection() {
             lanzamiento.
           </p>
           <div className={styles.actions}>
-            <PrimaryButton className={styles.cta} type='button'>
+            <PrimaryButton className={styles.cta} type='button' onClick={open}>
               Unirme a la lista de espera
             </PrimaryButton>
           </div>

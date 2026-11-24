@@ -1,0 +1,20 @@
+.git
+.github
+.githooks
+.vscode
+.atl
+.specify
+
+# Artefactos de build
+**/bin
+**/obj
+**/dist
+**/node_modules
+**/.tsupgrader
+
+frontend
+ops
+packages
+scripts
+specs
+src

@@ -26,7 +26,7 @@
 }
 
 .headingTitle {
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
 }
 
@@ -36,7 +36,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-tint-green);
   color: var(--status-green);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -55,7 +55,7 @@
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
 }
@@ -101,7 +101,7 @@
   display: block;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--fs-14);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -109,7 +109,7 @@
 .rowDetails span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 
 .quantity,
@@ -119,7 +119,7 @@
 
 .quantity {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--fs-14);
   font-weight: 600;
 }
 
@@ -131,7 +131,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-tint-green);
   color: var(--status-green);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 

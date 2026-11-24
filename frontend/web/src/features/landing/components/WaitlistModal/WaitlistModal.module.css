@@ -1,0 +1,31 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.phoneRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.phonePrefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: var(--color-primary-bg);
+  color: var(--color-text-primary);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.phoneField {
+  flex: 1;
+  min-width: 0;
+}

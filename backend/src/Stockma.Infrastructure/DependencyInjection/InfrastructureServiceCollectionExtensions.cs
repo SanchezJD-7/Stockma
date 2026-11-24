@@ -15,7 +15,10 @@ using Stockma.Infrastructure.Tenants;
 using Stockma.Infrastructure.Products;
 using Stockma.Infrastructure.Tenancy;
 using Stockma.Application.Identity;
+using Stockma.Application.Waitlist;
+using Stockma.Infrastructure.Email;
 using Stockma.Infrastructure.Identity;
+using Stockma.Infrastructure.Waitlist;
 
 namespace Stockma.Infrastructure.DependencyInjection;
 
@@ -42,6 +45,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IBatchRepository, BatchRepository>();
         services.AddScoped<ITenantSettingsProvider, TenantSettingsProvider>();
+        services.AddScoped<IWaitlistRepository, WaitlistRepository>();
+        services.AddSingleton<IEmailQueue, EmailQueue>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ISkuGenerator, SkuGenerator>();
 
@@ -128,6 +133,27 @@ public static class InfrastructureServiceCollectionExtensions
                         : SmsOptions.UnknownProviderMessage);
         });
 
+        return services;
+    }
+
+    public static IServiceCollection AddBrevoEmailSender(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isDevelopment)
+    {
+        services
+            .AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.ApiKey), EmailOptions.MissingApiKeyMessage)
+            .Validate(
+                options => isDevelopment || options.TemplateId > 0, EmailOptions.MissingTemplateIdMessage)
+            .Validate(
+                options => isDevelopment || !string.IsNullOrWhiteSpace(options.FromEmail), EmailOptions.MissingFromEmailMessage)
+            .ValidateOnStart();
+
+        services.AddHttpClient<EmailSender>();
+        services.AddScoped<IEmailSender>(provider => provider.GetRequiredService<EmailSender>());
         return services;
     }
 }

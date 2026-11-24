@@ -6,7 +6,7 @@ import CreditCardRoundedIcon from '@mui/icons-material/CreditCardRounded'
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded'
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { MutedText } from '../../../../styles/components/texts'
+import { MutedText } from '../../../../styles/components/texts.styles'
 import styles from './Features.module.css'
 
 export function Features() {

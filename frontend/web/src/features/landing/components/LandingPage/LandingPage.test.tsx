@@ -159,19 +159,45 @@ describe('LandingPage', () => {
     })
   })
 
-  it('mantiene los CTA de lista de espera habilitados y sin acción en esta versión', () => {
+  it('los 3 CTAs de lista de espera abren el diálogo de registro', () => {
     window.history.replaceState({}, '', '/')
     render(<LandingPage />)
 
-    const callsToAction = [
+    const waitlistCtas = [
       screen.getByRole('button', { name: 'Únete a la lista de espera' }),
-      ...screen.getAllByRole('button', { name: 'Empezar prueba' }),
-      screen.getByRole('button', { name: 'Hablar con ventas' }),
-      screen.getByRole('button', { name: 'Cotizar mi plan' }),
       ...screen.getAllByRole('button', { name: 'Unirme a la lista de espera' }),
     ]
 
-    callsToAction.forEach((button) => {
+    expect(waitlistCtas).toHaveLength(3)
+    waitlistCtas.forEach((cta) => expect(cta.hasAttribute('disabled')).toBe(false))
+
+    waitlistCtas.forEach((cta) => {
+      fireEvent.click(cta)
+
+      const dialog = screen.getByRole('dialog')
+      expect(dialog.getAttribute('aria-modal')).toBe('true')
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    expect(window.location.pathname).toBe('/')
+    expect(window.location.hash).toBe('')
+  })
+
+  it('los CTAs de Pricing siguen sin acción', () => {
+    window.history.replaceState({}, '', '/')
+    render(<LandingPage />)
+
+    const pricingCtas = [
+      ...screen.getAllByRole('button', { name: 'Empezar prueba' }),
+      screen.getByRole('button', { name: 'Hablar con ventas' }),
+      screen.getByRole('button', { name: 'Cotizar mi plan' }),
+    ]
+
+    expect(pricingCtas).toHaveLength(4)
+
+    pricingCtas.forEach((button) => {
       expect(button.hasAttribute('disabled')).toBe(false)
       fireEvent.click(button)
     })

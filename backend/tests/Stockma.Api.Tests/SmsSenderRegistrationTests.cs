@@ -1,16 +1,22 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Stockma.Application.Identity;
 using Stockma.Infrastructure.DependencyInjection;
+using Stockma.Infrastructure.Email;
 using Stockma.Infrastructure.Identity;
 
 namespace Stockma.Api.Tests;
 
 public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixture<StockmaApiFactory>
 {
+    private static IWebHostBuilder WithoutBrevoValidation(IWebHostBuilder builder) =>
+        builder.ConfigureTestServices(services => services.RemoveAll<IValidateOptions<EmailOptions>>());
+
     [Fact]
     public void Development_UsesTheConsoleSender()
     {
@@ -24,7 +30,8 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     [InlineData("Staging")]
     public void OutsideDevelopment_WithoutARealProvider_FailsAtStartup(string environment)
     {
-        using var app = factory.WithWebHostBuilder(builder => builder.UseEnvironment(environment));
+        using var app = factory.WithWebHostBuilder(builder =>
+            WithoutBrevoValidation(builder.UseEnvironment(environment)));
 
         var act = () => app.CreateClient();
 
@@ -38,10 +45,10 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     [InlineData("Staging")]
     public void OutsideDevelopment_WithTheConsoleProvider_FailsAtStartup(string environment)
     {
-        using var app = factory.WithWebHostBuilder(builder => builder
+        using var app = factory.WithWebHostBuilder(builder => WithoutBrevoValidation(builder
             .UseEnvironment(environment)
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Sms:Provider"] = "console" })));
+                new Dictionary<string, string?> { ["Sms:Provider"] = "console" }))));
 
         var act = () => app.CreateClient();
 
@@ -60,7 +67,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
         string sender,
         string missingSetting)
     {
-        using var app = factory.WithWebHostBuilder(builder => builder
+        using var app = factory.WithWebHostBuilder(builder => WithoutBrevoValidation(builder
             .UseEnvironment("Production")
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
@@ -69,7 +76,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
                     ["Sms:AccountSid"] = accountSid,
                     ["Sms:ApiKey"] = apiKey,
                     ["Sms:Sender"] = sender,
-                })));
+                }))));
 
         var act = () => app.CreateClient();
 

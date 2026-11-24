@@ -47,8 +47,12 @@ crea recién cuando la feature tiene algo que poner adentro.
 ```
 src/styles.css                   Hoja raíz: tokens, reset y tipografía del documento
 src/styles/tokens.css            Única fuente de verdad: SÓLO colores y tipografía
-src/styles/components/buttons.tsx  Botones reutilizables
-src/styles/components/texts.tsx    Textos reutilizables
+src/styles/components/buttons.styles.ts  Botones reutilizables
+src/styles/components/texts.styles.ts    Textos reutilizables
+src/styles/components/Modal.tsx          Diálogo reutilizable (foco, Escape, aria)
+src/styles/components/FormAlert.tsx      Aviso de formulario
+src/styles/components/Toaster.tsx        Pinta los avisos globales de notify.*
+src/shared/notify.ts              Store de avisos: notify.error(...) y compañía
 src/styles/theme/mui-bridge.ts     Construye el theme de MUI desde los tokens
 src/styles/theme/branding.ts       Branding por tenant + contraste derivado
 ```
@@ -58,19 +62,31 @@ Reglas:
 - **Ningún color literal fuera de `tokens.css`.** Los componentes leen `var(--...)`.
 - **`tokens.css` sólo lleva colores y tipografía.** Espaciados, radios y sombras van
   en el archivo de estilos del componente que los necesita.
-- **Lo único compartido son botones y textos.** El layout no es un primitivo: cada
-  componente trae su propio CSS al lado.
+- **Los primitivos compartidos son botones, textos, el diálogo y los avisos.** El
+  layout no es un primitivo: cada componente trae su propio CSS al lado.
 - **Los componentes no definen estilos.** Nada de `styled`, `css`, `sx`, `style` ni
-  `className` en un `.tsx` de `features/`: lo que no sale de `src/styles/` va en un
-  archivo `<Componente>.styles.ts` al lado. Lo verifica
-  `src/styles/no-inline-styles.test.ts`, que además prueba sus propias reglas contra
-  ejemplos para que un patrón mal escrito no pase en silencio.
+  `className` en ningún `.tsx` de `src/`: los estilos viven en un archivo aparte al
+  lado (`<Componente>.styles.ts` o `<Componente>.module.css`). Lo verifica
+  `src/styles/no-inline-styles.test.ts`, que revisa todos los `.tsx` y además prueba
+  sus propias reglas contra ejemplos para que un patrón mal escrito no pase en
+  silencio.
 - **No hay un theme con valores propios.** `createMuiBridge()` lee de `:root` los
   tokens ya resueltos. Pasarle `var()` a la paleta de MUI no alcanza: sus
   componentes llaman `alpha()` al renderizar y no pueden parsearlo.
 - El theme es una **foto** de los tokens. Después de cambiar el branding hay que
   reconstruirlo.
 - Tipografía única: **Inter**.
+
+### Avisos
+
+Dos canales, según dónde viva el mensaje:
+
+- **Dentro de un formulario o panel:** `<FormAlert>{mensaje}</FormAlert>`. Una
+  línea, `severity='error'` por defecto y `role="alert"` garantizado.
+- **Desde cualquier lado de la app:** `notify.error('...')` (también `success`,
+  `warning` e `info`). `<Toaster />` ya está montado en `App.tsx`, pila los avisos
+  abajo a la derecha por encima de las modales y los descartan a los 6 segundos o
+  con su botón de cierre.
 
 ### Textos de la interfaz
 

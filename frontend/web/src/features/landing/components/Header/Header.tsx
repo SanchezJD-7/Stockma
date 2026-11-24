@@ -5,7 +5,7 @@ import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined'
 import { useState } from 'react'
 import logoDarkUrl from '../../../../assets/Stockma_horizontal_dark.png'
 import logoUrl from '../../../../assets/Stockma_horizontal.png'
-import { GhostButton } from '../../../../styles/components/buttons'
+import { GhostButton } from '../../../../styles/components/buttons.styles'
 import styles from './Header.module.css'
 
 const navigationLinks = [

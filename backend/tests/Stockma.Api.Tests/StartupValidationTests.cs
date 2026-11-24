@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Stockma.Application.Waitlist;
+using Stockma.Infrastructure.Email;
 using Stockma.Infrastructure.Identity;
 
 namespace Stockma.Api.Tests;
@@ -19,7 +22,11 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
             builder.UseEnvironment(environment);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(settings.ToDictionary(s => s.Key, s => s.Value)));
-            builder.ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>());
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IValidateOptions<SmsOptions>>();
+                services.RemoveAll<IValidateOptions<EmailOptions>>();
+            });
         });
 
     private static void ShouldFailAtStartup(WebApplicationFactory<Program> app, string expected)
@@ -59,6 +66,14 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
         var act = () => app.CreateClient();
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void OutsideDevelopment_WithoutCorsOrigins_FailsAtStartup()
+    {
+        using var app = With("Production", (CorsConfigurationCheck.SectionName + ":0", ""));
+
+        ShouldFailAtStartup(app, "Cors:AllowedOrigins");
     }
 
     [Theory]
@@ -129,5 +144,87 @@ public class StartupValidationTests(StockmaApiFactory factory) : IClassFixture<S
         using var app = With("Development", ("ForwardedHeaders:KnownNetworks:0", network));
 
         ShouldFailAtStartup(app, "ForwardedHeaders:KnownNetworks");
+    }
+
+    [Fact]
+    public void TheBaseAppSettings_CarryNoBrevoSecrets()
+    {
+        var baseSettings = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        var brevo = baseSettings.GetSection("Brevo");
+        brevo.Exists().Should().BeTrue("la sección Brevo está cableada en la configuración base");
+        brevo["ApiKey"].Should()
+            .BeNullOrEmpty("las credenciales van en user-secrets o variables de entorno, nunca en el repositorio");
+        brevo["TemplateId"].Should()
+            .Be("0", "el ID de la plantilla se configura por entorno; 0 significa sin definir");
+        brevo["FromEmail"].Should().BeNullOrEmpty("el remitente se configura por entorno, no se versiona");
+        brevo["FromName"].Should().BeNullOrEmpty("el nombre del remitente se configura por entorno, no se versiona");
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void OutsideDevelopment_AMissingBrevoApiKey_FailsAtStartup(string environment)
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment(environment)
+            .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
+
+        ShouldFailAtStartup(app, "Brevo:ApiKey");
+    }
+
+    [Theory]
+    [InlineData("xkeysib-test", "0", "hola@stockma.app", "Brevo:TemplateId")]
+    [InlineData("xkeysib-test", "27", "", "Brevo:FromEmail")]
+    public void OutsideDevelopment_AMissingBrevoSetting_FailsAtStartup(
+        string apiKey,
+        string templateId,
+        string fromEmail,
+        string expectedSetting)
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment("Production")
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Brevo:ApiKey"] = apiKey,
+                    ["Brevo:TemplateId"] = templateId,
+                    ["Brevo:FromEmail"] = fromEmail,
+                }))
+            .ConfigureTestServices(services => services.RemoveAll<IValidateOptions<SmsOptions>>()));
+
+        ShouldFailAtStartup(app, expectedSetting);
+    }
+
+    [Fact]
+    public void InDevelopment_WithoutBrevoConfiguration_TheApiStarts()
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+
+        var act = () => app.CreateClient();
+
+        act.Should().NotThrow("en Development las credenciales se cargan con user-secrets cuando haga falta");
+    }
+
+    [Fact]
+    public void Development_WithBrevoConfigured_ResolvesTheBrevoEmailSender()
+    {
+        using var app = factory.WithWebHostBuilder(builder => builder
+            .UseEnvironment("Development")
+            .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Brevo:ApiKey"] = "xkeysib-test",
+                    ["Brevo:TemplateId"] = "27",
+                    ["Brevo:FromEmail"] = "hola@stockma.app",
+                })));
+
+        using var scope = app.Services.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IEmailSender>().Should()
+            .BeOfType<EmailSender>("el registro sigue el patrón de AddSmsSender: cliente HttpClient + IEmailSender");
     }
 }

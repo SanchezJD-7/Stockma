@@ -1,6 +1,6 @@
 import logoDarkUrl from '../../../../assets/Stockma_vertical_trim_dark.png'
 import logoUrl from '../../../../assets/Stockma_vertical_trim.png'
-import { MutedText } from '../../../../styles/components/texts'
+import { MutedText } from '../../../../styles/components/texts.styles'
 import styles from './Footer.module.css'
 import { SupportText } from './Footer.styles'
 import WhatsAppIcon from '@mui/icons-material/WhatsApp'

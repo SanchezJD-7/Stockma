@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Stockma.Application.Products.Exceptions;
+using Stockma.Application.Waitlist.Exceptions;
 using Stockma.Domain.Exceptions;
 
 namespace Stockma.Api.Middleware;
 
-public sealed class DomainExceptionMiddleware(RequestDelegate next)
+public sealed class DomainExceptionMiddleware(RequestDelegate next, ILogger<DomainExceptionMiddleware>? logger = null)
 {
     public async Task InvokeAsync(HttpContext httpContext)
     {
@@ -29,6 +31,23 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
                 options: null,
                 contentType: ProblemResponses.ContentType);
         }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "Excepción no dominada al procesar {Path}", httpContext.Request.Path);
+
+            httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+            await httpContext.Response.WriteAsJsonAsync(
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status500InternalServerError,
+                    Title = "Error inesperado",
+                    Detail = "Ocurrió un error procesando la solicitud.",
+                    Extensions = { ["errorCode"] = "INTERNAL_ERROR" },
+                },
+                options: null,
+                contentType: ProblemResponses.ContentType);
+        }
     }
 
     private static int MapStatus(DomainException exception) => exception switch
@@ -39,6 +58,7 @@ public sealed class DomainExceptionMiddleware(RequestDelegate next)
         NegativeStockException => StatusCodes.Status422UnprocessableEntity,
         ConcurrencyConflictException => StatusCodes.Status409Conflict,
         SkuDuplicateException or BarcodeDuplicateException => StatusCodes.Status409Conflict,
+        WaitlistEmailAlreadyRegisteredException => StatusCodes.Status409Conflict,
         SkuImmutableException or ValidationFailedException => StatusCodes.Status400BadRequest,
         ProductNotFoundException
             or BarcodeNotFoundException

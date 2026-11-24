@@ -13,6 +13,7 @@ using Stockma.Api.Middleware;
 using Stockma.Application.Identity;
 using Stockma.Application.DependencyInjection;
 using Stockma.Infrastructure.DependencyInjection;
+using Stockma.Infrastructure.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,10 +90,27 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSmsSender(builder.Configuration, builder.Environment.IsDevelopment());
+builder.Services.AddBrevoEmailSender(builder.Configuration, builder.Environment.IsDevelopment());
+builder.Services.AddHostedService<EmailBackgroundService>();
 
 if (RuntimeDatabaseRoleCheck.AppliesTo(builder.Environment))
 {
     builder.Services.AddHostedService<RuntimeDatabaseRoleCheck>();
+}
+
+var allowedCorsOrigins = CorsConfigurationCheck.AllowedOrigins(builder.Configuration);
+
+builder.Services.AddCors(options =>
+    options.AddPolicy(
+        "Frontend",
+        policy => policy
+            .WithOrigins(allowedCorsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()));
+
+if (CorsConfigurationCheck.AppliesTo(builder.Environment))
+{
+    builder.Services.AddHostedService<CorsConfigurationCheck>();
 }
 
 var app = builder.Build();
@@ -114,6 +132,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseForwardedHeaders();
 
+app.UseCors("Frontend");
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -130,6 +150,11 @@ app.UseMiddleware<TenantMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapGet(
+        "/health",
+        () => Results.Ok(new { status = "healthy", utc = DateTimeOffset.UtcNow }))
+    .AllowAnonymous();
 
 app.Run();
 
