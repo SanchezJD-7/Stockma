@@ -10,17 +10,17 @@ using System.Net.Mail;
 namespace Stockma.Application.Waitlist.Commands;
 
 public sealed record RegisterWaitlistEntryCommand(
-    [param: Required(ErrorMessage = "El nombre completo es obligatorio.")]
-    [param: StringLength(WaitlistRules.MaxNameLength, MinimumLength = WaitlistRules.MinNameLength, ErrorMessage = "El nombre completo debe tener entre 2 y 120 caracteres.")]
+    [param: Required(ErrorMessage = "El nombre completo es obligatorio")]
+    [param: StringLength(WaitlistRules.MaxNameLength, MinimumLength = WaitlistRules.MinNameLength, ErrorMessage = "El nombre completo debe tener entre 2 y 120 caracteres")]
     string FullName,
-    [param: Required(ErrorMessage = "El prefijo del país es obligatorio.")]
-    [param: RegularExpression(@"^\+[0-9]{1,4}$", ErrorMessage = "El prefijo del país no es válido.")]
+    [param: Required(ErrorMessage = "El prefijo del país es obligatorio")]
+    [param: RegularExpression(@"^\+[0-9]{1,4}$", ErrorMessage = "El prefijo del país no es válido")]
     string CountryCode,
-    [param: Required(ErrorMessage = "El teléfono es obligatorio.")]
-    [param: RegularExpression(@"^[0-9\s]{7,20}$", ErrorMessage = "El teléfono debe tener entre 7 y 15 dígitos.")]
+    [param: Required(ErrorMessage = "El teléfono es obligatorio")]
+    [param: RegularExpression(@"^[0-9\s]{7,20}$", ErrorMessage = "El teléfono debe tener entre 7 y 15 dígitos")]
     string Phone,
-    [param: Required(ErrorMessage = "El correo es obligatorio.")]
-    [param: EmailAddress(ErrorMessage = "El correo no tiene un formato válido.")]
+    [param: Required(ErrorMessage = "El correo es obligatorio")]
+    [param: EmailAddress(ErrorMessage = "El correo no tiene un formato válido")]
     string Email) : IRequest<WaitlistEntryDto>;
 
 public sealed class RegisterWaitlistEntryCommandHandler(

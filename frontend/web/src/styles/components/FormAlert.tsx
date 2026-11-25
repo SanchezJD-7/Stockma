@@ -1,5 +1,5 @@
-import Alert from '@mui/material/Alert'
 import type { ReactNode } from 'react'
+import { AlertAccent, AlertSurface } from './FormAlert.styles'
 
 export type AlertSeverity = 'error' | 'warning' | 'info' | 'success'
 
@@ -11,8 +11,9 @@ interface FormAlertProps {
 
 export function FormAlert({ severity = 'error', onClose, children }: FormAlertProps) {
   return (
-    <Alert severity={severity} role='alert' onClose={onClose}>
+    <AlertSurface severity={severity} role='alert' onClose={onClose} variant='filled'>
       {children}
-    </Alert>
+      <AlertAccent aria-hidden='true' />
+    </AlertSurface>
   )
 }

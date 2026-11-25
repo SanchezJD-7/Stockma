@@ -6,4 +6,10 @@ export const SubmitButton = styled(PrimaryButton)`
   height: 44px;
   font-size: var(--fs-16);
   gap: 10px;
+  background: var(--brand-teal);
+  color: var(--color-white);
+
+  &:hover:not(:disabled) {
+    background: var(--brand-teal-active);
+  }
 `

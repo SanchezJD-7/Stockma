@@ -95,7 +95,7 @@ Aplicado:
 - [x] 9.2 `components/WhoItsFor/WhoItsFor.tsx` + `.module.css`: `#audience` con 4 tarjetas (nuevo segmento), grid 4→2 columnas.
 - [x] 9.3 `components/Features/Features.tsx` + `.module.css`: icono `@mui/icons-material` por tarjeta; tag de reportes al pie de la tarjeta; prueba gratuita mencionada en copy.
 - [x] 9.4 `components/Comparison/Comparison.tsx`: copy nuevo, sin intros, 5 bullets por columna.
-- [x] 9.5 `components/Pricing/Pricing.tsx` + `.module.css`: badge de popularidad en el plan destacado; precio con unidad en wrapper propio; hover con elevación.
+- [x] 9.5 `components/Pricing/Pricing.tsx` + `.module.css`: precio con unidad en wrapper propio; hover con elevación.
 - [x] 9.6 `components/DemoSection/DemoSection.tsx` + `.module.css`: rediseño a CTA único de lista de espera (sin badge ni botón deshabilitado).
 - [x] 9.7 `components/WaitlistSection/WaitlistSection.tsx` + `.module.css`: barra `fixed` con `IntersectionObserver` sobre `#demo`; `<aside aria-label>`; animación `slideUp`.
 - [x] 9.8 `components/Footer/Footer.tsx`: iconos MUI WhatsApp/Instagram; corrección de "Escribénos".

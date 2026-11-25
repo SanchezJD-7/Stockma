@@ -1,20 +1,14 @@
 .git
-.github
 .githooks
+.vs
 .vscode
-.atl
-.specify
-
-# Artefactos de build
+.env*
 **/bin
 **/obj
-**/dist
 **/node_modules
-**/.tsupgrader
-
 frontend
-ops
-packages
-scripts
 specs
-src
+packages
+ops
+scripts
+backend/tests

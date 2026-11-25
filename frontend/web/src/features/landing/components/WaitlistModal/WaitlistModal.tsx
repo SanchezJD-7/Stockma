@@ -47,7 +47,13 @@ export function WaitlistModal({ open, onClose, onSuccess }: WaitlistModalProps) 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title='Únete a la lista de espera' closeButton>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title='Únete a la lista de espera'
+      subtitle='Rellena el formulario y recibe en primicia información de nuestro lanzamiento.'
+      closeButton
+    >
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <TextField
           label='Nombre completo'
@@ -61,7 +67,20 @@ export function WaitlistModal({ open, onClose, onSuccess }: WaitlistModalProps) 
           autoComplete='name'
         />
         <div className={styles.phoneRow}>
-          <span className={styles.phonePrefix}>🇨🇴 +57</span>
+          <div className={styles.phonePrefix} aria-label='Indicativo Colombia +57'>
+            <svg
+              width='20'
+              height='14'
+              viewBox='0 0 20 14'
+              aria-hidden='true'
+              className={styles.flagIcon}
+            >
+              <rect width='20' height='7' fill='#FCD116' />
+              <rect y='7' width='20' height='3.5' fill='#003893' />
+              <rect y='10.5' width='20' height='3.5' fill='#CE1126' />
+            </svg>
+            <span>+57</span>
+          </div>
           <TextField
             className={styles.phoneField}
             label='Teléfono'

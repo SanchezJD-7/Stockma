@@ -36,7 +36,7 @@
   --color-tint-green: rgba(46, 125, 50, 0.12);
   --color-tint-yellow: rgba(180, 83, 9, 0.12);
   --color-tint-red: rgba(180, 35, 24, 0.12);
-  --color-backdrop: rgba(15, 23, 42, 0.55);
+  --color-backdrop: rgba(0, 0, 0, 0.55);
   --color-border-on-deep: rgba(255, 255, 255, 0.12);
   --color-divider-on-deep: rgba(255, 255, 255, 0.08);
   --color-text-on-deep-muted: rgba(255, 255, 255, 0.75);
@@ -47,6 +47,7 @@
   --color-shadow-panel: 0 20px 40px rgba(0, 0, 0, 0.3);
   --color-shadow-card-hover: 0 16px 32px rgba(0, 0, 0, 0.18);
   --color-shadow-card-selected: 0 16px 32px rgba(0, 0, 0, 0.15);
+  --color-prefix: rgba(0, 0, 0, 0.42);
 
   --radius-card: 10px;
   --radius-pill: 999px;

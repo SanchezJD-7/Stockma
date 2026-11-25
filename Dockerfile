@@ -24,7 +24,7 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 10000
+USER app
 
-ENTRYPOINT ["dotnet", "Stockma.Api.dll"]
+ENTRYPOINT ["sh", "-c", "exec dotnet Stockma.Api.dll --urls http://0.0.0.0:${PORT:-10000}"]

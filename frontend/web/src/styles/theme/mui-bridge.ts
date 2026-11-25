@@ -79,6 +79,7 @@ export function createMuiBridge(root: HTMLElement = document.documentElement): T
             },
           },
           input: ({ theme }) => ({
+            fontSize: token('--fs-14'),
             '&:-webkit-autofill': {
               boxShadow: `0 0 0 100px ${fieldBg} inset`,
               WebkitTextFillColor: theme.palette.text.primary,
