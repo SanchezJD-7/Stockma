@@ -9,6 +9,8 @@ describe('FormAlert', () => {
     const alert = screen.getByRole('alert')
     expect(alert.textContent).toContain('No pudimos completar el registro')
     expect(alert.classList.contains('MuiAlert-colorError')).toBe(true)
+    expect(alert.classList.contains('MuiAlert-filled')).toBe(true)
+    expect(alert.querySelector('[aria-hidden="true"]')).not.toBeNull()
   })
 
   it('acepta otra severidad y el texto como children', () => {

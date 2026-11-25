@@ -120,6 +120,22 @@ describe('createMuiBridge', () => {
     expect(getComputedStyle(label).fontSize).toBe('14px')
   })
 
+  it('muestra el texto ingresado en los campos con tamaño de 14px', () => {
+    render(
+      <ThemeProvider theme={createMuiBridge()}>
+        <TextField label='Email' variant='filled' />
+      </ThemeProvider>,
+    )
+
+    const input = screen.getByRole('textbox', { name: 'Email' })
+    const emitted = Array.from(document.querySelectorAll('style'))
+      .map((tag) => tag.textContent ?? '')
+      .join('')
+
+    expect(input.classList.contains('MuiFilledInput-input')).toBe(true)
+    expect(emitted).toMatch(/MuiFilledInput-input\{[^}]*font-size:14px/)
+  })
+
   it('pinta las alertas de error con el rojo de Stockma: texto rojo sobre fondo rojo suave', () => {
     render(
       <ThemeProvider theme={createMuiBridge()}>
