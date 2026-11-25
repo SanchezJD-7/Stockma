@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import shared from '../../landing.module.css'
 import { LandingLead, LandingSectionHead, LandingSectionTitle } from '../../landing-texts'
-import { PrimaryButton, SecondaryButton } from '../../../../styles/components/buttons.styles'
+import { SecondaryButton } from '../../../../styles/components/buttons.styles'
 import styles from './Pricing.module.css'
 
 interface PlanCard {
@@ -13,7 +13,6 @@ interface PlanCard {
   features: string[]
   cta: string
   custom?: boolean
-  popular?: boolean
 }
 
 const plans: PlanCard[] = [
@@ -39,7 +38,6 @@ const plans: PlanCard[] = [
       'Reportes para el contador (próximamente)',
     ],
     cta: 'Empezar prueba',
-    popular: true,
   },
   {
     id: 'negocio',
@@ -95,9 +93,7 @@ export function Pricing() {
           {plans.map((plan) => (
             <article
               key={plan.id}
-              className={`${shared.card} ${styles.plan} ${plan.custom ? styles.custom : ''} ${
-                plan.popular ? styles.popular : ''
-              } ${selectedPlanId === plan.id ? 'is-selected' : ''}`}
+              className={`${shared.card} ${styles.plan} ${plan.custom ? styles.custom : ''} ${selectedPlanId === plan.id ? 'is-selected' : ''}`}
               aria-pressed={selectedPlanId === plan.id}
               tabIndex={0}
               onClick={(event) => {
@@ -106,7 +102,6 @@ export function Pricing() {
               }}
               onKeyDown={(event) => handlePlanKeyDown(event, plan.id)}
             >
-              {plan.popular && <span className={styles.badge}>Más popular</span>}
               <h3 className={shared.cardTitle}>{plan.name}</h3>
               <div className={styles.priceWrapper}>
                 <p className={`${styles.price} ${plan.custom ? styles.priceSm : ''}`}>
@@ -120,11 +115,7 @@ export function Pricing() {
                   <li key={feature}>{feature}</li>
                 ))}
               </ul>
-              {plan.popular ? (
-                <PrimaryButton type='button'>{plan.cta}</PrimaryButton>
-              ) : (
-                <SecondaryButton type='button'>{plan.cta}</SecondaryButton>
-              )}
+              <SecondaryButton type='button'>{plan.cta}</SecondaryButton>
             </article>
           ))}
         </div>

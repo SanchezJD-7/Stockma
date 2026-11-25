@@ -169,11 +169,6 @@ Marcar un ítem sólo cuando el comportamiento esté implementado **y** cubierto
       _Spec_: §Planes (último párrafo) · _Tareas_: [SIN TAREA]
       **Verificación**: test de teclado y puntero: la tarjeta activa queda en `is-selected`, `aria-pressed="true"`, y al seleccionar otra se desmarca la anterior.
 
-- [x] **PLAN-07 — Badge de popularidad**
-      La tarjeta destacada DEBE llevar un badge de popularidad definido en los componentes; ninguna otra tarjeta lo lleva.
-      _Spec_: §Planes · _Tareas_: 9.5
-      **Verificación**: revisión de código 2026-11-08: el badge existe sólo en la segunda tarjeta (`popular: true`).
-
 ## Preguntas frecuentes
 
 - [x] **FAQ-01 — Acordeón de preguntas**

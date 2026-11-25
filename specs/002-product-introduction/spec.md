@@ -28,7 +28,7 @@ Crear una pantalla de introducción (landing) en `/` para Stockma, con navegaci�
 - Sección `#features`: 6 tarjetas en grid 3x2, **cada una con icono**; **exactamente una** (reportes) lleva el tag de estado diferido.
 - Barra de lista de espera (`#waitlist`): barra **fija** al pie de la pantalla y de ancho completo, con CTA visible, habilitado y **sin acción** en esta spec; se oculta cuando `#demo` está en pantalla (ver §Lista de espera).
 - Sección `#comparison`: tabla comparativa manual vs producto, 2 columnas.
-- Sección `#pricing`: 4 planes con altura uniforme, con badge de popularidad en el destacado; los 4 botones están visibles, habilitados y **sin acción** en esta spec.
+- Sección `#pricing`: 4 planes con altura uniforme; los 4 botones están visibles, habilitados y **sin acción** en esta spec.
 - Sección `#demo`: tarjeta con **CTA único** de lista de espera visible, habilitado y **sin acción**; sin badge ni botón deshabilitado (ver §Agenda tu demo).
 - Sección `#faq`: acordeón.
 - Footer en tres filas (ver §Diseño). Sin navegación interna.
@@ -116,8 +116,6 @@ Crear una pantalla de introducción (landing) en `/` para Stockma, con navegaci�
   3. Plan intermedio — precio mensual placeholder — descripción y 3 bullets — CTA **secundario**.
   4. Plan a medida — **sin precio numérico**, borde punteado — descripción y 3 bullets — CTA **secundario**.
 - Nombres, precios, descripciones, bullets y labels de botón: en el copy versionado de los componentes.
-- La tarjeta destacada lleva un **badge de popularidad** definido en el copy de los componentes; el precio mensual muestra la unidad separada del monto.
-
 Los 4 botones se muestran habilitados y sin acción asociada en esta spec: no abren una modal ni navegan a otra sección. Las tarjetas de plan además son seleccionables (click/Enter/Espacio marca `is-selected` y `aria-pressed`).
 
 ## Agenda tu demo

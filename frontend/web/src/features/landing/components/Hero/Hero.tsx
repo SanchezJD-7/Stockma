@@ -7,7 +7,7 @@ import { useOpenWaitlist } from '../WaitlistModalProvider/WaitlistModalProvider'
 
 const ROTATING_TEXTS = [
   'deja las planillas atrás',
-  'olvídate de los excel',
+  'olvídate de los excel infinitos',
   'dile adiós a las libretas',
 ]
 

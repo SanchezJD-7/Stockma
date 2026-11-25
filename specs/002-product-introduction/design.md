@@ -125,7 +125,6 @@ export interface Plan {
   bullets: string[];
   featured?: boolean; // CTA primario
   custom?: boolean; // cuarta tarjeta: borde punteado, sin precio numérico
-  popular?: boolean; // badge de popularidad en la tarjeta destacada
 }
 ```
 

@@ -31,10 +31,6 @@
     var(--color-shadow-card-selected);
 }
 
-.popular {
-  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
-}
-
 .badge {
   position: absolute;
   top: -12px;
