@@ -17,9 +17,12 @@ describe('WaitlistSuccessModal', () => {
 
     const title = screen.getByRole('heading', { name: '¡Listo! Ya estás en la lista de espera' })
     expect(dialog.getAttribute('aria-labelledby')).toBe(title.id)
-    expect(
-      screen.getByText('Te avisaremos por correo muy pronto nuestra fecha de lanzamiento'),
-    ).toBeTruthy()
+    const icon = dialog.querySelector('svg[aria-hidden="true"]')
+    const body = screen.getByText(
+      'Te avisaremos por correo muy pronto nuestra fecha de lanzamiento',
+    )
+    expect(title.nextElementSibling).toBe(icon)
+    expect(icon?.nextElementSibling).toBe(body)
 
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(screen.queryByRole('form')).toBeNull()
@@ -31,6 +34,19 @@ describe('WaitlistSuccessModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
 
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('vuelve a montar el icono al reabrir el modal para reiniciar la animación', () => {
+    const { rerender } = render(<WaitlistSuccessModal open onClose={vi.fn()} />)
+    const firstIcon = screen.getByRole('dialog').querySelector('svg[aria-hidden="true"]')
+
+    rerender(<WaitlistSuccessModal open={false} onClose={vi.fn()} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    rerender(<WaitlistSuccessModal open onClose={vi.fn()} />)
+    const reopenedIcon = screen.getByRole('dialog').querySelector('svg[aria-hidden="true"]')
+
+    expect(reopenedIcon).not.toBe(firstIcon)
   })
 
   it('se cierra con Escape', () => {

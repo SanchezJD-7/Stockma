@@ -42,7 +42,7 @@ describe('WaitlistModal', () => {
     expect(screen.getByLabelText('Nombre completo')).toBeTruthy()
     expect(screen.getByLabelText('Teléfono')).toBeTruthy()
     expect(screen.getByLabelText('Correo electrónico')).toBeTruthy()
-    expect(screen.getByText('🇨🇴 +57')).toBeTruthy()
+    expect(screen.getByLabelText('Indicativo Colombia +57')).toBeTruthy()
   })
 
   it('mientras envía muestra spinner, aria-busy, botón y campos deshabilitados, sin doble submit', async () => {
@@ -91,7 +91,7 @@ describe('WaitlistModal', () => {
     mockApi(
       json(400, {
         errorCode: 'VALIDATION_FAILED',
-        errors: { email: ['El correo no tiene un formato válido.'] },
+        errors: { email: ['El correo no tiene un formato válido'] },
       }),
     )
 
@@ -101,7 +101,7 @@ describe('WaitlistModal', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('Revisa los campos marcados')
-    expect(screen.getByText('El correo no tiene un formato válido.')).toBeTruthy()
+    expect(screen.getByText('El correo no tiene un formato válido')).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
