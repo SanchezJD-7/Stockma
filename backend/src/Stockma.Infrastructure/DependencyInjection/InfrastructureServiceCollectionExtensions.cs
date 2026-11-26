@@ -87,9 +87,6 @@ public static class InfrastructureServiceCollectionExtensions
         services
             .AddOptions<SmsOptions>()
             .Bind(configuration.GetSection(SmsOptions.SectionName))
-            .Validate(
-                options => isDevelopment || !string.IsNullOrWhiteSpace(options.Provider),
-                SmsOptions.MissingProviderMessage)
             .Validate(options => isDevelopment || !options.IsConsole, SmsOptions.ConsoleOutsideDevelopmentMessage)
             .Validate(
                 options => string.IsNullOrWhiteSpace(options.Provider) || options.IsConsole || options.IsTwilio,
@@ -125,12 +122,15 @@ public static class InfrastructureServiceCollectionExtensions
                 return provider.GetRequiredService<TwilioSmsSender>();
             }
 
+            if (string.IsNullOrWhiteSpace(options.Provider))
+            {
+                return new DisabledSmsSender();
+            }
+
             throw new InvalidOperationException(
                 options.IsConsole
                     ? SmsOptions.ConsoleOutsideDevelopmentMessage
-                    : string.IsNullOrWhiteSpace(options.Provider)
-                        ? SmsOptions.MissingProviderMessage
-                        : SmsOptions.UnknownProviderMessage);
+                    : SmsOptions.UnknownProviderMessage);
         });
 
         return services;

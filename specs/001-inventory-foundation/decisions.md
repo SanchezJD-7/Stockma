@@ -733,13 +733,22 @@ salvo que se le escriba `RevokedAt` a la fila vieja — y eso es exactamente lo 
 ### Decisión 5 — El sender de consola sólo en `Development` (T077)
 
 `ConsoleSmsSender` se registra **únicamente** si el entorno es `Development`. En cualquier otro, y
-mientras no exista un proveedor real (T049), la API **no arranca**: una validación de opciones con
-`ValidateOnStart()` corta el arranque del host con un mensaje que dice qué falta.
+con `Sms:Provider` vacío, se registra `DisabledSmsSender`: la API **arranca**, y el envío lanza
+`SmsDeliveryException` al invocarse — el mismo camino que un fallo real de Twilio, así que el login
+responde igual y el motivo queda en el log.
 
 Se eligió `ValidateOnStart()` y no tirar la excepción al registrar servicios porque el subcomando
 `bootstrap-admin` (ADR-014) construye el host pero no lo arranca, y **tiene** que poder correr en
 producción. El error seguro es cerrado: nunca se cae en silencio al sender que escribe códigos en el
 log.
+
+**Amendado (noviembre 2026, arranque del waitlist)**: se quitó la validación de `ValidateOnStart()`
+que cortaba el arranque sin proveedor. Motivo: el 2FA por SMS todavía no se usa, y Twilio en Colombia
+no sale gratis — Colombia no soporta *alphanumeric sender ID* y una cuenta trial no puede usarlo de
+todos modos, así que bloquear el arranque obligaba a comprar un número para un feature sin usuarios.
+Lo que **sigue** valiendo: `console` fuera de `Development` sigue cortando el arranque (log = código en
+texto claro), y `Sms:Provider = twilio` con credenciales incompletas también. Habilitar el 2FA es
+cargar `Sms { AccountSid, ApiKey, Sender }` en el entorno, sin tocar código.
 
 ### Decisión 6 — Forwarded headers con proxies explícitos (T078)
 
@@ -780,8 +789,10 @@ como `application/problem+json`.
 
 ### Qué la devolvería a discusión
 
-- **Un proveedor de SMS real (T049)**: la validación de arranque pasa a exigir su configuración en
-  vez de fallar siempre fuera de `Development`.
+- **Volver a exigir el proveedor de SMS en el arranque**: hoy `Sms:Provider` vacío arranca igual y
+  registra `DisabledSmsSender`, que lanza `SmsDeliveryException` al invocarse — el mismo camino que un
+  fallo real de Twilio. Si conviene bloquear el arranque en vez de fallar en el primer login, hay que
+  revertirlo.
 - **Varias instancias de la API detrás de un balanceador**: el lock ya es de la base, así que sigue
   valiendo; el rate limit por IP es en memoria y **no** — cada instancia tendría su propia cuota.
 - **Un `deviceId` generado por el servidor** (cookie firmada): la regla de entropía pasaría a ser una
@@ -877,9 +888,9 @@ era un nombre de entorno que apagaba un control de seguridad; se quitó (T084).
 `bootstrap-admin` corre **los mismos** chequeos antes de hacer nada: la validación de opciones
 (`IStartupValidator`, lo que dispara `ValidateOnStart`) y `RuntimeDatabaseRole.EnsureRestrictedAsync`
 con la misma excepción de `Development`. Si fallan, sale con código `1` y el motivo en `stderr`
-(T085). Consecuencia aceptada: fuera de `Development`, sin proveedor de SMS (T049) el subcomando
-tampoco corre, igual que la API. Un admin creado así no podría loguearse de todos modos: el login
-exige OTP por SMS.
+(T085). Consecuencia aceptada: con `Sms:Provider` vacío el subcomando corre igual que la API, pero un
+admin creado así no podría loguearse desde un dispositivo nuevo: el login exige OTP por SMS y el envío
+falla con `DisabledSmsSender`.
 
 ### Decisión 5 — `confirm-device` es una sola unidad (T080)
 
@@ -1128,7 +1139,7 @@ inactividad y access token de 15 min.
 | Tema | Estado |
 |---|---|
 | Alta de tenants | Sin tarea. Hoy el seed es un `INSERT` manual: no se puede dar de alta una droguería sin tocar la base |
-| Proveedor de SMS | **Elegido: Twilio** (T049, cerrado). La API no arranca fuera de `Development` sin `Sms { AccountSid, ApiKey, Sender }` (ADR-016) |
+| Proveedor de SMS | **Elegido: Twilio** (T049, cerrado), pero **sin configurar**: la API arranca con `Sms:Provider` vacío y registra `DisabledSmsSender`. Habilitar el 2FA es cargar `Sms { AccountSid, ApiKey, Sender }` (ADR-016, decisión 5, amendada) |
 | Rate limit con varias instancias | Es en memoria por instancia; con más de una réplica cada una tiene su propia cuota (ADR-016). Sigue abierto tras la segunda revisión de 3b |
 | Password spraying | Una contraseña errada no incrementa `AccessFailedCount`; el único freno es el rate limit por IP. El lockout por intentos queda en los criterios de T068 |
 | Tiempo de `confirm-device` | Un email con OTP vigente cuesta un PBKDF2 y uno inexistente o bloqueado no: unos milisegundos de diferencia. Sólo distingue cuentas en las que alguien acaba de acertar la contraseña (ADR-016) |

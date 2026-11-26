@@ -10,10 +10,9 @@ public sealed class SmsOptions
     public const int MaximumRetryCount = 5;
     public const int MaximumRetryDelayMs = 10000;
 
-    public const string MissingProviderMessage =
-        "No hay proveedor de SMS configurado para este entorno. El sender de consola sólo corre en Development "
-        + "porque escribe el código y el celular en el log; conecta un proveedor real (T049) antes de levantar "
-        + "la API fuera de Development.";
+    public const string NotConfiguredMessage =
+        "SMS no configurado: Sms:Provider está vacío, así que el código no se envía a ningún lado. "
+        + "Configurá Sms:Provider = 'twilio' con Sms:AccountSid, Sms:ApiKey y Sms:Sender para habilitar el 2FA por SMS.";
 
     public const string ConsoleOutsideDevelopmentMessage =
         "Sms:Provider 'console' sólo corre en Development: fuera de ese entorno el código se escribiría en el log "

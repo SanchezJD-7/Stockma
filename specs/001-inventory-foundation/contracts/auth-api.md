@@ -213,9 +213,12 @@ El sistema genera un OTP (hash con `IPasswordHasher`, expira en ≤ 10 min, pers
 > **Usuario sin `PhoneNumber` cargado**: el acceso DEBE bloquearse con `403 AUTH_PHONE_NOT_ENROLLED`, indicando que un admin del tenant debe cargar el número. NO DEBE permitirse el ingreso salteando el 2FA ni ofrecerle al usuario enrolar el suyo (T050, T061).
 
 > **Proveedor y fallo de envío (T049)**: el canal real es **Twilio** (`Sms:Provider = "twilio"`, con
-> `Sms { AccountSid, ApiKey, Sender }`). Fuera de `Development` la API **no arranca** sin proveedor y
-> credenciales completas (ADR-016, T077); en `Development` se registra el sender de consola salvo que
-> `Sms:Provider` esté cargado, y entonces también se mandan SMS reales.
+> `Sms { AccountSid, ApiKey, Sender }`). Con `Sms:Provider` vacío la API **arranca** y registra
+> `DisabledSmsSender`, que lanza `SmsDeliveryException` al invocarse — mismo camino que un fallo real de
+> Twilio, así que el contrato de esta tabla no cambia: el login responde igual y el motivo queda en el
+> log (ADR-016, decisión 5, amendada). Con `Sms:Provider = "twilio"` y credenciales incompletas la API
+> **no arranca**. En `Development` se registra el sender de consola salvo que `Sms:Provider` esté
+> cargado, y entonces también se mandan SMS reales.
 >
 > El envío se reintenta hasta `Sms:RetryCount` veces (def. `2`) con backoff, sólo ante errores
 > transitorios (`429`, `408`, `5xx` o timeout). Un `4xx` de Twilio —número inválido, cuenta sin
