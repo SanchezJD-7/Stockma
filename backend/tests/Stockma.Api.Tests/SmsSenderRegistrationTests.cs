@@ -28,16 +28,17 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     [Theory]
     [InlineData("Production")]
     [InlineData("Staging")]
-    public void OutsideDevelopment_WithoutARealProvider_FailsAtStartup(string environment)
+    public void OutsideDevelopment_WithoutAProvider_StartsWithADisabledSender(string environment)
     {
         using var app = factory.WithWebHostBuilder(builder =>
             WithoutBrevoValidation(builder.UseEnvironment(environment)));
 
-        var act = () => app.CreateClient();
+        using var client = app.CreateClient();
 
-        act.Should()
-            .Throw<Exception>("ADR-016: fuera de Development nunca se cae en silencio al sender que loguea códigos")
-            .Which.ToString().Should().Contain("proveedor de SMS");
+        using var scope = app.Services.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<ISmsSender>().Should().BeOfType<DisabledSmsSender>(
+            "el waitlist no necesita SMS: la API arranca sin proveedor y el 2FA se habilita después con Twilio");
     }
 
     [Theory]
@@ -106,7 +107,7 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public void OutsideDevelopment_WithoutAProvider_NeverFallsBackToTheConsoleSender()
+    public async Task OutsideDevelopment_WithoutAProvider_NeverFallsBackToTheConsoleSender()
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -114,12 +115,15 @@ public class SmsSenderRegistrationTests(StockmaApiFactory factory) : IClassFixtu
 
         using var provider = services.BuildServiceProvider();
 
-        var act = () => provider.GetRequiredService<ISmsSender>();
+        var sender = provider.GetRequiredService<ISmsSender>();
 
-        var exception = act.Should()
-            .Throw<OptionsValidationException>(
-                "ADR-016: fuera de Development no hay sender de consola que rescatar: falla, no loguea el código");
+        sender.Should().BeOfType<DisabledSmsSender>(
+            "ADR-016: fuera de Development no hay sender de consola que rescatar: el envío falla, no se loguea el código");
 
-        exception.Which.Failures.Should().Contain(failure => failure.Contains("proveedor de SMS"));
+        var act = () => sender.SendAsync("+573043335365", "123456", CancellationToken.None);
+
+        await act.Should().ThrowAsync<SmsDeliveryException>()
+            .WithMessage("*Sms:Provider*",
+                "sin proveedor el envío falla igual que si Twilio respondiera un error: el login responde igual y el motivo queda en el log");
     }
 }
