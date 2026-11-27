@@ -1,4 +1,4 @@
-import axios, { type AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import { useAuthStore } from '../features/auth/store/auth-store'
 
 export const api = axios
@@ -21,15 +21,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => Promise.reject(toApiError(error)),
 )
-
-export function readAccessToken(): string | null {
-  return useAuthStore.getState().session?.accessToken ?? null
-}
-
-export function authConfig(): AxiosRequestConfig {
-  const token = readAccessToken()
-  return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-}
 
 export class ApiError extends Error {
   status: number

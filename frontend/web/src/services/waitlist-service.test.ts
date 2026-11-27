@@ -75,7 +75,7 @@ describe('WaitlistService.register', () => {
     expect((error as ApiError).errorCode).toBe('VALIDATION_FAILED')
   })
 
-  it('envía Authorization: Bearer con el token vigente vía authConfig()', async () => {
+  it('envía Authorization: Bearer con el token vigente mediante el interceptor compartido', async () => {
     useAuthStore.getState().setSession('token-vigente', 3600)
     const requests = mockApi(json(201, { id: 'x', email: 'a@b.com' }))
 

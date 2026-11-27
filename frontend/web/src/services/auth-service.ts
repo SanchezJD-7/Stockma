@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { config } from '../config'
-import { authConfig } from '../shared/http'
+import '../shared/http'
 
 export interface LoginRequest {
   email: string
@@ -45,7 +45,6 @@ class AuthService {
     const { data } = await axios.post<LoginResponseBody>(
       `${config.API_URL}/api/auth/login`,
       request,
-      authConfig(),
     )
 
     if (data.requiresDeviceConfirmation) {
@@ -65,24 +64,19 @@ class AuthService {
     const { data } = await axios.post<ConfirmDeviceResult>(
       `${config.API_URL}/api/auth/confirm-device`,
       request,
-      authConfig(),
     )
 
     return data
   }
 
   async refresh(request: RefreshRequest): Promise<RefreshResult> {
-    const { data } = await axios.post<RefreshResult>(
-      `${config.API_URL}/api/auth/refresh`,
-      request,
-      authConfig(),
-    )
+    const { data } = await axios.post<RefreshResult>(`${config.API_URL}/api/auth/refresh`, request)
 
     return data
   }
 
   async logout(): Promise<void> {
-    await axios.post(`${config.API_URL}/api/auth/logout`, undefined, authConfig())
+    await axios.post(`${config.API_URL}/api/auth/logout`)
   }
 }
 
