@@ -62,21 +62,11 @@ public sealed class DeviceOtpService : IDeviceOtpService
 
         if (outcome.Delivery is null) return;
 
-        try
-        {
-            await smsSender.SendAsync(
-                outcome.Delivery.Value.PhoneNumber,
-                $"Tu código de acceso a Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
-                cancellationToken);
-        }
-        catch (SmsDeliveryException exception)
-        {
-            logger.LogError(
-                exception,
-                "Falló el envío del SMS de OTP para el usuario {UserId}: {Reason}",
-                userId,
-                exception.Message);
-        }
+        await SendOtpAsync(
+            userId,
+            outcome.Delivery.Value,
+            "de acceso",
+            cancellationToken);
     }
 
     public async Task<PhoneChangeIssueResult> IssuePhoneNumberChangeAsync(Guid userId, string newPhoneNumber, CancellationToken cancellationToken = default)
@@ -97,21 +87,11 @@ public sealed class DeviceOtpService : IDeviceOtpService
             return new PhoneChangeIssueResult(PhoneChangeIssueStatus.RateLimited);
         }
 
-        try
-        {
-            await smsSender.SendAsync(
-                outcome.Delivery.Value.PhoneNumber,
-                $"Tu código para confirmar el cambio de número en Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
-                cancellationToken);
-        }
-        catch (SmsDeliveryException exception)
-        {
-            logger.LogError(
-                exception,
-                "Falló el envío del SMS de OTP de cambio de número para el usuario {UserId}: {Reason}",
-                userId,
-                exception.Message);
-        }
+        await SendOtpAsync(
+            userId,
+            outcome.Delivery.Value,
+            "de cambio de número",
+            cancellationToken);
 
         return new PhoneChangeIssueResult(PhoneChangeIssueStatus.Issued);
     }
@@ -126,18 +106,37 @@ public sealed class DeviceOtpService : IDeviceOtpService
 
         if (outcome.Delivery is null) return;
 
+        await SendOtpAsync(
+            userId,
+            outcome.Delivery.Value,
+            "de restablecimiento de contraseña",
+            cancellationToken);
+    }
+
+    private async Task SendOtpAsync(
+        Guid userId,
+        (string PhoneNumber, string Code) delivery,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        var message = purpose switch
+        {
+            "de acceso" => $"Tu código de acceso a Stockma es {delivery.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+            "de cambio de número" => $"Tu código para confirmar el cambio de número en Stockma es {delivery.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+            "de restablecimiento de contraseña" => $"Tu código para restablecer tu contraseña en Stockma es {delivery.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, "Propósito de OTP no reconocido."),
+        };
+
         try
         {
-            await smsSender.SendAsync(
-                outcome.Delivery.Value.PhoneNumber,
-                $"Tu código para restablecer tu contraseña en Stockma es {outcome.Delivery.Value.Code}. Vence en {Lifetime.TotalMinutes:0} minutos.",
-                cancellationToken);
+            await smsSender.SendAsync(delivery.PhoneNumber, message, cancellationToken);
         }
         catch (SmsDeliveryException exception)
         {
             logger.LogError(
                 exception,
-                "Falló el envío del SMS de restablecimiento de contraseña para el usuario {UserId}: {Reason}",
+                "Falló el envío del SMS de OTP {Purpose} para el usuario {UserId}: {Reason}",
+                purpose,
                 userId,
                 exception.Message);
         }

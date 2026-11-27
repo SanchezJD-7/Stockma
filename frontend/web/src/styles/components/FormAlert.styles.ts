@@ -6,6 +6,7 @@ export const AlertSurface = styled(Alert)`
   overflow: hidden;
   border-radius: 8px;
   box-shadow: var(--color-shadow-sm);
+  font-size: var(--fs-12);
 
   &.MuiAlert-colorSuccess {
     --alert-background: var(--color-tint-green);
