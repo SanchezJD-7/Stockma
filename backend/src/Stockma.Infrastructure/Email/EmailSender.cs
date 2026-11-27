@@ -74,13 +74,22 @@ public sealed class EmailSender : IEmailSender
                 To = [new BrevoRecipient { Email = message.ToEmail, Name = message.ToName }],
                 Sender = new BrevoRecipient { Email = options.FromEmail, Name = options.FromName },
                 TemplateId = options.TemplateId,
-                Params = new Dictionary<string, string> { ["Name"] = message.ToName },
+                Params = new Dictionary<string, string> { ["Name"] = FirstName(message.ToName) },
             }),
         };
 
         request.Headers.Add(ApiKeyHeaderName, options.ApiKey);
 
         return request;
+    }
+
+    private static string FirstName(string fullName)
+    {
+        var parts = fullName.Split(
+            (char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return parts.Length > 0 ? parts[0] : fullName.Trim();
     }
 
     private static string Describe(HttpStatusCode statusCode, string body)

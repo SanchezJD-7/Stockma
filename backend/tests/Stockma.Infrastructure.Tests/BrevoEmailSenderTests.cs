@@ -110,11 +110,41 @@ public class BrevoEmailSenderTests
             .Equal(
                 new[] { "Name" },
                 "la plantilla renderiza {{ params.Name }}: la clave va en params, PascalCase");
-        templateParams.GetProperty("Name").GetString().Should().Be(RecipientName);
+        templateParams.GetProperty("Name").GetString().Should()
+            .Be(
+                "Juan",
+                "el saludo de la plantilla recibe sólo el primer nombre; el nombre completo va en to[].name");
 
         var senderElement = root.GetProperty("sender");
         senderElement.GetProperty("email").GetString().Should().Be(FromEmail);
         senderElement.GetProperty("name").GetString().Should().Be(FromName);
+    }
+
+    [Theory]
+    [InlineData("Juan", "Juan")]
+    [InlineData("Juan Diego Sánchez", "Juan")]
+    [InlineData("  Juan   Diego  ", "Juan")]
+    [InlineData("María", "María")]
+    public async Task SendAsync_SendsOnlyTheFirstNameAsTemplateParam(
+        string fullName,
+        string expectedFirstName)
+    {
+        var handler = new StubHandler();
+        handler.RespondWith(HttpStatusCode.Accepted);
+        var sender = CreateSender(handler);
+
+        await sender.SendAsync(new EmailMessage(RecipientEmail, fullName));
+
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        var root = payload.RootElement;
+
+        root.GetProperty("params").GetProperty("Name").GetString().Should()
+            .Be(expectedFirstName, "el saludo de la plantilla debe mostrar sólo el primer nombre");
+
+        root.GetProperty("to").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("name").GetString()
+            .Should()
+            .Be(fullName, "el destinatario del correo conserva el nombre completo");
     }
 
     [Fact]
