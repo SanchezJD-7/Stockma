@@ -15,7 +15,8 @@ const faqItems = [
   },
   {
     question: '¿Puedo usar un lector de códigos de barras?',
-    answer: 'Sí. Se conecta como un teclado y el producto aparece apenas pasa el código.',
+    answer:
+      'Sí. Si ya tienes un lector, puedes conectarlo a tu computadora y trabajar con él en Stockma; de lo contrario, con tu celular puedes escanear códigos de barras y QR sin ningún problema.',
   },
   {
     question: '¿Qué pasa si dos personas editan el mismo lote?',

@@ -13,6 +13,10 @@ const base = `
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  user-select: none;
   transition:
     background-color 120ms ease,
     color 120ms ease,

@@ -50,8 +50,8 @@ export function Features() {
             </div>
             <h3 className={shared.cardTitle}>Lectura rápida con código de barras</h3>
             <MutedText>
-              Pasa el lector y el producto aparece al instante. Si un artículo no tiene código,
-              Stockma te ayuda a crearlo y asignarlo sin enredos.
+              Lee códigos de barras y QR desde tu cámara o lector al instante. Si el producto no
+              tiene código, créalo y asígnalo en Stockma sin enredos
             </MutedText>
           </article>
 
