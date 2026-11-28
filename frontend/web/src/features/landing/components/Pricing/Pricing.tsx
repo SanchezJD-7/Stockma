@@ -34,7 +34,7 @@ const plans: PlanCard[] = [
     features: [
       'Todo lo del Básico',
       'Hasta 5 usuarios',
-      'Lector de códigos de barras',
+      'Lector de códigos de barras desde tu celular',
       'Reportes para el contador (próximamente)',
     ],
     cta: 'Empezar prueba',

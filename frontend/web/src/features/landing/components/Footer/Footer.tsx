@@ -16,7 +16,7 @@ export function Footer() {
           <div className={styles.social}>
             <a
               className={styles.socialLink}
-              href='https://w.app/stockmaapp'
+              href='https://wa.me/573043335365?text=Bienvenido%20a%20la%20linea%20de%20soporte%20de%20Stockma.%20En%20que%20puedo%20ayudarte%20hoy%3F'
               target='_blank'
               rel='noreferrer'
               aria-label='WhatsApp de Stockma'
@@ -36,7 +36,11 @@ export function Footer() {
         </div>
         <SupportText>
           Atención, preguntas frecuentes y soporte:{' '}
-          <a href='https://w.app/stockmaapp' target='_blank' rel='noreferrer'>
+          <a
+            href='https://wa.me/573043335365?text=Bienvenido%20a%20la%20linea%20de%20soporte%20de%20Stockma.%20En%20que%20puedo%20ayudarte%20hoy%3F'
+            target='_blank'
+            rel='noreferrer'
+          >
             Escríbenos al WhatsApp
           </a>
         </SupportText>

@@ -5,6 +5,9 @@
 }
 
 .plan {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -21,6 +24,11 @@
   transform: translateY(-6px);
   box-shadow: var(--color-shadow-card-hover), var(--color-shadow-lg);
   border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+}
+
+.plan:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 
 .plan[aria-pressed='true'] {

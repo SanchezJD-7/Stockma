@@ -19,6 +19,19 @@ optgroup {
   font-family: inherit;
 }
 
+button,
+a,
+[tabindex] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button,
+article[tabindex],
+a {
+  -webkit-touch-callout: none;
+}
+
 body {
   margin: 0;
   font-size: var(--fs-14);
